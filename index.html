@@ -153,6 +153,15 @@
       box-shadow: 0 4px 16px rgba(250, 204, 21, 0.4);
     }
     button.school:hover:not(:disabled) { box-shadow: 0 6px 22px rgba(250, 204, 21, 0.55); }
+    button.school.ready {
+      font-size: 1.15rem;
+      padding: 16px 32px;
+      animation: schoolPulse 1.1s ease-in-out infinite;
+    }
+    @keyframes schoolPulse {
+      0%, 100% { transform: scale(1); box-shadow: 0 4px 16px rgba(250, 204, 21, 0.45); }
+      50% { transform: scale(1.08); box-shadow: 0 8px 32px rgba(250, 204, 21, 0.85); }
+    }
     .canvas-wrap {
       position: relative;
       padding: 10px;
@@ -275,7 +284,7 @@
         <input id="speed" type="number" value="80" min="20" max="500">
       </div>
     </div>
-    <div class="hint">Use the arrow keys, WASD, or the on-screen D-pad to swim. On mobile you can also touch and hold anywhere on the water to swim toward that spot. Avoid the sharks.</div>
+    <div class="hint">Use the arrow keys, WASD, or the on-screen D-pad to swim. On mobile you can also touch and hold anywhere on the water; the dolphin swims in that direction relative to the centre of the screen, and wraps around the edges. Avoid the sharks.</div>
     <div class="controls">
       <button id="startBtn" onclick="start()">Start</button>
       <button class="secondary" onclick="reset()">Reset</button>
@@ -332,8 +341,8 @@
     let shrimpSpawned = false;
     let schoolMode = false;
     let pointerActive = false;
-    let pointerGridX = 0;
-    let pointerGridY = 0;
+    let pointerDirX = 0;
+    let pointerDirY = 0;
     let envCanvas = null;
     let envCtx = null;
     let imgData = null;
@@ -507,6 +516,7 @@
       shrimpSpawned = false;
       schoolMode = false;
       document.getElementById('schoolBtn').textContent = 'School (needs 5 dolphins)';
+      document.getElementById('schoolBtn').classList.remove('ready');
       updateStats();
       draw();
       return true;
@@ -522,8 +532,10 @@
     function toggleSchool() {
       if (dolphins.length < 5 || schoolMode || !running) return;
       schoolMode = true;
-      document.getElementById('schoolBtn').disabled = true;
-      document.getElementById('schoolBtn').textContent = 'Schooling!';
+      const schoolBtn = document.getElementById('schoolBtn');
+      schoolBtn.disabled = true;
+      schoolBtn.classList.remove('ready');
+      schoolBtn.textContent = 'Schooling!';
       document.getElementById('statStatus').textContent = 'Schooling! Ram the sharks';
     }
 
@@ -544,6 +556,7 @@
       document.getElementById('statStatus').textContent = 'You win! All sharks defeated';
       document.getElementById('startBtn').textContent = 'Restart';
       document.getElementById('schoolBtn').disabled = true;
+      document.getElementById('schoolBtn').classList.remove('ready');
     }
 
     function movePlayer() {
@@ -554,11 +567,9 @@
       let dy = 0;
 
       if (pointerActive) {
-        const deadZone = 3;
-        const diffX = pointerGridX - player._x;
-        const diffY = pointerGridY - player._y;
-        if (Math.abs(diffX) > deadZone) dx = Math.sign(diffX);
-        if (Math.abs(diffY) > deadZone) dy = Math.sign(diffY);
+        const deadZone = 0.08;
+        if (Math.abs(pointerDirX) > deadZone) dx = Math.sign(pointerDirX);
+        if (Math.abs(pointerDirY) > deadZone) dy = Math.sign(pointerDirY);
       } else {
         if (keys['ArrowUp'] || keys['w'] || keys['W']) dy = -1;
         if (keys['ArrowDown'] || keys['s'] || keys['S']) dy = 1;
@@ -716,6 +727,7 @@
       document.getElementById('statStatus').textContent = 'Eaten by a shark';
       document.getElementById('startBtn').textContent = 'Restart';
       document.getElementById('schoolBtn').disabled = true;
+      document.getElementById('schoolBtn').classList.remove('ready');
     }
 
     function reset() {
@@ -738,8 +750,10 @@
 
       const schoolBtn = document.getElementById('schoolBtn');
       if (!schoolMode) {
-        schoolBtn.disabled = dolphins.length < 5 || !running;
-        schoolBtn.textContent = dolphins.length < 5 ? 'School (needs 5 dolphins)' : 'School';
+        const isReady = dolphins.length >= 5 && running;
+        schoolBtn.disabled = !isReady;
+        schoolBtn.textContent = dolphins.length < 5 ? 'School (needs 5 dolphins)' : 'School the pod!';
+        schoolBtn.classList.toggle('ready', isReady);
       }
     }
 
@@ -901,20 +915,10 @@
       btn.addEventListener('mouseleave', release);
     });
 
-    function canvasPointToGrid(clientX, clientY) {
+    function updatePointerDirection(clientX, clientY) {
       const rect = canvas.getBoundingClientRect();
-      const relX = (clientX - rect.left) / rect.width;
-      const relY = (clientY - rect.top) / rect.height;
-      return {
-        x: Math.min(SIZE, Math.max(0, relX * SIZE)),
-        y: Math.min(SIZE, Math.max(0, relY * SIZE))
-      };
-    }
-
-    function updatePointerTarget(clientX, clientY) {
-      const point = canvasPointToGrid(clientX, clientY);
-      pointerGridX = point.x;
-      pointerGridY = point.y;
+      pointerDirX = (clientX - rect.left) / rect.width - 0.5;
+      pointerDirY = (clientY - rect.top) / rect.height - 0.5;
     }
 
     canvas.addEventListener('touchstart', e => {
@@ -922,14 +926,14 @@
       const touch = e.touches[0];
       if (!touch) return;
       pointerActive = true;
-      updatePointerTarget(touch.clientX, touch.clientY);
+      updatePointerDirection(touch.clientX, touch.clientY);
     }, { passive: false });
 
     canvas.addEventListener('touchmove', e => {
       e.preventDefault();
       const touch = e.touches[0];
       if (!touch) return;
-      updatePointerTarget(touch.clientX, touch.clientY);
+      updatePointerDirection(touch.clientX, touch.clientY);
     }, { passive: false });
 
     canvas.addEventListener('touchend', e => { e.preventDefault(); pointerActive = false; }, { passive: false });
@@ -937,10 +941,10 @@
 
     canvas.addEventListener('mousedown', e => {
       pointerActive = true;
-      updatePointerTarget(e.clientX, e.clientY);
+      updatePointerDirection(e.clientX, e.clientY);
     });
     canvas.addEventListener('mousemove', e => {
-      if (pointerActive) updatePointerTarget(e.clientX, e.clientY);
+      if (pointerActive) updatePointerDirection(e.clientX, e.clientY);
     });
     window.addEventListener('mouseup', () => { pointerActive = false; });
 
