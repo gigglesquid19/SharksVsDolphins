@@ -188,6 +188,33 @@
       bottom: 24px;
       right: 24px;
     }
+    .canvas-wrap:fullscreen .stats {
+      display: none;
+    }
+    .canvas-wrap:fullscreen {
+      padding: 0;
+    }
+    .game-controls {
+      margin-top: 0;
+      margin-bottom: 12px;
+      gap: 8px;
+    }
+    .game-controls button {
+      padding: 8px 14px;
+      font-size: 0.82rem;
+    }
+    .canvas-wrap:fullscreen .game-controls {
+      position: fixed;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      margin: 0;
+      z-index: 5;
+      background: rgba(2, 6, 23, 0.55);
+      backdrop-filter: blur(8px);
+      padding: 8px 10px;
+      border-radius: 999px;
+    }
     canvas {
       display: block;
       width: 100%;
@@ -226,9 +253,15 @@
     .dpad-down { grid-column: 2; grid-row: 3; }
     .stats {
       display: grid;
-      grid-template-columns: repeat(6, 1fr);
+      grid-template-columns: 1fr;
       gap: 12px;
       margin-top: 14px;
+      max-width: 200px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .stat-hidden {
+      display: none;
     }
     .stat {
       text-align: center;
@@ -256,7 +289,7 @@
     @media (max-width: 480px) {
       .grid { grid-template-columns: 1fr; }
       .full { grid-column: span 1; }
-      .stats { grid-template-columns: repeat(2, 1fr); }
+      .stats { grid-template-columns: 1fr; }
       body { padding: 16px 12px; }
     }
   </style>
@@ -284,16 +317,16 @@
         <input id="speed" type="number" value="80" min="20" max="500">
       </div>
     </div>
-    <div class="hint">Use the arrow keys, WASD, or the on-screen D-pad to swim. On mobile you can also touch and hold anywhere on the water; the dolphin swims in that direction relative to the centre of the screen, and wraps around the edges. Avoid the sharks.</div>
-    <div class="controls">
-      <button id="startBtn" onclick="start()">Start</button>
-      <button class="secondary" onclick="reset()">Reset</button>
-      <button id="schoolBtn" class="school" onclick="toggleSchool()" disabled>School (needs 5 dolphins)</button>
-      <button class="secondary" onclick="toggleFullscreen()">Fullscreen</button>
-    </div>
+    <div class="hint">Use the arrow keys, WASD, or the on-screen D-pad to swim. On mobile you can also touch and hold anywhere on the water; the dolphin swims in that direction relative to the centre of the screen. Swim off the left or right edge to wrap around to the other side, Pac-Man style. Avoid the sharks.</div>
   </div>
 
   <div class="panel canvas-wrap" id="canvasWrap">
+    <div class="controls game-controls">
+      <button id="startBtn" onclick="start()">Start</button>
+      <button class="secondary" onclick="reset()">Reset</button>
+      <button id="schoolBtn" class="school" onclick="toggleSchool()" disabled>School (needs 5 dolphins)</button>
+      <button id="fullscreenBtn" class="secondary" onclick="toggleFullscreen()">Fullscreen</button>
+    </div>
     <canvas id="simCanvas" width="600" height="600"></canvas>
     <div class="dpad" id="dpad">
       <div class="dpad-btn dpad-up" data-key="ArrowUp">▲</div>
@@ -303,11 +336,11 @@
     </div>
     <div class="stats">
       <div class="stat"><div class="stat-label">Time</div><span class="stat-value" id="statTime">0.0s</span></div>
-      <div class="stat"><div class="stat-label">Spawn</div><span class="stat-value" id="statSpawn">60.0s</span></div>
-      <div class="stat"><div class="stat-label">Shrimp</div><span class="stat-value" id="statShrimp">120.0s</span></div>
-      <div class="stat dolphin"><div class="stat-label">Dolphins</div><span class="stat-value" id="statDolphins">1</span></div>
-      <div class="stat shark"><div class="stat-label">Sharks</div><span class="stat-value" id="statSharks">0</span></div>
-      <div class="stat"><div class="stat-label">Status</div><span class="stat-value" id="statStatus" style="font-size: 0.85rem; font-weight: 700;">Ready</span></div>
+      <div class="stat stat-hidden"><div class="stat-label">Spawn</div><span class="stat-value" id="statSpawn">60.0s</span></div>
+      <div class="stat stat-hidden"><div class="stat-label">Shrimp</div><span class="stat-value" id="statShrimp">120.0s</span></div>
+      <div class="stat dolphin stat-hidden"><div class="stat-label">Dolphins</div><span class="stat-value" id="statDolphins">1</span></div>
+      <div class="stat shark stat-hidden"><div class="stat-label">Sharks</div><span class="stat-value" id="statSharks">0</span></div>
+      <div class="stat stat-hidden"><div class="stat-label">Status</div><span class="stat-value" id="statStatus" style="font-size: 0.85rem; font-weight: 700;">Ready</span></div>
     </div>
   </div>
 
@@ -323,6 +356,13 @@
     const SIZE = 100;
     const canvas = document.getElementById('simCanvas');
     const ctx = canvas.getContext('2d');
+
+    function wrapX(x) {
+      return ((x % SIZE) + SIZE) % SIZE;
+    }
+    function clampY(y) {
+      return Math.min(SIZE - 1, Math.max(0, y));
+    }
     ctx.imageSmoothingEnabled = false;
 
     const keys = {};
@@ -361,6 +401,9 @@
       move() {
         if (this.isPlayer) return;
 
+        const podBoosted = player && Date.now() < player.speedBoostUntil;
+        const boostMult = podBoosted ? 2 : 1;
+
         const avoidRadius = 20;
         let nearestShark = null;
         let nearestDist = Infinity;
@@ -375,14 +418,14 @@
         if (nearestShark && nearestDist <= avoidRadius) {
           const dx = Math.sign(this._x - nearestShark._x) || (Math.random() < 0.5 ? 1 : -1);
           const dy = Math.sign(this._y - nearestShark._y) || (Math.random() < 0.5 ? 1 : -1);
-          this._x = (this._x + dx * 2 + 100) % 100;
-          this._y = (this._y + dy * 2 + 100) % 100;
+          this._x = wrapX(this._x + dx * 2 * boostMult);
+          this._y = clampY(this._y + dy * 2 * boostMult);
         } else {
-          if (Math.random() < 0.33) this._y = (this._y + 1) % 100;
-          else this._y = (this._y - 1 + 100) % 100;
+          if (Math.random() < 0.33) this._y = clampY(this._y + 1 * boostMult);
+          else this._y = clampY(this._y - 1 * boostMult);
 
-          if (Math.random() < 0.33) this._x = (this._x + 1) % 100;
-          else this._x = (this._x - 1 + 100) % 100;
+          if (Math.random() < 0.33) this._x = wrapX(this._x + 1 * boostMult);
+          else this._x = wrapX(this._x - 1 * boostMult);
         }
       }
 
@@ -409,15 +452,15 @@
           const effectiveSpeed = speed * this.speedMultiplier * 0.7;
           const dx = Math.sign(player._x - this._x);
           const dy = Math.sign(player._y - this._y);
-          this._x = (this._x + dx * effectiveSpeed + 100) % 100;
-          this._y = (this._y + dy * effectiveSpeed + 100) % 100;
+          this._x = wrapX(this._x + dx * effectiveSpeed);
+          this._y = clampY(this._y + dy * effectiveSpeed);
         } else {
-          const wanderSpeed = 1;
+          const wanderSpeed = 1 + Math.random() * 2.5;
           if (Math.random() < 0.5) {
-            this._x = (this._x + (Math.random() < 0.5 ? 1 : -1) * wanderSpeed + 100) % 100;
+            this._x = wrapX(this._x + (Math.random() < 0.5 ? 1 : -1) * wanderSpeed);
           }
           if (Math.random() < 0.5) {
-            this._y = (this._y + (Math.random() < 0.5 ? 1 : -1) * wanderSpeed + 100) % 100;
+            this._y = clampY(this._y + (Math.random() < 0.5 ? 1 : -1) * wanderSpeed);
           }
         }
       }
@@ -525,8 +568,8 @@
     function moveTowards(dolphin, tx, ty, speed) {
       const dx = Math.sign(tx - dolphin._x);
       const dy = Math.sign(ty - dolphin._y);
-      dolphin._x = (dolphin._x + dx * speed + SIZE) % SIZE;
-      dolphin._y = (dolphin._y + dy * speed + SIZE) % SIZE;
+      dolphin._x = wrapX(dolphin._x + dx * speed);
+      dolphin._y = clampY(dolphin._y + dy * speed);
     }
 
     function toggleSchool() {
@@ -540,13 +583,15 @@
     }
 
     function moveSchool() {
+      const boosted = Date.now() < player.speedBoostUntil;
+      const followerSpeed = boosted ? 4 : 2;
       const followers = dolphins.filter(d => !d.isPlayer);
       followers.forEach((dolphin, idx) => {
         const angle = (idx / followers.length) * Math.PI * 2;
         const radius = 6;
-        const tx = (player._x + Math.round(Math.cos(angle) * radius) + SIZE) % SIZE;
-        const ty = (player._y + Math.round(Math.sin(angle) * radius) + SIZE) % SIZE;
-        moveTowards(dolphin, tx, ty, 2);
+        const tx = wrapX(player._x + Math.round(Math.cos(angle) * radius));
+        const ty = clampY(player._y + Math.round(Math.sin(angle) * radius));
+        moveTowards(dolphin, tx, ty, followerSpeed);
       });
     }
 
@@ -578,8 +623,8 @@
       }
 
       if (dx !== 0 || dy !== 0) {
-        player._x = (player._x + dx * speed + SIZE) % SIZE;
-        player._y = (player._y + dy * speed + SIZE) % SIZE;
+        player._x = wrapX(player._x + dx * speed);
+        player._y = clampY(player._y + dy * speed);
       }
     }
 
@@ -693,8 +738,8 @@
           if (now < dolphin.matableAfter) continue;
           const dist = player.distanceBetween(dolphin);
           if (dist <= 5) {
-            const nx = (dolphin._x + 3) % SIZE;
-            const ny = (dolphin._y + 3) % SIZE;
+            const nx = wrapX(dolphin._x + 3);
+            const ny = clampY(dolphin._y + 3);
             const baby = new Dolphin(dolphins.length, ny, nx);
             baby.invulnerableUntil = Date.now() + 30000;
             baby.matableAfter = Date.now() + 30000;
@@ -821,15 +866,18 @@
       if (magicShrimp) {
         const cx = magicShrimp._x * scale + scale / 2;
         const cy = magicShrimp._y * scale + scale / 2;
-        ctx.font = `${fontSize}px ${family}`;
+        const pulse = 1 + Math.sin((gameTime || 0) * 6) * 0.12;
+        const shrimpFont = fontSize * 5 * pulse;
+
+        ctx.font = `${shrimpFont}px ${family}`;
         ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
         ctx.shadowBlur = 0;
         ctx.beginPath();
-        ctx.arc(cx, cy, fontSize / 2, 0, Math.PI * 2);
+        ctx.arc(cx, cy, shrimpFont / 2, 0, Math.PI * 2);
         ctx.fill();
 
         ctx.shadowColor = '#facc15';
-        ctx.shadowBlur = 8;
+        ctx.shadowBlur = 20;
         ctx.fillText('🍤', cx, cy);
       }
 
@@ -902,6 +950,11 @@
         document.exitFullscreen();
       }
     }
+
+    document.addEventListener('fullscreenchange', () => {
+      const btn = document.getElementById('fullscreenBtn');
+      btn.textContent = document.fullscreenElement ? 'Exit Fullscreen' : 'Fullscreen';
+    });
 
     document.querySelectorAll('.dpad-btn').forEach(btn => {
       const key = btn.dataset.key;
