@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0b1120">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Agent Based Model</title>
+  <title>Shark and Dolphin Model</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/svg+xml" href="icon.svg">
   <link rel="apple-touch-icon" href="icon.svg">
@@ -17,8 +17,8 @@
       --accent: #38bdf8;
       --text: #e2e8f0;
       --muted: #94a3b8;
-      --deer: #a3e635;
-      --wolf: #fb7185;
+      --deer: #22d3ee;
+      --wolf: #f87171;
       --radius: 20px;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -165,16 +165,16 @@
   </style>
 </head>
 <body>
-  <h1>Deer and Wolf Agent Model</h1>
+  <h1>Shark and Dolphin Agent Model</h1>
 
   <div class="panel">
     <div class="grid">
       <div class="field">
-        <label for="numDeers">Number of deer</label>
+        <label for="numDeers">Number of dolphins</label>
         <input id="numDeers" type="number" value="20" min="0" max="100">
       </div>
       <div class="field">
-        <label for="numWolves">Number of wolves</label>
+        <label for="numWolves">Number of sharks</label>
         <input id="numWolves" type="number" value="10" min="0" max="50">
       </div>
       <div class="field">
@@ -206,14 +206,14 @@
     <canvas id="simCanvas" width="600" height="600"></canvas>
     <div class="stats">
       <div class="stat"><div class="stat-label">Iteration</div><span class="stat-value" id="statIter">0</span></div>
-      <div class="stat deer"><div class="stat-label">Deer</div><span class="stat-value" id="statDeer">0</span></div>
-      <div class="stat wolf"><div class="stat-label">Wolves</div><span class="stat-value" id="statWolf">0</span></div>
+      <div class="stat deer"><div class="stat-label">Dolphins</div><span class="stat-value" id="statDeer">0</span></div>
+      <div class="stat wolf"><div class="stat-label">Sharks</div><span class="stat-value" id="statWolf">0</span></div>
       <div class="stat"><div class="stat-label">Status</div><span class="stat-value" id="statStatus" style="font-size: 0.85rem; font-weight: 700;">Ready</span></div>
     </div>
   </div>
 
   <div class="panel info">
-    This is a browser port of the deer and wolf agent based model. It runs on desktop and mobile browsers. Upload the original <code>in.txt</code> file or use the generated environment.
+    This is a browser port of the dolphin and shark agent based model. It runs on desktop and mobile browsers. Upload the original <code>in.txt</code> file or use the generated environment.
   </div>
 
   <script>
@@ -419,7 +419,7 @@
 
       if (wolves.length === 0) {
         stop();
-        document.getElementById('statStatus').textContent = 'Wolves starved';
+        document.getElementById('statStatus').textContent = 'Sharks starved';
       } else if (iteration >= maxIterations) {
         stop();
         document.getElementById('statStatus').textContent = 'Max iterations reached';
@@ -495,10 +495,11 @@
       for (let y = 0; y < SIZE; y++) {
         for (let x = 0; x < SIZE; x++) {
           const v = Math.max(0, environment[y][x]);
-          const g = Math.min(255, 18 + v * 2);
+          const levelG = Math.min(255, 20 + v);
+          const levelB = Math.min(255, 40 + v * 2);
           data[ptr] = 6;
-          data[ptr + 1] = g;
-          data[ptr + 2] = 14;
+          data[ptr + 1] = levelG;
+          data[ptr + 2] = levelB;
           data[ptr + 3] = 255;
           ptr += 4;
         }
@@ -510,21 +511,40 @@
     function drawAgents() {
       const scale = canvas.width / SIZE;
       const fontSize = Math.max(8, Math.floor(scale * 1.1));
+      const family = '"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
       ctx.save();
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.font = `${fontSize}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`;
 
       for (const deer of deers) {
-        ctx.shadowColor = '#84cc16';
+        const cx = deer._x * scale + scale / 2;
+        const cy = deer._y * scale + scale / 2;
+        ctx.font = `${fontSize}px ${family}`;
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+        ctx.shadowBlur = 0;
+        ctx.beginPath();
+        ctx.arc(cx, cy, fontSize / 2, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.shadowColor = '#22d3ee';
         ctx.shadowBlur = 5;
-        ctx.fillText('🦌', deer._x * scale + scale / 2, deer._y * scale + scale / 2);
+        ctx.fillText('🐬', cx, cy);
       }
 
       for (const wolf of wolves) {
-        ctx.shadowColor = '#ef4444';
+        const cx = wolf._x * scale + scale / 2;
+        const cy = wolf._y * scale + scale / 2;
+        const sharkFont = fontSize * 2;
+        ctx.font = `${sharkFont}px ${family}`;
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+        ctx.shadowBlur = 0;
+        ctx.beginPath();
+        ctx.arc(cx, cy, sharkFont / 2, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.shadowColor = '#f87171';
         ctx.shadowBlur = 5;
-        ctx.fillText('🐺', wolf._x * scale + scale / 2, wolf._y * scale + scale / 2);
+        ctx.fillText('🦈', cx, cy);
       }
 
       ctx.restore();
