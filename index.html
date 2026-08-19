@@ -213,12 +213,12 @@
   </div>
 
   <div class="panel info">
-    This is a browser port of the deer and wolf agent based model. It works offline as a PWA. Upload the original <code>in.txt</code> file or use the generated environment.
+    This is a browser port of the deer and wolf agent based model. It runs on desktop and mobile browsers. Upload the original <code>in.txt</code> file or use the generated environment.
   </div>
 
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js?v=3').catch(err => console.warn('SW registration failed:', err));
+      navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister())).catch(err => console.warn('SW unregister failed:', err));
     }
 
     const SIZE = 100;
