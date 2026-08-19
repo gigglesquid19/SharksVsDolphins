@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0b1120">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Shark and Dolphin Survival</title>
+  <title>SharksVsDolphins</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/svg+xml" href="icon.svg">
   <link rel="apple-touch-icon" href="icon.svg">
@@ -25,13 +25,60 @@
     html, body { height: 100%; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      background: radial-gradient(circle at 20% 10%, #172554 0%, #020617 50%, #000000 100%);
       color: var(--text);
       display: flex;
       flex-direction: column;
       align-items: center;
       padding: 24px 16px;
       min-height: 100vh;
+      position: relative;
+      overflow-x: hidden;
+      background: linear-gradient(180deg, #0c4a6e 0%, #075985 18%, #0e3a5c 40%, #082f49 62%, #051c30 82%, #010914 100%);
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -3;
+      background-image:
+        radial-gradient(circle at 15% 20%, rgba(56, 189, 248, 0.10) 0%, transparent 40%),
+        radial-gradient(circle at 85% 60%, rgba(34, 211, 238, 0.08) 0%, transparent 45%),
+        radial-gradient(circle at 50% 90%, rgba(2, 132, 199, 0.12) 0%, transparent 50%);
+      pointer-events: none;
+    }
+    .waves {
+      position: fixed;
+      left: 0;
+      width: 100%;
+      z-index: -2;
+      pointer-events: none;
+      opacity: 0.5;
+    }
+    .waves.wave1 { top: 8%; animation: driftLeft 34s linear infinite; }
+    .waves.wave2 { top: 34%; opacity: 0.35; animation: driftRight 46s linear infinite; }
+    .waves.wave3 { top: 64%; opacity: 0.3; animation: driftLeft 58s linear infinite; }
+    .waves svg { width: 200%; height: 90px; display: block; }
+    @keyframes driftLeft { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+    @keyframes driftRight { from { transform: translateX(-50%); } to { transform: translateX(0); } }
+    .bubbles {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .bubble {
+      position: absolute;
+      bottom: -40px;
+      border-radius: 50%;
+      background: rgba(224, 242, 254, 0.18);
+      border: 1px solid rgba(224, 242, 254, 0.25);
+      animation: floatUp linear infinite;
+    }
+    @keyframes floatUp {
+      0% { transform: translateY(0) translateX(0); opacity: 0; }
+      10% { opacity: 0.6; }
+      100% { transform: translateY(-115vh) translateX(20px); opacity: 0; }
     }
     h1 {
       font-size: clamp(1.4rem, 5vw, 2rem);
@@ -113,6 +160,25 @@
       background: linear-gradient(180deg, rgba(15, 23, 42, 0.8), rgba(2, 6, 23, 0.9));
       border: 1px solid rgba(255, 255, 255, 0.08);
     }
+    .canvas-wrap:fullscreen {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      background: #020617;
+      width: 100vw;
+      height: 100vh;
+    }
+    .canvas-wrap:fullscreen canvas {
+      width: min(96vw, 96vh);
+      height: min(96vw, 96vh);
+      max-width: none;
+    }
+    .canvas-wrap:fullscreen .dpad {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+    }
     canvas {
       display: block;
       width: 100%;
@@ -120,7 +186,35 @@
       border-radius: 14px;
       background: #020617;
       box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.6);
+      touch-action: none;
     }
+    .dpad {
+      display: grid;
+      grid-template-columns: 56px 56px 56px;
+      grid-template-rows: 56px 56px 56px;
+      gap: 6px;
+      justify-content: center;
+      margin-top: 16px;
+      user-select: none;
+    }
+    .dpad-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 14px;
+      font-size: 1.4rem;
+      color: #fff;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .dpad-btn.active { background: rgba(56, 189, 248, 0.35); }
+    .dpad-up { grid-column: 2; grid-row: 1; }
+    .dpad-left { grid-column: 1; grid-row: 2; }
+    .dpad-right { grid-column: 3; grid-row: 2; }
+    .dpad-down { grid-column: 2; grid-row: 3; }
     .stats {
       display: grid;
       grid-template-columns: repeat(6, 1fr);
@@ -159,7 +253,12 @@
   </style>
 </head>
 <body>
-  <h1>Shark and Dolphin Survival</h1>
+  <div class="waves wave1"><svg viewBox="0 0 1600 90" preserveAspectRatio="none"><path d="M0,45 C200,90 400,0 600,45 C800,90 1000,0 1200,45 C1400,90 1600,0 1800,45 C2000,90 2200,0 2400,45 C2600,90 2800,0 3000,45 C3200,90 3200,90 3200,90 L3200,90 L0,90 Z" fill="#38bdf8"/></svg></div>
+  <div class="waves wave2"><svg viewBox="0 0 1600 90" preserveAspectRatio="none"><path d="M0,45 C200,0 400,90 600,45 C800,0 1000,90 1200,45 C1400,0 1600,90 1800,45 C2000,0 2200,90 2400,45 C2600,0 2800,90 3000,45 C3200,0 3200,0 3200,0 L3200,90 L0,90 Z" fill="#0ea5e9"/></svg></div>
+  <div class="waves wave3"><svg viewBox="0 0 1600 90" preserveAspectRatio="none"><path d="M0,45 C200,90 400,0 600,45 C800,90 1000,0 1200,45 C1400,90 1600,0 1800,45 C2000,90 2200,0 2400,45 C2600,90 2800,0 3000,45 C3200,90 3200,90 3200,90 L3200,90 L0,90 Z" fill="#22d3ee"/></svg></div>
+  <div class="bubbles" id="bubbles"></div>
+
+  <h1>SharksVsDolphins</h1>
 
   <div class="panel">
     <div class="grid">
@@ -181,11 +280,18 @@
       <button id="startBtn" onclick="start()">Start</button>
       <button class="secondary" onclick="reset()">Reset</button>
       <button id="schoolBtn" class="school" onclick="toggleSchool()" disabled>School (needs 5 dolphins)</button>
+      <button class="secondary" onclick="toggleFullscreen()">Fullscreen</button>
     </div>
   </div>
 
-  <div class="panel canvas-wrap">
+  <div class="panel canvas-wrap" id="canvasWrap">
     <canvas id="simCanvas" width="600" height="600"></canvas>
+    <div class="dpad" id="dpad">
+      <div class="dpad-btn dpad-up" data-key="ArrowUp">▲</div>
+      <div class="dpad-btn dpad-left" data-key="ArrowLeft">◀</div>
+      <div class="dpad-btn dpad-right" data-key="ArrowRight">▶</div>
+      <div class="dpad-btn dpad-down" data-key="ArrowDown">▼</div>
+    </div>
     <div class="stats">
       <div class="stat"><div class="stat-label">Time</div><span class="stat-value" id="statTime">0.0s</span></div>
       <div class="stat"><div class="stat-label">Spawn</div><span class="stat-value" id="statSpawn">60.0s</span></div>
@@ -264,7 +370,7 @@
 
       move(speed) {
         if (!player) return;
-        const effectiveSpeed = speed * this.speedMultiplier;
+        const effectiveSpeed = speed * this.speedMultiplier * 0.7;
         const dx = Math.sign(player._x - this._x);
         const dy = Math.sign(player._y - this._y);
         this._x = (this._x + dx * effectiveSpeed + 100) % 100;
@@ -629,31 +735,32 @@
         ctx.fillText('🍤', cx, cy);
       }
 
+      const dolphinFont = fontSize * 4;
       for (const dolphin of dolphins) {
         const cx = dolphin._x * scale + scale / 2;
         const cy = dolphin._y * scale + scale / 2;
         const boosted = now < dolphin.speedBoostUntil;
         const invulnerable = now < dolphin.invulnerableUntil;
 
-        ctx.font = `${fontSize}px ${family}`;
+        ctx.font = `${dolphinFont}px ${family}`;
         ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
         ctx.shadowBlur = 0;
         ctx.beginPath();
-        ctx.arc(cx, cy, fontSize / 2, 0, Math.PI * 2);
+        ctx.arc(cx, cy, dolphinFont / 2, 0, Math.PI * 2);
         ctx.fill();
 
         if (boosted) {
           ctx.strokeStyle = '#facc15';
           ctx.lineWidth = 2;
           ctx.beginPath();
-          ctx.arc(cx, cy, fontSize / 2 + 4, 0, Math.PI * 2);
+          ctx.arc(cx, cy, dolphinFont / 2 + 4, 0, Math.PI * 2);
           ctx.stroke();
         }
         if (invulnerable) {
           ctx.strokeStyle = '#a855f7';
           ctx.lineWidth = 2;
           ctx.beginPath();
-          ctx.arc(cx, cy, fontSize / 2 + 4, 0, Math.PI * 2);
+          ctx.arc(cx, cy, dolphinFont / 2 + 4, 0, Math.PI * 2);
           ctx.stroke();
         }
 
@@ -665,7 +772,7 @@
       for (const shark of sharks) {
         const cx = shark._x * scale + scale / 2;
         const cy = shark._y * scale + scale / 2;
-        const sharkFont = fontSize * 2 * shark.sizeMultiplier;
+        const sharkFont = fontSize * 3 * shark.sizeMultiplier;
         ctx.font = `${sharkFont}px ${family}`;
         ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
         ctx.shadowBlur = 0;
@@ -689,8 +796,45 @@
     window.addEventListener('keydown', e => { keys[e.key] = true; });
     window.addEventListener('keyup', e => { keys[e.key] = false; });
 
+    function toggleFullscreen() {
+      const wrap = document.getElementById('canvasWrap');
+      if (!document.fullscreenElement) {
+        wrap.requestFullscreen().catch(err => console.warn('Fullscreen failed:', err));
+      } else {
+        document.exitFullscreen();
+      }
+    }
+
+    document.querySelectorAll('.dpad-btn').forEach(btn => {
+      const key = btn.dataset.key;
+      const press = e => { e.preventDefault(); keys[key] = true; btn.classList.add('active'); };
+      const release = e => { e.preventDefault(); keys[key] = false; btn.classList.remove('active'); };
+      btn.addEventListener('touchstart', press, { passive: false });
+      btn.addEventListener('touchend', release, { passive: false });
+      btn.addEventListener('touchcancel', release, { passive: false });
+      btn.addEventListener('mousedown', press);
+      btn.addEventListener('mouseup', release);
+      btn.addEventListener('mouseleave', release);
+    });
+
     createEnvironment();
     init();
+
+    (function spawnBubbles() {
+      const container = document.getElementById('bubbles');
+      const count = 22;
+      for (let i = 0; i < count; i++) {
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble';
+        const size = 4 + Math.random() * 14;
+        bubble.style.width = `${size}px`;
+        bubble.style.height = `${size}px`;
+        bubble.style.left = `${Math.random() * 100}%`;
+        bubble.style.animationDuration = `${10 + Math.random() * 18}s`;
+        bubble.style.animationDelay = `${Math.random() * 20}s`;
+        container.appendChild(bubble);
+      }
+    })();
   </script>
 </body>
 </html>
