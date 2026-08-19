@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0b1120">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Shark and Dolphin Model</title>
+  <title>Shark and Dolphin Survival</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/svg+xml" href="icon.svg">
   <link rel="apple-touch-icon" href="icon.svg">
@@ -17,8 +17,8 @@
       --accent: #38bdf8;
       --text: #e2e8f0;
       --muted: #94a3b8;
-      --deer: #22d3ee;
-      --wolf: #f87171;
+      --dolphin: #22d3ee;
+      --shark: #f87171;
       --radius: 20px;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -39,7 +39,7 @@
       text-align: center;
       font-weight: 800;
       letter-spacing: -0.03em;
-      background: linear-gradient(90deg, var(--deer), var(--accent), var(--wolf));
+      background: linear-gradient(90deg, var(--dolphin), var(--accent), var(--shark));
       -webkit-background-clip: text;
       background-clip: text;
       color: transparent;
@@ -54,7 +54,6 @@
       max-width: 680px;
       padding: 20px;
       margin-bottom: 20px;
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
     .grid {
       display: grid;
@@ -70,7 +69,7 @@
       color: var(--muted);
       font-weight: 600;
     }
-    input[type="number"], input[type="file"] {
+    input[type="number"] {
       padding: 10px 12px;
       border: 1px solid rgba(255, 255, 255, 0.12);
       border-radius: 12px;
@@ -78,13 +77,14 @@
       background: rgba(2, 6, 23, 0.6);
       color: var(--text);
       outline: none;
-      transition: border-color 0.2s, box-shadow 0.2s;
-    }
-    input[type="number"]:focus, input[type="file"]:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
     }
     .full { grid-column: span 2; }
+    .hint {
+      font-size: 0.85rem;
+      color: var(--muted);
+      text-align: center;
+      margin-top: 12px;
+    }
     .controls { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; justify-content: center; }
     button {
       padding: 12px 22px;
@@ -101,11 +101,11 @@
     button:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 22px rgba(14, 165, 233, 0.5); }
     button:active:not(:disabled) { transform: translateY(0); }
     button:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
-    button.secondary {
-      background: rgba(255, 255, 255, 0.08);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    button.school {
+      background: linear-gradient(135deg, #facc15, #f97316);
+      box-shadow: 0 4px 16px rgba(250, 204, 21, 0.4);
     }
-    button.secondary:hover:not(:disabled) { background: rgba(255, 255, 255, 0.14); }
+    button.school:hover:not(:disabled) { box-shadow: 0 6px 22px rgba(250, 204, 21, 0.55); }
     .canvas-wrap {
       position: relative;
       padding: 10px;
@@ -123,7 +123,7 @@
     }
     .stats {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(6, 1fr);
       gap: 12px;
       margin-top: 14px;
     }
@@ -142,19 +142,13 @@
       margin-top: 4px;
       color: #fff;
     }
-    .stat.deer .stat-value { color: var(--deer); text-shadow: 0 0 12px rgba(163, 230, 53, 0.45); }
-    .stat.wolf .stat-value { color: var(--wolf); text-shadow: 0 0 12px rgba(251, 113, 133, 0.45); }
+    .stat.dolphin .stat-value { color: var(--dolphin); text-shadow: 0 0 12px rgba(34, 211, 238, 0.45); }
+    .stat.shark .stat-value { color: var(--shark); text-shadow: 0 0 12px rgba(248, 113, 113, 0.45); }
     .info {
       font-size: 0.8rem;
       color: var(--muted);
       line-height: 1.5;
       text-align: center;
-    }
-    .info code {
-      background: rgba(255, 255, 255, 0.08);
-      padding: 2px 6px;
-      border-radius: 4px;
-      color: var(--accent);
     }
     @media (max-width: 480px) {
       .grid { grid-template-columns: 1fr; }
@@ -165,55 +159,45 @@
   </style>
 </head>
 <body>
-  <h1>Shark and Dolphin Agent Model</h1>
+  <h1>Shark and Dolphin Survival</h1>
 
   <div class="panel">
     <div class="grid">
       <div class="field">
-        <label for="numDeers">Number of dolphins</label>
-        <input id="numDeers" type="number" value="20" min="0" max="100">
+        <label for="numSharks">Number of sharks</label>
+        <input id="numSharks" type="number" value="8" min="1" max="30">
       </div>
       <div class="field">
-        <label for="numWolves">Number of sharks</label>
-        <input id="numWolves" type="number" value="10" min="0" max="50">
-      </div>
-      <div class="field">
-        <label for="numIter">Max iterations (100-500)</label>
-        <input id="numIter" type="number" value="200" min="100" max="500">
-      </div>
-      <div class="field">
-        <label for="neighbourhood">Neighbourhood (10-100)</label>
-        <input id="neighbourhood" type="number" value="20" min="10" max="100">
+        <label for="sharkSpeed">Shark speed</label>
+        <input id="sharkSpeed" type="number" value="1" min="1" max="5">
       </div>
       <div class="field full">
-        <label for="inFile">Environment file (in.txt, optional)</label>
-        <input id="inFile" type="file" accept=".txt,.csv">
-      </div>
-      <div class="field full">
-        <label for="speed">Speed (ms per frame)</label>
-        <input id="speed" type="number" value="100" min="10" max="2000">
+        <label for="speed">Game speed (ms per frame)</label>
+        <input id="speed" type="number" value="80" min="20" max="500">
       </div>
     </div>
+    <div class="hint">Use the arrow keys or WASD to swim. Avoid the sharks.</div>
     <div class="controls">
       <button id="startBtn" onclick="start()">Start</button>
-      <button id="pauseBtn" class="secondary" onclick="togglePause()" disabled>Pause</button>
-      <button class="secondary" onclick="stepOnce()">Step</button>
       <button class="secondary" onclick="reset()">Reset</button>
+      <button id="schoolBtn" class="school" onclick="toggleSchool()" disabled>School (needs 5 dolphins)</button>
     </div>
   </div>
 
   <div class="panel canvas-wrap">
     <canvas id="simCanvas" width="600" height="600"></canvas>
     <div class="stats">
-      <div class="stat"><div class="stat-label">Iteration</div><span class="stat-value" id="statIter">0</span></div>
-      <div class="stat deer"><div class="stat-label">Dolphins</div><span class="stat-value" id="statDeer">0</span></div>
-      <div class="stat wolf"><div class="stat-label">Sharks</div><span class="stat-value" id="statWolf">0</span></div>
+      <div class="stat"><div class="stat-label">Time</div><span class="stat-value" id="statTime">0.0s</span></div>
+      <div class="stat"><div class="stat-label">Spawn</div><span class="stat-value" id="statSpawn">60.0s</span></div>
+      <div class="stat"><div class="stat-label">Shrimp</div><span class="stat-value" id="statShrimp">120.0s</span></div>
+      <div class="stat dolphin"><div class="stat-label">Dolphins</div><span class="stat-value" id="statDolphins">1</span></div>
+      <div class="stat shark"><div class="stat-label">Sharks</div><span class="stat-value" id="statSharks">0</span></div>
       <div class="stat"><div class="stat-label">Status</div><span class="stat-value" id="statStatus" style="font-size: 0.85rem; font-weight: 700;">Ready</span></div>
     </div>
   </div>
 
   <div class="panel info">
-    This is a browser port of the dolphin and shark agent based model. It runs on desktop and mobile browsers. Upload the original <code>in.txt</code> file or use the generated environment.
+    Swim as the dolphin, avoid sharks, meet other dolphins to grow your pod, and watch for the magic shrimp at 2 minutes.
   </div>
 
   <script>
@@ -226,29 +210,37 @@
     const ctx = canvas.getContext('2d');
     ctx.imageSmoothingEnabled = false;
 
+    const keys = {};
     let environment = [];
-    let deers = [];
-    let wolves = [];
-    let iteration = 0;
-    let maxIterations = 200;
-    let neighbourhood = 20;
+    let dolphins = [];
+    let sharks = [];
+    let player = null;
     let running = false;
     let timer = null;
+    let startTime = 0;
+    let gameTime = 0;
+    let secondDolphinSpawned = false;
+    let reproduceTimer = 0;
+    let lastFrameTime = 0;
+    let magicShrimp = null;
+    let shrimpSpawned = false;
+    let schoolMode = false;
     let envCanvas = null;
     let envCtx = null;
     let imgData = null;
 
-    class Deer {
-      constructor(i, y, x, env) {
+    class Dolphin {
+      constructor(i, y, x) {
         this.id = i;
-        this._x = x === null || x === undefined ? Math.floor(Math.random() * 100) : x;
-        this._y = y === null || y === undefined ? Math.floor(Math.random() * 100) : y;
-        this.environment = env;
-        this.store = 0;
-        this.color = 1;
+        this._x = x;
+        this._y = y;
+        this.isPlayer = false;
+        this.speedBoostUntil = 0;
+        this.invulnerableUntil = 0;
       }
 
       move() {
+        if (this.isPlayer) return;
         if (Math.random() < 0.33) this._y = (this._y + 1) % 100;
         else this._y = (this._y - 1 + 100) % 100;
 
@@ -256,61 +248,27 @@
         else this._x = (this._x - 1 + 100) % 100;
       }
 
-      eat() {
-        if (this.environment[this._y][this._x] > 0) {
-          this.environment[this._y][this._x] -= 10;
-          this.store += 10;
-        }
-      }
-
       distanceBetween(other) {
         return Math.sqrt((this._x - other._x) ** 2 + (this._y - other._y) ** 2);
       }
-
-      shareWithNeighbours() {
-        for (const deer of deers) {
-          if (deer === this) continue;
-          const dist = this.distanceBetween(deer);
-          if (dist <= neighbourhood) {
-            const average = (this.store + deer.store) / 2;
-            this.store = average;
-            deer.store = average;
-          }
-        }
-      }
     }
 
-    class Wolf {
+    class Shark {
       constructor(i) {
         this.id = i;
         this._x = Math.floor(Math.random() * 100);
         this._y = Math.floor(Math.random() * 100);
-        this.store = 0;
-        this.color = 1;
-        this.energy = 200;
+        this.sizeMultiplier = 1;
+        this.speedMultiplier = 1;
       }
 
-      move() {
-        if (Math.random() < 0.33) this._y = (this._y + 4) % 100;
-        else this._y = (this._y - 4 + 100) % 100;
-        this.energy -= 1;
-
-        if (Math.random() < 0.33) this._x = (this._x + 4) % 100;
-        else this._x = (this._x - 4 + 100) % 100;
-        this.energy -= 1;
-      }
-
-      eat() {
-        for (let i = 0; i < deers.length; i++) {
-          const deer = deers[i];
-          const dist = this.distanceBetween(deer);
-          if (dist <= neighbourhood && this.energy <= 100) {
-            this.energy = 150;
-            deers.splice(i, 1);
-            return true;
-          }
-        }
-        return false;
+      move(speed) {
+        if (!player) return;
+        const effectiveSpeed = speed * this.speedMultiplier;
+        const dx = Math.sign(player._x - this._x);
+        const dy = Math.sign(player._y - this._y);
+        this._x = (this._x + dx * effectiveSpeed + 100) % 100;
+        this._y = (this._y + dy * effectiveSpeed + 100) % 100;
       }
 
       distanceBetween(other) {
@@ -318,10 +276,14 @@
       }
     }
 
-    function shuffle(array) {
-      for (let i = array.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
+    class MagicShrimp {
+      constructor() {
+        this._x = Math.floor(Math.random() * 100);
+        this._y = Math.floor(Math.random() * 100);
+      }
+
+      distanceBetween(other) {
+        return Math.sqrt((this._x - other._x) ** 2 + (this._y - other._y) ** 2);
       }
     }
 
@@ -346,135 +308,260 @@
       }
     }
 
-    function loadEnvironmentFromFile(text) {
-      const rows = text.trim().split(/\r?\n/);
-      if (rows.length < SIZE) throw new Error('File must have at least 100 rows');
-      environment = [];
-      for (let y = 0; y < SIZE; y++) {
-        const values = rows[y].split(',').map(v => parseInt(v.trim(), 10));
-        if (values.length < SIZE) throw new Error(`Row ${y+1} must have at least 100 values`);
-        environment.push(values.slice(0, SIZE));
+    function findSafestCorner() {
+      const corners = [{x: 5, y: 5}, {x: 95, y: 5}, {x: 5, y: 95}, {x: 95, y: 95}];
+      let best = corners[0];
+      let bestDist = 0;
+      for (const c of corners) {
+        let minDist = Infinity;
+        for (const shark of sharks) {
+          const d = Math.sqrt((shark._x - c.x) ** 2 + (shark._y - c.y) ** 2);
+          if (d < minDist) minDist = d;
+        }
+        if (minDist > bestDist) {
+          bestDist = minDist;
+          best = c;
+        }
       }
+      return best;
+    }
+
+    function spawnSecondDolphin() {
+      const corner = findSafestCorner();
+      const dolphin = new Dolphin(1, corner.y, corner.x);
+      dolphin.invulnerableUntil = Date.now() + 30000;
+      dolphins.push(dolphin);
+      secondDolphinSpawned = true;
+      document.getElementById('statStatus').textContent = 'Second dolphin arrived';
     }
 
     function init() {
-      const numDeers = parseInt(document.getElementById('numDeers').value, 10) || 0;
-      const numWolves = parseInt(document.getElementById('numWolves').value, 10) || 0;
-      maxIterations = parseInt(document.getElementById('numIter').value, 10) || 200;
-      neighbourhood = parseInt(document.getElementById('neighbourhood').value, 10) || 20;
+      const numSharks = parseInt(document.getElementById('numSharks').value, 10) || 8;
 
-      if (maxIterations < 100 || maxIterations > 500) {
-        alert('Iterations must be between 100 and 500');
-        return false;
-      }
-      if (neighbourhood < 10 || neighbourhood > 100) {
-        alert('Neighbourhood must be between 10 and 100');
-        return false;
-      }
+      dolphins = [];
+      const px = Math.floor(SIZE / 2);
+      const py = Math.floor(SIZE / 2);
+      player = new Dolphin(0, py, px);
+      player.isPlayer = true;
+      dolphins.push(player);
 
-      deers = [];
-      for (let i = 0; i < numDeers; i++) {
-        const x = Math.floor(Math.random() * 100);
-        const y = Math.floor(Math.random() * 100);
-        deers.push(new Deer(i, y, x, environment));
+      sharks = [];
+      for (let i = 0; i < numSharks; i++) {
+        let sx, sy;
+        do {
+          sx = Math.floor(Math.random() * 100);
+          sy = Math.floor(Math.random() * 100);
+        } while (Math.abs(sx - px) < 15 && Math.abs(sy - py) < 15);
+        sharks.push(new Shark(i));
       }
 
-      wolves = [];
-      for (let i = 0; i < numWolves; i++) {
-        wolves.push(new Wolf(i));
-      }
-
-      iteration = 0;
+      gameTime = 0;
+      startTime = 0;
+      secondDolphinSpawned = false;
+      reproduceTimer = 0;
+      lastFrameTime = 0;
+      magicShrimp = null;
+      shrimpSpawned = false;
+      schoolMode = false;
+      document.getElementById('schoolBtn').textContent = 'School (needs 5 dolphins)';
       updateStats();
       draw();
       return true;
     }
 
+    function moveTowards(dolphin, tx, ty, speed) {
+      const dx = Math.sign(tx - dolphin._x);
+      const dy = Math.sign(ty - dolphin._y);
+      dolphin._x = (dolphin._x + dx * speed + SIZE) % SIZE;
+      dolphin._y = (dolphin._y + dy * speed + SIZE) % SIZE;
+    }
+
+    function toggleSchool() {
+      if (dolphins.length < 5 || schoolMode || !running) return;
+      schoolMode = true;
+      document.getElementById('schoolBtn').disabled = true;
+      document.getElementById('schoolBtn').textContent = 'Schooling!';
+      document.getElementById('statStatus').textContent = 'Schooling! Ram the sharks';
+    }
+
+    function moveSchool() {
+      const followers = dolphins.filter(d => !d.isPlayer);
+      followers.forEach((dolphin, idx) => {
+        const angle = (idx / followers.length) * Math.PI * 2;
+        const radius = 6;
+        const tx = (player._x + Math.round(Math.cos(angle) * radius) + SIZE) % SIZE;
+        const ty = (player._y + Math.round(Math.sin(angle) * radius) + SIZE) % SIZE;
+        moveTowards(dolphin, tx, ty, 2);
+      });
+    }
+
+    function winGame() {
+      running = false;
+      clearTimeout(timer);
+      document.getElementById('statStatus').textContent = 'You win! All sharks defeated';
+      document.getElementById('startBtn').textContent = 'Restart';
+      document.getElementById('schoolBtn').disabled = true;
+    }
+
+    function movePlayer() {
+      if (!player) return;
+      const boosted = Date.now() < player.speedBoostUntil;
+      const speed = boosted ? 4 : 2;
+      let dx = 0;
+      let dy = 0;
+
+      if (keys['ArrowUp'] || keys['w'] || keys['W']) dy = -1;
+      if (keys['ArrowDown'] || keys['s'] || keys['S']) dy = 1;
+      if (keys['ArrowLeft'] || keys['a'] || keys['A']) dx = -1;
+      if (keys['ArrowRight'] || keys['d'] || keys['D']) dx = 1;
+
+      if (dx !== 0 || dy !== 0) {
+        player._x = (player._x + dx * speed + SIZE) % SIZE;
+        player._y = (player._y + dy * speed + SIZE) % SIZE;
+      }
+    }
+
+    function findFreeSpot() {
+      let x, y;
+      do {
+        x = Math.floor(Math.random() * SIZE);
+        y = Math.floor(Math.random() * SIZE);
+      } while (player && Math.abs(x - player._x) < 10 && Math.abs(y - player._y) < 10);
+      return { x, y };
+    }
+
+    function spawnMagicShrimp() {
+      const spot = findFreeSpot();
+      magicShrimp = new MagicShrimp();
+      magicShrimp._x = spot.x;
+      magicShrimp._y = spot.y;
+      shrimpSpawned = true;
+      document.getElementById('statStatus').textContent = 'Magic shrimp appeared!';
+    }
+
+    function checkShrimpCollection() {
+      if (!magicShrimp) return;
+
+      for (const dolphin of dolphins) {
+        if (dolphin.distanceBetween(magicShrimp) <= 4) {
+          if (dolphin.isPlayer) {
+            dolphin.speedBoostUntil = Date.now() + 30000;
+            document.getElementById('statStatus').textContent = 'Speed boost!';
+          } else {
+            dolphin.invulnerableUntil = Date.now() + 30000;
+            document.getElementById('statStatus').textContent = 'A dolphin is invulnerable!';
+          }
+          magicShrimp = null;
+          return;
+        }
+      }
+
+      for (const shark of sharks) {
+        if (shark.distanceBetween(magicShrimp) <= 4) {
+          shark.sizeMultiplier = 5;
+          shark.speedMultiplier = 1.25;
+          document.getElementById('statStatus').textContent = 'A shark grabbed the shrimp!';
+          magicShrimp = null;
+          return;
+        }
+      }
+    }
+
     function step() {
-      if (wolves.length === 0 || iteration >= maxIterations) {
-        stop();
-        document.getElementById('statStatus').textContent = 'Finished';
-        return;
+      if (!running) return;
+
+      const sharkSpeed = parseInt(document.getElementById('sharkSpeed').value, 10) || 1;
+
+      movePlayer();
+      if (schoolMode) moveSchool();
+
+      const now = Date.now();
+
+      for (const shark of sharks) {
+        shark.move(sharkSpeed);
       }
 
-      shuffle(wolves);
-      shuffle(deers);
-
-      for (const deer of deers) {
-        deer.move();
-        deer.eat();
-        deer.shareWithNeighbours();
+      if (schoolMode) {
+        const hitRadius = 4;
+        sharks = sharks.filter(shark => {
+          const hitsAnyDolphin = dolphins.some(d => shark.distanceBetween(d) < hitRadius);
+          return !hitsAnyDolphin;
+        });
+        if (sharks.length === 0) {
+          winGame();
+          return;
+        }
+      } else {
+        for (const shark of sharks) {
+          const isPlayerInvulnerable = player.invulnerableUntil && now < player.invulnerableUntil;
+          if (!isPlayerInvulnerable && shark.distanceBetween(player) < 4) {
+            gameOver();
+            return;
+          }
+        }
       }
 
-      for (const wolf of wolves) {
-        wolf.move();
-        wolf.eat();
+      const dt = lastFrameTime === 0 ? 0 : (now - lastFrameTime) / 1000;
+      lastFrameTime = now;
+
+      if (startTime === 0) startTime = now;
+      gameTime = (now - startTime) / 1000;
+
+      if (!secondDolphinSpawned && gameTime >= 60) {
+        spawnSecondDolphin();
       }
 
-      wolves = wolves.filter(w => w.energy > 0);
+      if (!shrimpSpawned && gameTime >= 120) {
+        spawnMagicShrimp();
+      }
 
-      iteration++;
-      updateStats();
+      checkShrimpCollection();
+
+      if (reproduceTimer > 0) reproduceTimer -= dt;
+
+      if (dolphins.length < 5 && reproduceTimer <= 0) {
+        for (const dolphin of dolphins) {
+          if (dolphin === player) continue;
+          const dist = player.distanceBetween(dolphin);
+          if (dist <= 5) {
+            const nx = (dolphin._x + 3) % SIZE;
+            const ny = (dolphin._y + 3) % SIZE;
+            const baby = new Dolphin(dolphins.length, ny, nx);
+            baby.invulnerableUntil = Date.now() + 30000;
+            dolphins.push(baby);
+            reproduceTimer = 2.0;
+            document.getElementById('statStatus').textContent = 'New dolphin born';
+            break;
+          }
+        }
+      }
+
       draw();
+      updateStats();
 
-      if (wolves.length === 0) {
-        stop();
-        document.getElementById('statStatus').textContent = 'Sharks starved';
-      } else if (iteration >= maxIterations) {
-        stop();
-        document.getElementById('statStatus').textContent = 'Max iterations reached';
-      }
+      const speed = parseInt(document.getElementById('speed').value, 10) || 80;
+      timer = setTimeout(step, speed);
     }
 
     function start() {
       if (!init()) return;
       running = true;
       document.getElementById('startBtn').textContent = 'Restart';
-      document.getElementById('pauseBtn').disabled = false;
-      document.getElementById('pauseBtn').textContent = 'Pause';
-      document.getElementById('statStatus').textContent = 'Running';
-      loop();
-    }
-
-    function loop() {
-      if (!running) return;
-      step();
-      if (running) {
-        const speed = parseInt(document.getElementById('speed').value, 10) || 100;
-        timer = setTimeout(loop, speed);
-      }
-    }
-
-    function togglePause() {
-      running = !running;
-      const btn = document.getElementById('pauseBtn');
-      if (running) {
-        btn.textContent = 'Pause';
-        document.getElementById('statStatus').textContent = 'Running';
-        loop();
-      } else {
-        btn.textContent = 'Resume';
-        document.getElementById('statStatus').textContent = 'Paused';
-      }
-    }
-
-    function stepOnce() {
-      if (deers.length === 0 && wolves.length === 0 && iteration === 0) {
-        if (!init()) return;
-      }
-      running = false;
-      document.getElementById('pauseBtn').textContent = 'Resume';
+      document.getElementById('statStatus').textContent = 'Swimming';
       step();
     }
 
-    function stop() {
+    function gameOver() {
       running = false;
       clearTimeout(timer);
-      document.getElementById('pauseBtn').disabled = true;
+      document.getElementById('statStatus').textContent = 'Eaten by a shark';
+      document.getElementById('startBtn').textContent = 'Restart';
+      document.getElementById('schoolBtn').disabled = true;
     }
 
     function reset() {
-      stop();
+      running = false;
+      clearTimeout(timer);
       createEnvironment();
       init();
       document.getElementById('statStatus').textContent = 'Ready';
@@ -482,9 +569,19 @@
     }
 
     function updateStats() {
-      document.getElementById('statIter').textContent = iteration;
-      document.getElementById('statDeer').textContent = deers.length;
-      document.getElementById('statWolf').textContent = wolves.length;
+      document.getElementById('statTime').textContent = gameTime.toFixed(1) + 's';
+      const spawnCount = Math.max(0, 60 - gameTime);
+      document.getElementById('statSpawn').textContent = secondDolphinSpawned ? 'Arrived' : spawnCount.toFixed(1) + 's';
+      const shrimpCount = Math.max(0, 120 - gameTime);
+      document.getElementById('statShrimp').textContent = magicShrimp ? 'On the board!' : (shrimpSpawned ? 'Gone' : shrimpCount.toFixed(1) + 's');
+      document.getElementById('statDolphins').textContent = dolphins.length;
+      document.getElementById('statSharks').textContent = sharks.length;
+
+      const schoolBtn = document.getElementById('schoolBtn');
+      if (!schoolMode) {
+        schoolBtn.disabled = dolphins.length < 5 || !running;
+        schoolBtn.textContent = dolphins.length < 5 ? 'School (needs 5 dolphins)' : 'School';
+      }
     }
 
     function drawEnvironment() {
@@ -512,13 +609,14 @@
       const scale = canvas.width / SIZE;
       const fontSize = Math.max(8, Math.floor(scale * 1.1));
       const family = '"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
+      const now = Date.now();
       ctx.save();
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
 
-      for (const deer of deers) {
-        const cx = deer._x * scale + scale / 2;
-        const cy = deer._y * scale + scale / 2;
+      if (magicShrimp) {
+        const cx = magicShrimp._x * scale + scale / 2;
+        const cy = magicShrimp._y * scale + scale / 2;
         ctx.font = `${fontSize}px ${family}`;
         ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
         ctx.shadowBlur = 0;
@@ -526,15 +624,48 @@
         ctx.arc(cx, cy, fontSize / 2, 0, Math.PI * 2);
         ctx.fill();
 
+        ctx.shadowColor = '#facc15';
+        ctx.shadowBlur = 8;
+        ctx.fillText('🍤', cx, cy);
+      }
+
+      for (const dolphin of dolphins) {
+        const cx = dolphin._x * scale + scale / 2;
+        const cy = dolphin._y * scale + scale / 2;
+        const boosted = now < dolphin.speedBoostUntil;
+        const invulnerable = now < dolphin.invulnerableUntil;
+
+        ctx.font = `${fontSize}px ${family}`;
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+        ctx.shadowBlur = 0;
+        ctx.beginPath();
+        ctx.arc(cx, cy, fontSize / 2, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (boosted) {
+          ctx.strokeStyle = '#facc15';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(cx, cy, fontSize / 2 + 4, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        if (invulnerable) {
+          ctx.strokeStyle = '#a855f7';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(cx, cy, fontSize / 2 + 4, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
         ctx.shadowColor = '#22d3ee';
         ctx.shadowBlur = 5;
         ctx.fillText('🐬', cx, cy);
       }
 
-      for (const wolf of wolves) {
-        const cx = wolf._x * scale + scale / 2;
-        const cy = wolf._y * scale + scale / 2;
-        const sharkFont = fontSize * 2;
+      for (const shark of sharks) {
+        const cx = shark._x * scale + scale / 2;
+        const cy = shark._y * scale + scale / 2;
+        const sharkFont = fontSize * 2 * shark.sizeMultiplier;
         ctx.font = `${sharkFont}px ${family}`;
         ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
         ctx.shadowBlur = 0;
@@ -555,18 +686,8 @@
       drawAgents();
     }
 
-    document.getElementById('inFile').addEventListener('change', async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const text = await file.text();
-      try {
-        loadEnvironmentFromFile(text);
-        init();
-        document.getElementById('statStatus').textContent = 'Environment loaded';
-      } catch (err) {
-        alert('Could not read environment file: ' + err.message);
-      }
-    });
+    window.addEventListener('keydown', e => { keys[e.key] = true; });
+    window.addEventListener('keyup', e => { keys[e.key] = false; });
 
     createEnvironment();
     init();
