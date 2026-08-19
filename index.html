@@ -275,7 +275,7 @@
         <input id="speed" type="number" value="80" min="20" max="500">
       </div>
     </div>
-    <div class="hint">Use the arrow keys or WASD to swim. Avoid the sharks.</div>
+    <div class="hint">Use the arrow keys, WASD, or the on-screen D-pad to swim. On mobile you can also touch and hold anywhere on the water to swim toward that spot. Avoid the sharks.</div>
     <div class="controls">
       <button id="startBtn" onclick="start()">Start</button>
       <button class="secondary" onclick="reset()">Reset</button>
@@ -331,6 +331,9 @@
     let magicShrimp = null;
     let shrimpSpawned = false;
     let schoolMode = false;
+    let pointerActive = false;
+    let pointerGridX = 0;
+    let pointerGridY = 0;
     let envCanvas = null;
     let envCtx = null;
     let imgData = null;
@@ -343,15 +346,35 @@
         this.isPlayer = false;
         this.speedBoostUntil = 0;
         this.invulnerableUntil = 0;
+        this.matableAfter = 0;
       }
 
       move() {
         if (this.isPlayer) return;
-        if (Math.random() < 0.33) this._y = (this._y + 1) % 100;
-        else this._y = (this._y - 1 + 100) % 100;
 
-        if (Math.random() < 0.33) this._x = (this._x + 1) % 100;
-        else this._x = (this._x - 1 + 100) % 100;
+        const avoidRadius = 20;
+        let nearestShark = null;
+        let nearestDist = Infinity;
+        for (const shark of sharks) {
+          const d = this.distanceBetween(shark);
+          if (d < nearestDist) {
+            nearestDist = d;
+            nearestShark = shark;
+          }
+        }
+
+        if (nearestShark && nearestDist <= avoidRadius) {
+          const dx = Math.sign(this._x - nearestShark._x) || (Math.random() < 0.5 ? 1 : -1);
+          const dy = Math.sign(this._y - nearestShark._y) || (Math.random() < 0.5 ? 1 : -1);
+          this._x = (this._x + dx * 2 + 100) % 100;
+          this._y = (this._y + dy * 2 + 100) % 100;
+        } else {
+          if (Math.random() < 0.33) this._y = (this._y + 1) % 100;
+          else this._y = (this._y - 1 + 100) % 100;
+
+          if (Math.random() < 0.33) this._x = (this._x + 1) % 100;
+          else this._x = (this._x - 1 + 100) % 100;
+        }
       }
 
       distanceBetween(other) {
@@ -370,11 +393,24 @@
 
       move(speed) {
         if (!player) return;
-        const effectiveSpeed = speed * this.speedMultiplier * 0.7;
-        const dx = Math.sign(player._x - this._x);
-        const dy = Math.sign(player._y - this._y);
-        this._x = (this._x + dx * effectiveSpeed + 100) % 100;
-        this._y = (this._y + dy * effectiveSpeed + 100) % 100;
+        const huntRadius = 25;
+        const distToPlayer = this.distanceBetween(player);
+
+        if (distToPlayer <= huntRadius) {
+          const effectiveSpeed = speed * this.speedMultiplier * 0.7;
+          const dx = Math.sign(player._x - this._x);
+          const dy = Math.sign(player._y - this._y);
+          this._x = (this._x + dx * effectiveSpeed + 100) % 100;
+          this._y = (this._y + dy * effectiveSpeed + 100) % 100;
+        } else {
+          const wanderSpeed = 1;
+          if (Math.random() < 0.5) {
+            this._x = (this._x + (Math.random() < 0.5 ? 1 : -1) * wanderSpeed + 100) % 100;
+          }
+          if (Math.random() < 0.5) {
+            this._y = (this._y + (Math.random() < 0.5 ? 1 : -1) * wanderSpeed + 100) % 100;
+          }
+        }
       }
 
       distanceBetween(other) {
@@ -436,6 +472,7 @@
       const corner = findSafestCorner();
       const dolphin = new Dolphin(1, corner.y, corner.x);
       dolphin.invulnerableUntil = Date.now() + 30000;
+      dolphin.matableAfter = Date.now() + 30000;
       dolphins.push(dolphin);
       secondDolphinSpawned = true;
       document.getElementById('statStatus').textContent = 'Second dolphin arrived';
@@ -516,10 +553,18 @@
       let dx = 0;
       let dy = 0;
 
-      if (keys['ArrowUp'] || keys['w'] || keys['W']) dy = -1;
-      if (keys['ArrowDown'] || keys['s'] || keys['S']) dy = 1;
-      if (keys['ArrowLeft'] || keys['a'] || keys['A']) dx = -1;
-      if (keys['ArrowRight'] || keys['d'] || keys['D']) dx = 1;
+      if (pointerActive) {
+        const deadZone = 3;
+        const diffX = pointerGridX - player._x;
+        const diffY = pointerGridY - player._y;
+        if (Math.abs(diffX) > deadZone) dx = Math.sign(diffX);
+        if (Math.abs(diffY) > deadZone) dy = Math.sign(diffY);
+      } else {
+        if (keys['ArrowUp'] || keys['w'] || keys['W']) dy = -1;
+        if (keys['ArrowDown'] || keys['s'] || keys['S']) dy = 1;
+        if (keys['ArrowLeft'] || keys['a'] || keys['A']) dx = -1;
+        if (keys['ArrowRight'] || keys['d'] || keys['D']) dx = 1;
+      }
 
       if (dx !== 0 || dy !== 0) {
         player._x = (player._x + dx * speed + SIZE) % SIZE;
@@ -579,7 +624,13 @@
       const sharkSpeed = parseInt(document.getElementById('sharkSpeed').value, 10) || 1;
 
       movePlayer();
-      if (schoolMode) moveSchool();
+      if (schoolMode) {
+        moveSchool();
+      } else {
+        for (const dolphin of dolphins) {
+          if (!dolphin.isPlayer) dolphin.move();
+        }
+      }
 
       const now = Date.now();
 
@@ -628,12 +679,14 @@
       if (dolphins.length < 5 && reproduceTimer <= 0) {
         for (const dolphin of dolphins) {
           if (dolphin === player) continue;
+          if (now < dolphin.matableAfter) continue;
           const dist = player.distanceBetween(dolphin);
           if (dist <= 5) {
             const nx = (dolphin._x + 3) % SIZE;
             const ny = (dolphin._y + 3) % SIZE;
             const baby = new Dolphin(dolphins.length, ny, nx);
             baby.invulnerableUntil = Date.now() + 30000;
+            baby.matableAfter = Date.now() + 30000;
             dolphins.push(baby);
             reproduceTimer = 2.0;
             document.getElementById('statStatus').textContent = 'New dolphin born';
@@ -691,24 +744,55 @@
     }
 
     function drawEnvironment() {
-      const off = getEnvCanvas();
-      if (!imgData) imgData = off.ctx.createImageData(SIZE, SIZE);
-      const data = imgData.data;
-      let ptr = 0;
-      for (let y = 0; y < SIZE; y++) {
-        for (let x = 0; x < SIZE; x++) {
-          const v = Math.max(0, environment[y][x]);
-          const levelG = Math.min(255, 20 + v);
-          const levelB = Math.min(255, 40 + v * 2);
-          data[ptr] = 6;
-          data[ptr + 1] = levelG;
-          data[ptr + 2] = levelB;
-          data[ptr + 3] = 255;
-          ptr += 4;
-        }
+      const w = canvas.width;
+      const h = canvas.height;
+      const t = gameTime || 0;
+
+      const waterGrad = ctx.createLinearGradient(0, 0, 0, h);
+      waterGrad.addColorStop(0, '#0ea5e9');
+      waterGrad.addColorStop(0.32, '#0284c7');
+      waterGrad.addColorStop(0.68, '#075985');
+      waterGrad.addColorStop(1, '#04283b');
+      ctx.fillStyle = waterGrad;
+      ctx.fillRect(0, 0, w, h);
+
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < 6; i++) {
+        const cx = w * (0.15 + 0.7 * ((Math.sin(t * 0.15 + i * 1.9) + 1) / 2));
+        const cy = h * (0.08 + 0.16 * i + 0.04 * Math.sin(t * 0.22 + i));
+        const r = w * (0.13 + 0.025 * Math.sin(t * 0.3 + i * 1.3));
+        const patch = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+        patch.addColorStop(0, 'rgba(224, 242, 254, 0.12)');
+        patch.addColorStop(1, 'rgba(224, 242, 254, 0)');
+        ctx.fillStyle = patch;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fill();
       }
-      off.ctx.putImageData(imgData, 0, 0);
-      ctx.drawImage(off.canvas, 0, 0, canvas.width, canvas.height);
+      ctx.restore();
+
+      ctx.save();
+      ctx.strokeStyle = 'rgba(224, 242, 254, 0.10)';
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 3; i++) {
+        const yOff = h * (0.2 + i * 0.28) + Math.sin(t * 0.25 + i * 2) * 10;
+        ctx.beginPath();
+        for (let x = -20; x <= w + 20; x += 20) {
+          const y = yOff + Math.sin((x * 0.02) + t * 0.4 + i) * 8;
+          if (x === -20) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      const sandHeight = h * 0.07;
+      const sandGrad = ctx.createLinearGradient(0, h - sandHeight, 0, h);
+      sandGrad.addColorStop(0, 'rgba(217, 180, 90, 0.10)');
+      sandGrad.addColorStop(1, 'rgba(180, 140, 60, 0.30)');
+      ctx.fillStyle = sandGrad;
+      ctx.fillRect(0, h - sandHeight, w, sandHeight);
     }
 
     function drawAgents() {
@@ -772,7 +856,7 @@
       for (const shark of sharks) {
         const cx = shark._x * scale + scale / 2;
         const cy = shark._y * scale + scale / 2;
-        const sharkFont = fontSize * 3 * shark.sizeMultiplier;
+        const sharkFont = fontSize * 8 * shark.sizeMultiplier;
         ctx.font = `${sharkFont}px ${family}`;
         ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
         ctx.shadowBlur = 0;
@@ -816,6 +900,49 @@
       btn.addEventListener('mouseup', release);
       btn.addEventListener('mouseleave', release);
     });
+
+    function canvasPointToGrid(clientX, clientY) {
+      const rect = canvas.getBoundingClientRect();
+      const relX = (clientX - rect.left) / rect.width;
+      const relY = (clientY - rect.top) / rect.height;
+      return {
+        x: Math.min(SIZE, Math.max(0, relX * SIZE)),
+        y: Math.min(SIZE, Math.max(0, relY * SIZE))
+      };
+    }
+
+    function updatePointerTarget(clientX, clientY) {
+      const point = canvasPointToGrid(clientX, clientY);
+      pointerGridX = point.x;
+      pointerGridY = point.y;
+    }
+
+    canvas.addEventListener('touchstart', e => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      if (!touch) return;
+      pointerActive = true;
+      updatePointerTarget(touch.clientX, touch.clientY);
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', e => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      if (!touch) return;
+      updatePointerTarget(touch.clientX, touch.clientY);
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', e => { e.preventDefault(); pointerActive = false; }, { passive: false });
+    canvas.addEventListener('touchcancel', e => { e.preventDefault(); pointerActive = false; }, { passive: false });
+
+    canvas.addEventListener('mousedown', e => {
+      pointerActive = true;
+      updatePointerTarget(e.clientX, e.clientY);
+    });
+    canvas.addEventListener('mousemove', e => {
+      if (pointerActive) updatePointerTarget(e.clientX, e.clientY);
+    });
+    window.addEventListener('mouseup', () => { pointerActive = false; });
 
     createEnvironment();
     init();
