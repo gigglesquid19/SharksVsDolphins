@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#2c3e50">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Agent Based Model</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <style>
+    :root { --bg: #f5f7fa; --panel: #fff; --accent: #2c3e50; --text: #333; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); display: flex; flex-direction: column; align-items: center; padding: 16px; min-height: 100vh; }
+    h1 { font-size: 1.25rem; margin-bottom: 12px; text-align: center; color: var(--accent); }
+    .panel { background: var(--panel); border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); width: 100%; max-width: 640px; padding: 16px; margin-bottom: 16px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .field { display: flex; flex-direction: column; }
+    label { font-size: 0.85rem; margin-bottom: 4px; color: #555; }
+    input[type="number"], input[type="file"] { padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 1rem; }
+    .full { grid-column: span 2; }
+    .controls { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; justify-content: center; }
+    button { padding: 10px 16px; border: none; border-radius: 6px; background: var(--accent); color: #fff; font-size: 0.95rem; cursor: pointer; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    button.secondary { background: #7f8c8d; }
+    canvas { display: block; width: 100%; max-width: 600px; height: auto; border-radius: 8px; background: #000; margin: 0 auto; }
+    .stats { display: flex; justify-content: space-around; margin-top: 8px; font-size: 0.9rem; }
+    .stat { text-align: center; }
+    .stat span { display: block; font-size: 1.2rem; font-weight: 700; }
+    .info { margin-top: 12px; font-size: 0.8rem; color: #666; line-height: 1.4; }
+    @media (max-width: 480px) {
+      .grid { grid-template-columns: 1fr; }
+      .full { grid-column: span 1; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Deer and Wolf Agent Model</h1>
+  <div class="panel">
+    <div class="grid">
+      <div class="field">
+        <label for="numDeers">Number of deer</label>
+        <input id="numDeers" type="number" value="20" min="0" max="100">
+      </div>
+      <div class="field">
+        <label for="numWolves">Number of wolves</label>
+        <input id="numWolves" type="number" value="10" min="0" max="50">
+      </div>
+      <div class="field">
+        <label for="numIter">Max iterations (100-500)</label>
+        <input id="numIter" type="number" value="200" min="100" max="500">
+      </div>
+      <div class="field">
+        <label for="neighbourhood">Neighbourhood (10-100)</label>
+        <input id="neighbourhood" type="number" value="20" min="10" max="100">
+      </div>
+      <div class="field full">
+        <label for="inFile">Environment file (in.txt, optional)</label>
+        <input id="inFile" type="file" accept=".txt,.csv">
+      </div>
+      <div class="field full">
+        <label for="speed">Speed (ms per frame)</label>
+        <input id="speed" type="number" value="100" min="10" max="2000">
+      </div>
+    </div>
+    <div class="controls">
+      <button id="startBtn" onclick="start()">Start</button>
+      <button id="pauseBtn" class="secondary" onclick="togglePause()" disabled>Pause</button>
+      <button class="secondary" onclick="stepOnce()">Step</button>
+      <button class="secondary" onclick="reset()">Reset</button>
+    </div>
+  </div>
+  <div class="panel" style="padding: 12px;">
+    <canvas id="simCanvas" width="600" height="600"></canvas>
+    <div class="stats">
+      <div class="stat">Iteration<br><span id="statIter">0</span></div>
+      <div class="stat">Deer<br><span id="statDeer">0</span></div>
+      <div class="stat">Wolves<br><span id="statWolf">0</span></div>
+      <div class="stat">Status<br><span id="statStatus">Ready</span></div>
+    </div>
+  </div>
+  <div class="panel info">
+    This is a browser port of the deer and wolf agent based model. It works offline as a PWA. If you want the original environment data, upload the <code>in.txt</code> file from the Python version; otherwise a random environment is generated.
+  </div>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW registration failed:', err));
+    }
+
+    const SIZE = 100;
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+
+    let environment = [];
+    let deers = [];
+    let wolves = [];
+    let iteration = 0;
+    let maxIterations = 200;
+    let neighbourhood = 20;
+    let running = false;
+    let timer = null;
+    let envCanvas = null;
+    let envCtx = null;
+    let imgData = null;
+
+    class Deer {
+      constructor(i, y, x, env) {
+        this.id = i;
+        this._x = x === null || x === undefined ? Math.floor(Math.random() * 100) : x;
+        this._y = y === null || y === undefined ? Math.floor(Math.random() * 100) : y;
+        this.environment = env;
+        this.store = 0;
+        this.color = 1;
+      }
+
+      move() {
+        if (Math.random() < 0.33) this._y = (this._y + 1) % 100;
+        else this._y = (this._y - 1 + 100) % 100;
+
+        if (Math.random() < 0.33) this._x = (this._x + 1) % 100;
+        else this._x = (this._x - 1 + 100) % 100;
+      }
+
+      eat() {
+        if (this.environment[this._y][this._x] > 0) {
+          this.environment[this._y][this._x] -= 10;
+          this.store += 10;
+        }
+      }
+
+      distanceBetween(other) {
+        return Math.sqrt((this._x - other._x) ** 2 + (this._y - other._y) ** 2);
+      }
+
+      shareWithNeighbours() {
+        for (const deer of deers) {
+          if (deer === this) continue;
+          const dist = this.distanceBetween(deer);
+          if (dist <= neighbourhood) {
+            const average = (this.store + deer.store) / 2;
+            this.store = average;
+            deer.store = average;
+          }
+        }
+      }
+    }
+
+    class Wolf {
+      constructor(i) {
+        this.id = i;
+        this._x = Math.floor(Math.random() * 100);
+        this._y = Math.floor(Math.random() * 100);
+        this.store = 0;
+        this.color = 1;
+        this.energy = 200;
+      }
+
+      move() {
+        if (Math.random() < 0.33) this._y = (this._y + 4) % 100;
+        else this._y = (this._y - 4 + 100) % 100;
+        this.energy -= 1;
+
+        if (Math.random() < 0.33) this._x = (this._x + 4) % 100;
+        else this._x = (this._x - 4 + 100) % 100;
+        this.energy -= 1;
+      }
+
+      eat() {
+        for (let i = 0; i < deers.length; i++) {
+          const deer = deers[i];
+          const dist = this.distanceBetween(deer);
+          if (dist <= neighbourhood && this.energy <= 100) {
+            this.energy = 150;
+            deers.splice(i, 1);
+            return true;
+          }
+        }
+        return false;
+      }
+
+      distanceBetween(other) {
+        return Math.sqrt((this._x - other._x) ** 2 + (this._y - other._y) ** 2);
+      }
+    }
+
+    function shuffle(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+    }
+
+    function getEnvCanvas() {
+      if (!envCanvas) {
+        envCanvas = document.createElement('canvas');
+        envCanvas.width = SIZE;
+        envCanvas.height = SIZE;
+        envCtx = envCanvas.getContext('2d');
+      }
+      return { canvas: envCanvas, ctx: envCtx };
+    }
+
+    function createEnvironment() {
+      environment = [];
+      for (let y = 0; y < SIZE; y++) {
+        const row = [];
+        for (let x = 0; x < SIZE; x++) {
+          row.push(Math.floor(Math.random() * 100));
+        }
+        environment.push(row);
+      }
+    }
+
+    function loadEnvironmentFromFile(text) {
+      const rows = text.trim().split(/\r?\n/);
+      if (rows.length < SIZE) throw new Error('File must have at least 100 rows');
+      environment = [];
+      for (let y = 0; y < SIZE; y++) {
+        const values = rows[y].split(',').map(v => parseInt(v.trim(), 10));
+        if (values.length < SIZE) throw new Error(`Row ${y+1} must have at least 100 values`);
+        environment.push(values.slice(0, SIZE));
+      }
+    }
+
+    function init() {
+      const numDeers = parseInt(document.getElementById('numDeers').value, 10) || 0;
+      const numWolves = parseInt(document.getElementById('numWolves').value, 10) || 0;
+      maxIterations = parseInt(document.getElementById('numIter').value, 10) || 200;
+      neighbourhood = parseInt(document.getElementById('neighbourhood').value, 10) || 20;
+
+      if (maxIterations < 100 || maxIterations > 500) {
+        alert('Iterations must be between 100 and 500');
+        return false;
+      }
+      if (neighbourhood < 10 || neighbourhood > 100) {
+        alert('Neighbourhood must be between 10 and 100');
+        return false;
+      }
+
+      deers = [];
+      for (let i = 0; i < numDeers; i++) {
+        const x = Math.floor(Math.random() * 100);
+        const y = Math.floor(Math.random() * 100);
+        deers.push(new Deer(i, y, x, environment));
+      }
+
+      wolves = [];
+      for (let i = 0; i < numWolves; i++) {
+        wolves.push(new Wolf(i));
+      }
+
+      iteration = 0;
+      updateStats();
+      draw();
+      return true;
+    }
+
+    function step() {
+      if (wolves.length === 0 || iteration >= maxIterations) {
+        stop();
+        document.getElementById('statStatus').textContent = 'Finished';
+        return;
+      }
+
+      shuffle(wolves);
+      shuffle(deers);
+
+      for (const deer of deers) {
+        deer.move();
+        deer.eat();
+        deer.shareWithNeighbours();
+      }
+
+      for (const wolf of wolves) {
+        wolf.move();
+        wolf.eat();
+      }
+
+      wolves = wolves.filter(w => w.energy > 0);
+
+      iteration++;
+      updateStats();
+      draw();
+
+      if (wolves.length === 0) {
+        stop();
+        document.getElementById('statStatus').textContent = 'Wolves starved';
+      } else if (iteration >= maxIterations) {
+        stop();
+        document.getElementById('statStatus').textContent = 'Max iterations reached';
+      }
+    }
+
+    function start() {
+      if (!init()) return;
+      running = true;
+      document.getElementById('startBtn').textContent = 'Restart';
+      document.getElementById('pauseBtn').disabled = false;
+      document.getElementById('pauseBtn').textContent = 'Pause';
+      document.getElementById('statStatus').textContent = 'Running';
+      loop();
+    }
+
+    function loop() {
+      if (!running) return;
+      step();
+      if (running) {
+        const speed = parseInt(document.getElementById('speed').value, 10) || 100;
+        timer = setTimeout(loop, speed);
+      }
+    }
+
+    function togglePause() {
+      running = !running;
+      const btn = document.getElementById('pauseBtn');
+      if (running) {
+        btn.textContent = 'Pause';
+        document.getElementById('statStatus').textContent = 'Running';
+        loop();
+      } else {
+        btn.textContent = 'Resume';
+        document.getElementById('statStatus').textContent = 'Paused';
+      }
+    }
+
+    function stepOnce() {
+      if (deers.length === 0 && wolves.length === 0 && iteration === 0) {
+        if (!init()) return;
+      }
+      running = false;
+      document.getElementById('pauseBtn').textContent = 'Resume';
+      step();
+    }
+
+    function stop() {
+      running = false;
+      clearTimeout(timer);
+      document.getElementById('pauseBtn').disabled = true;
+    }
+
+    function reset() {
+      stop();
+      createEnvironment();
+      init();
+      document.getElementById('statStatus').textContent = 'Ready';
+      document.getElementById('startBtn').textContent = 'Start';
+    }
+
+    function updateStats() {
+      document.getElementById('statIter').textContent = iteration;
+      document.getElementById('statDeer').textContent = deers.length;
+      document.getElementById('statWolf').textContent = wolves.length;
+    }
+
+    function drawEnvironment() {
+      const off = getEnvCanvas();
+      if (!imgData) imgData = off.ctx.createImageData(SIZE, SIZE);
+      const data = imgData.data;
+      let ptr = 0;
+      for (let y = 0; y < SIZE; y++) {
+        for (let x = 0; x < SIZE; x++) {
+          const v = Math.max(0, environment[y][x]);
+          const green = Math.min(255, Math.max(0, v * 2));
+          data[ptr] = 0;
+          data[ptr + 1] = green;
+          data[ptr + 2] = 0;
+          data[ptr + 3] = 255;
+          ptr += 4;
+        }
+      }
+      off.ctx.putImageData(imgData, 0, 0);
+      ctx.drawImage(off.canvas, 0, 0, canvas.width, canvas.height);
+    }
+
+    function drawAgents() {
+      const scale = canvas.width / SIZE;
+      ctx.save();
+      ctx.scale(scale, scale);
+
+      for (const deer of deers) {
+        ctx.beginPath();
+        ctx.fillStyle = '#4caf50';
+        ctx.arc(deer._x + 0.5, deer._y + 0.5, 0.4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      for (const wolf of wolves) {
+        ctx.beginPath();
+        ctx.fillStyle = '#ff5252';
+        ctx.arc(wolf._x + 0.5, wolf._y + 0.5, 0.45, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.restore();
+    }
+
+    function draw() {
+      drawEnvironment();
+      drawAgents();
+    }
+
+    document.getElementById('inFile').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const text = await file.text();
+      try {
+        loadEnvironmentFromFile(text);
+        init();
+        document.getElementById('statStatus').textContent = 'Environment loaded';
+      } catch (err) {
+        alert('Could not read environment file: ' + err.message);
+      }
+    });
+
+    createEnvironment();
+    init();
+  </script>
+</body>
+</html>

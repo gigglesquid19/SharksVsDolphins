@@ -1,0 +1,16 @@
+{
+  "name": "Agent Based Model",
+  "short_name": "ABM",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#f5f7fa",
+  "theme_color": "#2c3e50",
+  "description": "Deer and wolf agent based simulation",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
