@@ -310,7 +310,7 @@ button.school.mega-pod:hover:not(:disabled) { box-shadow: 0 6px 22px rgba(168, 8
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.canvas-wrap:fullscreen {
+.canvas-wrap:fullscreen, .canvas-wrap.compact {
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -321,13 +321,13 @@ button.school.mega-pod:hover:not(:disabled) { box-shadow: 0 6px 22px rgba(168, 8
   padding: 0;
   border-radius: 0;
 }
-.canvas-wrap:fullscreen canvas {
+.canvas-wrap:fullscreen canvas, .canvas-wrap.compact canvas {
   width: 100vmin;
   height: 100vmin;
   max-width: none;
   border-radius: 0;
 }
-.canvas-wrap:fullscreen .dpad-row {
+.canvas-wrap:fullscreen .dpad-row, .canvas-wrap.compact .dpad-row {
   position: fixed;
   bottom: 20px;
   left: 50%;
@@ -335,7 +335,7 @@ button.school.mega-pod:hover:not(:disabled) { box-shadow: 0 6px 22px rgba(168, 8
   margin: 0;
   z-index: 5;
 }
-.canvas-wrap:fullscreen .stats {
+.canvas-wrap:fullscreen .stats, .canvas-wrap.compact .stats {
   display: none;
 }
 
@@ -867,7 +867,7 @@ button.mega-shrimp.green {
   border: 2px solid #fff;
   cursor: pointer;
 }
-.canvas-wrap:fullscreen .game-controls {
+.canvas-wrap:fullscreen .game-controls, .canvas-wrap.compact .game-controls {
   position: fixed;
   top: 12px;
   left: 50%;
@@ -882,7 +882,7 @@ button.mega-shrimp.green {
 /* Fullscreen keeps only Start/Retry + Pause visible - everything else relocates into the
    pause panel (see main.ts) so the bar stays a single row and the canvas gets the space back.
    Reset is the one exception: it's just hidden, since the pause panel already has its own. */
-.canvas-wrap:fullscreen #resetBtn {
+.canvas-wrap:fullscreen #resetBtn, .canvas-wrap.compact #resetBtn {
   display: none;
 }
 
@@ -918,34 +918,6 @@ canvas {
   margin-top: 16px;
 }
 
-.dpad {
-  display: grid;
-  grid-template-columns: 56px 56px 56px;
-  grid-template-rows: 56px 56px 56px;
-  gap: 6px;
-  justify-content: center;
-  user-select: none;
-}
-
-.dpad-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 14px;
-  font-size: 1.4rem;
-  color: #fff;
-  touch-action: none;
-  user-select: none;
-  -webkit-user-select: none;
-}
-
-.dpad-btn.active { background: rgba(56, 189, 248, 0.35); }
-.dpad-up { grid-column: 2; grid-row: 1; }
-.dpad-left { grid-column: 1; grid-row: 2; }
-.dpad-right { grid-column: 3; grid-row: 2; }
-.dpad-down { grid-column: 2; grid-row: 3; }
 
 .joystick {
   display: flex;

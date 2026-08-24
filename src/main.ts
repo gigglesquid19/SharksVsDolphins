@@ -3,6 +3,7 @@ import { Game } from './game';
 import { sfx } from './sfx';
 import { clearRunCheckpoint, loadRunCheckpoint } from './runState';
 import { registerSW } from 'virtual:pwa-register';
+import { Capacitor } from '@capacitor/core';
 
 // Registers the Workbox-generated service worker (see vite.config.ts) so the built assets
 // are cached for offline play; auto-updates in the background when a new build is deployed.
@@ -108,6 +109,10 @@ const inputs = {
   await game.init();
   const gameCanvas = game.getCanvas();
 
+  if (Capacitor.isNativePlatform()) {
+    enableNativeCompactLayout();
+  }
+
   inputs.startBtn.addEventListener('click', () => game.retry());
 
   document.getElementById('titleCampaignBtn')!.addEventListener('click', () => {
@@ -191,9 +196,16 @@ const inputs = {
     }
   }
 
+  // True browser Fullscreen API (desktop/mobile web) OR the native app's always-on compact
+  // layout (see enableNativeCompactLayout - Android WebView doesn't reliably support
+  // Element.requestFullscreen() for arbitrary elements, so the native app can't rely on it).
+  function isCompactLayout(): boolean {
+    return !!document.fullscreenElement || canvasWrap.classList.contains('compact');
+  }
+
   function applyFullscreenCanvasSize(): void {
-    if (document.fullscreenElement) {
-      // The top control bar floats fixed over the canvas in fullscreen; reserve real space
+    if (isCompactLayout()) {
+      // The top control bar floats fixed over the canvas in this layout; reserve real space
       // for it (measured, since it can wrap onto two rows on a narrower window) so gameplay
       // near the top edge is never hidden behind it.
       const controlsEl = document.querySelector('.canvas-wrap .game-controls') as HTMLElement | null;
@@ -201,9 +213,16 @@ const inputs = {
       const reservedTop = controlsEl ? controlsEl.getBoundingClientRect().bottom + gap : 0;
       canvasWrap.style.paddingTop = `${reservedTop}px`;
 
-      const size = Math.min(window.innerWidth, window.innerHeight - reservedTop);
-      gameCanvas.style.width = `${size}px`;
-      gameCanvas.style.height = `${size}px`;
+      // The world grid is a fixed 1:1 square, but a phone screen isn't - a true square bounded
+      // by width alone only ever covers ~45-55% of a tall screen. Instead of preserving the
+      // square, fill most of both dimensions independently (mild stretch, not a hard crop) so
+      // the play area actually covers most of the screen. WIDTH_FILL/HEIGHT_FILL leave a small
+      // breathing-room margin rather than going fully edge-to-edge.
+      const WIDTH_FILL = 0.95;
+      const HEIGHT_FILL = 0.85;
+      const availableHeight = window.innerHeight - reservedTop;
+      gameCanvas.style.width = `${window.innerWidth * WIDTH_FILL}px`;
+      gameCanvas.style.height = `${availableHeight * HEIGHT_FILL}px`;
     } else {
       canvasWrap.style.paddingTop = '';
       gameCanvas.style.width = '';
@@ -220,7 +239,6 @@ const inputs = {
     'achievementsBtn',
     'fullscreenBtn',
     'muteBtn',
-    'controlModeBtn',
     'volumeControl',
   ];
   let relocatedControls: { el: HTMLElement; parent: HTMLElement; nextSibling: Node | null }[] = [];
@@ -244,6 +262,17 @@ const inputs = {
     relocatedControls = [];
   }
 
+  // The native Android/iOS app has no browser chrome to escape and always fills the screen,
+  // so it gets the compact layout permanently rather than through the (unreliable, in a
+  // WebView) Fullscreen API. The Fullscreen toggle itself is meaningless there, so it's
+  // hidden rather than relocated.
+  function enableNativeCompactLayout(): void {
+    canvasWrap.classList.add('compact');
+    document.getElementById('fullscreenBtn')?.classList.add('hidden');
+    moveControlsIntoPauseMenu();
+    applyFullscreenCanvasSize();
+  }
+
   document.addEventListener('fullscreenchange', () => {
     const btn = document.getElementById('fullscreenBtn') as HTMLButtonElement;
     btn.textContent = document.fullscreenElement ? 'Exit Fullscreen' : 'Fullscreen';
@@ -256,33 +285,11 @@ const inputs = {
   });
 
   window.addEventListener('resize', () => {
-    if (document.fullscreenElement) applyFullscreenCanvasSize();
+    if (isCompactLayout()) applyFullscreenCanvasSize();
   });
 
-  const dpadEl = document.getElementById('dpad') as HTMLDivElement;
-  const joystickEl = document.getElementById('joystick') as HTMLDivElement;
   const joystickBase = document.getElementById('joystickBase') as HTMLDivElement;
   const joystickThumb = document.getElementById('joystickThumb') as HTMLDivElement;
-  const controlModeBtn = document.getElementById('controlModeBtn') as HTMLButtonElement;
-  const CONTROL_MODE_KEY = 'svsd-control-mode';
-  let controlMode: 'dpad' | 'joystick' = localStorage.getItem(CONTROL_MODE_KEY) === 'joystick' ? 'joystick' : 'dpad';
-
-  function applyControlMode(): void {
-    const useJoystick = controlMode === 'joystick';
-    dpadEl.classList.toggle('hidden', useJoystick);
-    joystickEl.classList.toggle('hidden', !useJoystick);
-    controlModeBtn.textContent = useJoystick ? 'Controls: Joystick' : 'Controls: D-Pad';
-  }
-  applyControlMode();
-
-  controlModeBtn.addEventListener('click', () => {
-    controlMode = controlMode === 'dpad' ? 'joystick' : 'dpad';
-    localStorage.setItem(CONTROL_MODE_KEY, controlMode);
-    applyControlMode();
-    game.setPointer(false);
-    joystickBase.classList.remove('active');
-    joystickThumb.style.transform = '';
-  });
 
   const JOYSTICK_RADIUS = 52;
   let joystickActive = false;
@@ -351,26 +358,6 @@ const inputs = {
   });
   window.addEventListener('mouseup', () => {
     if (joystickActive) endJoystick();
-  });
-
-  document.querySelectorAll('.dpad-btn').forEach((btn) => {
-    const key = (btn as HTMLElement).dataset.key!;
-    const press = (e: Event) => {
-      e.preventDefault();
-      game.setKey(key, true);
-      btn.classList.add('active');
-    };
-    const release = (e: Event) => {
-      e.preventDefault();
-      game.setKey(key, false);
-      btn.classList.remove('active');
-    };
-    btn.addEventListener('touchstart', press, { passive: false });
-    btn.addEventListener('touchend', release, { passive: false });
-    btn.addEventListener('touchcancel', release, { passive: false });
-    btn.addEventListener('mousedown', press);
-    btn.addEventListener('mouseup', release);
-    btn.addEventListener('mouseleave', release);
   });
 
   function updatePointerDirection(clientX: number, clientY: number): void {

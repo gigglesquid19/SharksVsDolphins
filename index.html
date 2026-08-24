@@ -84,7 +84,6 @@
         <button id="achievementsBtn" class="secondary">Achievements</button>
         <button id="fullscreenBtn" class="secondary">Fullscreen</button>
         <button id="muteBtn" class="secondary" aria-label="Mute music">Music: On</button>
-        <button id="controlModeBtn" class="secondary">Controls: D-Pad</button>
         <div class="volume-control" id="volumeControl">
           <label for="volumeSlider">Vol</label>
           <input type="range" id="volumeSlider" min="0" max="100" value="35" aria-label="Volume">
@@ -199,13 +198,7 @@
         </div>
       </div>
       <div class="dpad-row">
-        <div class="dpad" id="dpad">
-          <div class="dpad-btn dpad-up" data-key="ArrowUp">▲</div>
-          <div class="dpad-btn dpad-left" data-key="ArrowLeft">◀</div>
-          <div class="dpad-btn dpad-right" data-key="ArrowRight">▶</div>
-          <div class="dpad-btn dpad-down" data-key="ArrowDown">▼</div>
-        </div>
-        <div class="joystick hidden" id="joystick">
+        <div class="joystick" id="joystick">
           <div class="joystick-base" id="joystickBase">
             <div class="joystick-thumb" id="joystickThumb"></div>
           </div>
