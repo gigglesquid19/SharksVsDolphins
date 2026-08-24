@@ -25,7 +25,7 @@ export default defineConfig({
             handler: 'CacheFirst',
             options: {
               cacheName: 'svsd-audio',
-              expiration: { maxEntries: 4 },
+              expiration: { maxEntries: 6 },
             },
           },
         ],

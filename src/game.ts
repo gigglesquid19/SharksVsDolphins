@@ -33,6 +33,7 @@ import {
 } from './scoring';
 import { RunCheckpoint, clearRunCheckpoint, saveRunCheckpoint } from './runState';
 import { hasSeenHint, markHintSeen, HintId } from './tutorialHints';
+import { AMBIENT_TRACKS, BOSS_TRACKS, pickRandomTrack } from './music';
 import { ACHIEVEMENTS, AchievementId, getUnlockedMap, unlock } from './achievements';
 
 export type GameMode = 'campaign' | 'endless';
@@ -215,6 +216,8 @@ export class Game {
   private sharkWarningOverlayEl: HTMLDivElement;
   private sharkWarningListEl: HTMLDivElement;
   private onSchoolingChange?: (active: boolean) => void;
+  private onMusicTrackChange?: (url: string) => void;
+  private lastMusicLevel = 0;
   private paused = false;
 
   private stage!: Container;
@@ -251,6 +254,7 @@ export class Game {
       sharkWarningOverlay: HTMLDivElement;
       sharkWarningList: HTMLDivElement;
       onSchoolingChange?: (active: boolean) => void;
+      onMusicTrackChange?: (url: string) => void;
     }
   ) {
     this.canvas = canvas;
@@ -299,6 +303,7 @@ export class Game {
     this.sharkWarningOverlayEl = inputs.sharkWarningOverlay;
     this.sharkWarningListEl = inputs.sharkWarningList;
     this.onSchoolingChange = inputs.onSchoolingChange;
+    this.onMusicTrackChange = inputs.onMusicTrackChange;
     this.lastLifeHeart = document.getElementById('lastLifeHeart');
     this.levelBadgeNumberEl = document.getElementById('levelBadgeNumber');
 
@@ -673,6 +678,7 @@ export class Game {
       this.sharksKilled = 0;
       this.sessionStartTime = 0;
       this.totalDolphinsSaved = 0;
+      this.lastMusicLevel = 0;
       this.leaderboardOverlayEl?.classList.add('hidden');
     }
 
@@ -723,6 +729,7 @@ export class Game {
     this.draw();
     this.checkForNewSharks(config);
     this.announceLevel();
+    this.applyLevelMusic();
     return true;
   }
 
@@ -733,6 +740,28 @@ export class Game {
 
   private updateLevelBadge(): void {
     if (this.levelBadgeNumberEl) this.levelBadgeNumberEl.textContent = String(this.currentLevel);
+  }
+
+  /**
+   * Picks the background music track for the level just entered (a no-op on a same-level retry,
+   * since currentLevel won't have changed). A boss level gets a fresh random boss track; the level
+   * right after a boss level (or level 1 of a fresh run) gets a fresh random ambient track; any other
+   * level leaves whatever's already playing alone, so the ambient track loops across a whole block.
+   */
+  private applyLevelMusic(): void {
+    if (this.currentLevel === this.lastMusicLevel) return;
+    this.lastMusicLevel = this.currentLevel;
+
+    const config = getLevelConfig(this.currentLevel);
+    if (config.matriarch) {
+      this.onMusicTrackChange?.(pickRandomTrack(BOSS_TRACKS));
+      return;
+    }
+
+    const previousWasBoss = this.currentLevel > 1 && getLevelConfig(this.currentLevel - 1).matriarch;
+    if (this.currentLevel === 1 || previousWasBoss) {
+      this.onMusicTrackChange?.(pickRandomTrack(AMBIENT_TRACKS));
+    }
   }
 
   private addDolphinSprite(dolphin: Dolphin): void {
@@ -1153,6 +1182,7 @@ export class Game {
 
     this.setStatus(`Level ${this.currentLevel}: hunt the sharks!`);
     this.announceLevel(2500);
+    this.applyLevelMusic();
 
     if (this.player) {
       if (this.mode === 'campaign') {

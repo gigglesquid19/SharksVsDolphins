@@ -25,6 +25,8 @@ Contents
   persistence (`localStorage`).
 - `src/tutorialHints.ts` - first-run tooltip seen/unseen persistence
   (`localStorage`).
+- `src/music.ts` - the ambient/boss track lists and random-pick helper (see
+  Music below).
 - `src/utils.ts` / `src/constants.ts` - shared world-space math helpers
   (wrap/clamp/direction) and the SIZE/CANVAS_SIZE constants they use.
 - `src/levels.ts` - the ten-level campaign as data (shark composition,
@@ -127,9 +129,28 @@ Game Features
   repeats at the next 10-level mark rather than ending the run. She only
   counts toward the Matriarch Slayer achievement and the sharks-killed
   stat on an actual kill, which now only happens in Campaign mode.
-- **Sound**: background music with a mute toggle and volume slider, plus
-  procedurally synthesized sound effects (bite, recruit chime, shrimp
-  pickup, storm rumble) via the Web Audio API.
+- **Sound**: dynamic background music (see Music below) with a mute toggle
+  and volume slider, plus procedurally synthesized sound effects (bite,
+  recruit chime, shrimp pickup, storm rumble) via the Web Audio API.
+
+Music
+--------------------
+Six tracks live in `public/music/`: three ambient (`ambient-1/2/3.mp3`) and
+three boss (`boss-1/2/3.mp3`), picked randomly at runtime by
+`src/music.ts`/`Game.applyLevelMusic()` (called whenever the current level
+number changes - a same-level retry leaves the current track alone):
+- A fresh run (level 1) picks a random ambient track and loops it.
+- A boss level (level 10 in Campaign; every 10th level in Endless) picks a
+  random boss track the moment it starts.
+- The level right after a boss level picks a fresh random ambient track and
+  loops that until the next boss level.
+- Any other level transition leaves whatever's currently playing alone, so
+  the ambient track spans the whole block between boss levels.
+
+Source `.mp3`s for both sets also live in `audio/Ambient/` and
+`audio/Boss/` (the project's convention for original/source assets, mirroring
+`Images/` for the level backgrounds) - `public/music/` holds the served
+copies. See Known Issues below for their license status.
 - **Pause menu**: freezes the simulation and timers; resume, restart, or
   reset from the overlay, or toggle with `Esc`/`P`.
 - **Achievements**: five one-time unlocks (first recruit, first Hunting Mode
@@ -146,13 +167,13 @@ Game Features
 
 Known Issues / Before You Deploy Publicly
 ---------------------------------------------
-- **`public/ambient-music.mp3` needs to be replaced.** The file currently in
-  this repo is a placeholder used for local testing and is not
-  rights-cleared for distribution. Swap in a licensed or original track
-  before building/deploying anywhere public. Budget the replacement to
-  roughly 1-2MB compressed (a loopable ~90-180s track at a moderate MP3/OGG
-  bitrate is plenty for background music and keeps the PWA/install payload
-  reasonable) rather than the current 6MB file.
+- The old copyrighted placeholder track (`public/ambient-music.mp3`, a
+  Nintendo song) has been removed and replaced by the six-track system in
+  `public/music/` (see Music above). **License status of the six new
+  tracks is not yet documented** - they need their source/license recorded
+  (a credits file, per Store Readiness below) before a public release,
+  even though none of them are commercial game music like the old
+  placeholder was.
 - Background images in `public/` and `Images/` should be checked for usage
   rights before a public or commercial release. The shark sprite pack in
   `public/sharks/` (sourced from `Images/Free Shark Enemy Pack`) is

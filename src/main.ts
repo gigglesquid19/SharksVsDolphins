@@ -96,6 +96,11 @@ const inputs = {
   onSchoolingChange: (active: boolean) => {
     bgMusic.playbackRate = active ? 1.5 : 1;
   },
+  onMusicTrackChange: (url: string) => {
+    bgMusic.src = url;
+    bgMusic.load();
+    bgMusic.play().catch((err) => console.warn('Music track switch failed:', err));
+  },
 };
 
 (async function main() {
