@@ -2,10 +2,11 @@ import './style.css';
 import { Game } from './game';
 import { sfx } from './sfx';
 import { clearRunCheckpoint, loadRunCheckpoint } from './runState';
+import { registerSW } from 'virtual:pwa-register';
 
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then((regs) => regs.forEach((r) => r.unregister())).catch((err) => console.warn('SW unregister failed:', err));
-}
+// Registers the Workbox-generated service worker (see vite.config.ts) so the built assets
+// are cached for offline play; auto-updates in the background when a new build is deployed.
+registerSW({ immediate: true });
 
 const canvas = document.getElementById('simCanvas') as HTMLCanvasElement;
 const canvasWrap = document.getElementById('canvasWrap') as HTMLDivElement;
