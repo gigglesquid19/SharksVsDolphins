@@ -211,9 +211,47 @@ const inputs = {
     }
   }
 
+  // In fullscreen, only Start/Retry + Pause stay in the always-visible bar; everything else
+  // (settings, secondary actions) relocates into the pause panel so the bar stays one row and
+  // the canvas gets that space back. Moved back to their original spot on exiting fullscreen.
+  const RELOCATABLE_CONTROL_IDS = [
+    'levelSelectWrap',
+    'leaderboardBtn',
+    'achievementsBtn',
+    'fullscreenBtn',
+    'muteBtn',
+    'controlModeBtn',
+    'volumeControl',
+  ];
+  let relocatedControls: { el: HTMLElement; parent: HTMLElement; nextSibling: Node | null }[] = [];
+
+  function moveControlsIntoPauseMenu(): void {
+    if (relocatedControls.length) return;
+    const target = document.getElementById('pauseSettingsList');
+    if (!target) return;
+    for (const id of RELOCATABLE_CONTROL_IDS) {
+      const el = document.getElementById(id);
+      if (!el || !el.parentElement) continue;
+      relocatedControls.push({ el, parent: el.parentElement, nextSibling: el.nextSibling });
+      target.appendChild(el);
+    }
+  }
+
+  function restoreControlsFromPauseMenu(): void {
+    for (const { el, parent, nextSibling } of relocatedControls) {
+      parent.insertBefore(el, nextSibling);
+    }
+    relocatedControls = [];
+  }
+
   document.addEventListener('fullscreenchange', () => {
     const btn = document.getElementById('fullscreenBtn') as HTMLButtonElement;
     btn.textContent = document.fullscreenElement ? 'Exit Fullscreen' : 'Fullscreen';
+    if (document.fullscreenElement) {
+      moveControlsIntoPauseMenu();
+    } else {
+      restoreControlsFromPauseMenu();
+    }
     applyFullscreenCanvasSize();
   });
 

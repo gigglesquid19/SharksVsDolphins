@@ -879,6 +879,26 @@ button.mega-shrimp.green {
   padding: 8px 10px;
   border-radius: 999px;
 }
+/* Fullscreen keeps only Start/Retry + Pause visible - everything else relocates into the
+   pause panel (see main.ts) so the bar stays a single row and the canvas gets the space back.
+   Reset is the one exception: it's just hidden, since the pause panel already has its own. */
+.canvas-wrap:fullscreen #resetBtn {
+  display: none;
+}
+
+.pause-settings {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  width: 100%;
+}
+.pause-settings:empty {
+  display: none;
+}
 
 canvas {
   display: block;

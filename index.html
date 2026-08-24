@@ -85,7 +85,7 @@
         <button id="fullscreenBtn" class="secondary">Fullscreen</button>
         <button id="muteBtn" class="secondary" aria-label="Mute music">Music: On</button>
         <button id="controlModeBtn" class="secondary">Controls: D-Pad</button>
-        <div class="volume-control">
+        <div class="volume-control" id="volumeControl">
           <label for="volumeSlider">Vol</label>
           <input type="range" id="volumeSlider" min="0" max="100" value="35" aria-label="Volume">
         </div>
@@ -127,6 +127,7 @@
           <button id="pauseResumeBtn" class="school ready">Resume</button>
           <button id="pauseRestartBtn" class="secondary">Restart</button>
           <button id="pauseResetBtn" class="secondary">Reset</button>
+          <div class="pause-settings" id="pauseSettingsList"></div>
         </div>
       </div>
       <div class="level-up-overlay hidden" id="levelUpOverlay">
