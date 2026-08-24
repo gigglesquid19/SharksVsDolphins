@@ -14,19 +14,31 @@ Contents
   game canvas, on-screen controls, and audio elements.
 - `src/main.ts` - entry point: wires up all UI (buttons, D-pad, joystick,
   volume, pause menu, fullscreen) to the `Game` class.
-- `src/game.ts` - core game/simulation logic: dolphins, sharks, movement,
-  collisions, Hunting Mode, procedural storm events, level transitions,
-  banners, and the render loop.
-- `src/sprites.ts` - PixiJS Graphics-based dolphin and shark sprite factories.
+- `src/game.ts` - core game/simulation orchestration: level flow, spawning,
+  Hunting Mode, procedural storm/jellyfish events, the matriarch boss, the
+  Mega Shrimp upgrade choices, banners, and the render loop.
+- `src/entities.ts` - the Dolphin, Shark, MagicShrimp, and Jellyfish classes
+  and their movement logic (no Pixi/DOM dependencies).
+- `src/scoring.ts` - local top-10 leaderboard persistence (`localStorage`).
+- `src/utils.ts` / `src/constants.ts` - shared world-space math helpers
+  (wrap/clamp/direction) and the SIZE/CANVAS_SIZE constants they use.
+- `src/levels.ts` - the ten-level campaign as data (shark composition,
+  counts, speed scaling, pod requirements) rather than per-level code.
+- `src/sprites.ts` - PixiJS Graphics/texture factories for dolphins, sharks,
+  and jellyfish.
 - `src/particles.ts` - lightweight pooled particle system (bubbles, wakes,
   hit sparks, sparkles).
 - `src/sfx.ts` - procedurally synthesized sound effects (Web Audio API, no
   external audio files needed for SFX).
 - `src/style.css` - all styling: layout, theming, banners, overlays, and
   responsive/mobile rules.
-- `public/` - static assets served as-is: background images, the manifest,
-  the app icon, and background music.
+- `src/*.test.ts` - vitest unit tests for the modules above; run with
+  `npm test`.
+- `public/` - static assets served as-is: background images (WebP), the
+  manifest, the app icon, and background music.
 - `manifest.json` - PWA metadata / home screen icon config.
+- `.github/workflows/ci.yml` - runs `npm test` and `npm run build` on every
+  push/PR once this repo has a GitHub remote.
 
 Getting Started
 --------------------
@@ -103,25 +115,31 @@ Known Issues / Before You Deploy Publicly
 - **`public/ambient-music.mp3` needs to be replaced.** The file currently in
   this repo is a placeholder used for local testing and is not
   rights-cleared for distribution. Swap in a licensed or original track
-  before building/deploying anywhere public.
+  before building/deploying anywhere public. Budget the replacement to
+  roughly 1-2MB compressed (a loopable ~90-180s track at a moderate MP3/OGG
+  bitrate is plenty for background music and keeps the PWA/install payload
+  reasonable) rather than the current 6MB file.
 - Background images in `public/` and `Images/` should be checked for usage
-  rights before a public or commercial release.
+  rights before a public or commercial release. The shark sprite pack in
+  `public/sharks/` (sourced from `Images/Free Shark Enemy Pack`) is
+  confirmed clear: MutterPixel Studio's license permits commercial use with
+  no attribution required (see the pack's own `README.txt`).
 - `npm run build` output (`dist/`) is what should be deployed, not the raw
   repository root; the previous "no build step" GitHub Pages setup no
   longer applies now that the project uses Vite and TypeScript.
 
 Ideas for Further Development
 -----------------------------
-- Data-driven level definitions (shark counts/sizes/speeds, background,
-  win condition) instead of hand-written per-level spawn methods, to make
-  adding a third level and beyond easier.
-- Persistent high scores / best times using local storage.
 - Android packaging via Capacitor or a Trusted Web Activity, plus PNG app
   icons (192x192/512x512/maskable) for proper install prompts.
-- Analytics/crash reporting, and a CI pipeline running `tsc`/`vite build` on
-  every push.
+- Analytics/crash reporting.
 - Cosmetic unlocks, achievements, and daily challenges for longer-term
   retention.
+- Split the storm/matriarch/spawning logic still in `src/game.ts` out into
+  dedicated system modules, the way `src/entities.ts` and `src/scoring.ts`
+  already were. That code is threaded through `step()`/`init()` with a lot
+  of shared private state, so it needs either an interface redesign or
+  broader test coverage first to extract safely.
 
 Original Python Model
 -----------------------------
