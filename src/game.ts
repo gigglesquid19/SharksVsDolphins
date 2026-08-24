@@ -183,6 +183,8 @@ export class Game {
   private sharkGuideList: HTMLElement;
   private lastLifeHeart: HTMLElement | null = null;
   private levelBadgeNumberEl: HTMLElement | null = null;
+  private dolphinsSavedBadgeEl: HTMLElement | null = null;
+  private dolphinsSavedNumberEl: HTMLElement | null = null;
   private bannerEl: HTMLDivElement;
   private bannerTimeout: ReturnType<typeof setTimeout> | null = null;
   private newWatersPromptEl: HTMLDivElement;
@@ -306,6 +308,8 @@ export class Game {
     this.onMusicTrackChange = inputs.onMusicTrackChange;
     this.lastLifeHeart = document.getElementById('lastLifeHeart');
     this.levelBadgeNumberEl = document.getElementById('levelBadgeNumber');
+    this.dolphinsSavedBadgeEl = document.getElementById('dolphinsSavedBadge');
+    this.dolphinsSavedNumberEl = document.getElementById('dolphinsSavedNumber');
 
     this.glowTexture = makeRadialGradientTexture(64, 'rgba(34, 211, 238, 0.45)');
   }
@@ -506,8 +510,26 @@ export class Game {
       this.spawnRecruitedDolphin(this.player._x, this.player._y);
     }
     sfx.playRecruit();
-    this.setStatus(`Mega Pod summoned! +${count} dolphins`);
-    this.showBanner('Mega Pod Summoned!', 'victory', 2600);
+    this.setStatus(count > 0 ? `Mega Pod summoned! +${count} dolphins` : 'Mega Pod summoned!');
+    this.showBanner('Mega Pod Summoned!', 'victory', 1800);
+
+    setTimeout(() => this.defeatMatriarchWithMegaPod(), 1800);
+  }
+
+  /** The Mega Pod's finishing blow, delayed slightly after the summon banner so they don't collide. */
+  private defeatMatriarchWithMegaPod(): void {
+    if (!this.running || !this.matriarch || !this.sharks.includes(this.matriarch) || this.levelCompleted) return;
+    const scale = CANVAS_SIZE / SIZE;
+    this.particles.emit('hit', this.matriarch._x * scale + scale / 2, this.matriarch._y * scale + scale / 2, 24, {
+      speed: 4,
+      life: 0.8,
+    });
+    this.sharksKilled += this.sharks.length;
+    for (const s of this.sharks) this.removeSharkSprite(s);
+    this.sharks = [];
+    this.tryUnlock('matriarchSlayer');
+    this.setStatus('The Matriarch is defeated!');
+    this.levelComplete();
   }
 
   switchDolphin(): void {
@@ -730,6 +752,7 @@ export class Game {
     this.checkForNewSharks(config);
     this.announceLevel();
     this.applyLevelMusic();
+    this.updateDolphinsSavedBadge();
     return true;
   }
 
@@ -740,6 +763,12 @@ export class Game {
 
   private updateLevelBadge(): void {
     if (this.levelBadgeNumberEl) this.levelBadgeNumberEl.textContent = String(this.currentLevel);
+  }
+
+  /** Shown only in Campaign mode, where Dolphins Saved is actually tracked (see saveDolphinsAndDepart). */
+  private updateDolphinsSavedBadge(): void {
+    this.dolphinsSavedBadgeEl?.classList.toggle('hidden', this.mode !== 'campaign');
+    if (this.dolphinsSavedNumberEl) this.dolphinsSavedNumberEl.textContent = String(this.totalDolphinsSaved);
   }
 
   /**
@@ -1002,12 +1031,31 @@ export class Game {
   private levelComplete(): void {
     this.levelCompleted = true;
     if (this.lostThisLevel === 0) this.tryUnlock('flawlessLevel');
+    this.saveDolphinsAndDepart();
     if (this.mode === 'campaign' && this.currentLevel === LEVELS.length) {
       this.recordCampaignClear();
       return;
     }
     this.setStatus('All sharks destroyed!');
     this.showLevelUpChoice();
+  }
+
+  /** Fires the instant the level is cleared, not when the next one starts: in Campaign mode, the
+   * outgoing pod's size is banked as Dolphins Saved and the companions swim off-screen right away.
+   * Endless mode just clears them instantly (no saved-dolphins tracking there - see Mega Pod docs). */
+  private saveDolphinsAndDepart(): void {
+    if (!this.player) return;
+    if (this.mode === 'campaign') {
+      this.totalDolphinsSaved += this.getPodSize();
+      this.updateDolphinsSavedBadge();
+    }
+    for (const dolphin of this.dolphins) {
+      if (!dolphin.isPlayer) {
+        if (this.mode === 'campaign') this.departDolphinSprite(dolphin);
+        else this.removeDolphinSprite(dolphin);
+      }
+    }
+    this.dolphins = [this.player];
   }
 
   /** Campaign-mode classic ending: clearing level 10 stops the run and prompts for the leaderboard. */
@@ -1183,16 +1231,14 @@ export class Game {
     this.setStatus(`Level ${this.currentLevel}: hunt the sharks!`);
     this.announceLevel(2500);
     this.applyLevelMusic();
+    this.updateDolphinsSavedBadge();
 
     if (this.player) {
-      if (this.mode === 'campaign') {
-        this.totalDolphinsSaved += this.getPodSize();
-      }
+      // Companions already departed (Campaign) or were removed (Endless) back in levelComplete(),
+      // right when the level actually finished - this just clears any stragglers defensively and
+      // rebuilds the pod for the level being entered.
       for (const dolphin of this.dolphins) {
-        if (!dolphin.isPlayer) {
-          if (this.mode === 'campaign') this.departDolphinSprite(dolphin);
-          else this.removeDolphinSprite(dolphin);
-        }
+        if (!dolphin.isPlayer) this.removeDolphinSprite(dolphin);
       }
       this.dolphins = [this.player];
 
@@ -1622,7 +1668,11 @@ export class Game {
         if (!this.matriarchSmallCleared) {
           this.matriarchSmallCleared = true;
           this.matriarchSpawnerTimer = this.gameTime + 20;
-          if (this.mode === 'campaign' && this.totalDolphinsSaved > 0) {
+          // No totalDolphinsSaved gate here deliberately: she's only killable via this button in
+          // Campaign mode, so it must always appear once escorts are cleared, even with 0 saved
+          // (summoning would then just add no dolphins but still land the finishing blow) -
+          // otherwise a 0-total run could never defeat her at all.
+          if (this.mode === 'campaign') {
             this.megaPodAvailable = true;
             this.megaPodBtnWrap?.classList.remove('hidden');
             this.setStatus('The dolphins you saved are ready to be summoned!');
@@ -1805,7 +1855,11 @@ export class Game {
       for (const shark of this.sharks) {
         const hitRadius = this.sharkHitRadius(shark);
         const hitsAnyDolphin = this.dolphins.some((d) => shark.distanceBetween(d) < hitRadius);
-        const canDestroy = hitsAnyDolphin && this.getPodSize() >= this.sharkPodRequirement(shark.kind, shark.large);
+        // In Campaign mode the Matriarch can only be defeated via Summon Mega Pod (see
+        // defeatMatriarchWithMegaPod) - ramming her, however big the pod, never destroys her here.
+        const isUnrammableMatriarch = shark === this.matriarch && this.mode === 'campaign';
+        const canDestroy =
+          !isUnrammableMatriarch && hitsAnyDolphin && this.getPodSize() >= this.sharkPodRequirement(shark.kind, shark.large);
         if (!canDestroy) {
           survivingSharks.push(shark);
         } else if (shark === this.matriarch && this.mode === 'endless') {
