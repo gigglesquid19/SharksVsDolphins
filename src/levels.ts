@@ -29,5 +29,5 @@ export const LEVELS: LevelConfig[] = [
 ];
 
 export function getLevelBackground(level: number): string {
-  return `levels/${level}.jpg`;
+  return `levels/${level}.webp`;
 }

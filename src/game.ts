@@ -436,7 +436,7 @@ export class Game {
   }
 
   private async createBackground(): Promise<void> {
-    await this.loadBackground('/OpenOceanBGImage.jpg');
+    await this.loadBackground('/OpenOceanBGImage.webp');
   }
 
   private async loadBackground(url: string): Promise<void> {
