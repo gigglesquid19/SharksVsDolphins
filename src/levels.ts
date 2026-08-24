@@ -37,8 +37,10 @@ export function getLevelBackground(level: number): string {
  * Endless-mode scaling past the 10-level campaign: shark counts, pod
  * requirements, and max pod size grow then cap out so late levels stay
  * playable, while speed keeps climbing indefinitely - that's what
- * eventually ends an endless run. The matriarch reappears every 5 levels
- * as a recurring boss beat.
+ * eventually ends an endless run. The matriarch reappears every 10 levels
+ * as a recurring boss beat; unlike the campaign, she flees wounded instead
+ * of being destroyed (see Game.fleeMatriarch), so the same cycle repeats
+ * indefinitely rather than ending the run.
  */
 export function getEndlessLevelConfig(level: number): LevelConfig {
   const over = level - LEVELS.length;
@@ -50,7 +52,7 @@ export function getEndlessLevelConfig(level: number): LevelConfig {
     largeSharkPodRequirement: Math.min(14 + Math.ceil(over / 2), 20),
     maxDolphins: Math.min(15 + Math.floor(over / 4), 20),
     sharkSpeedMultiplier: 1.27 + over * 0.03,
-    matriarch: over % 5 === 0,
+    matriarch: over % 10 === 0,
   };
 }
 

@@ -28,10 +28,11 @@ describe('getEndlessLevelConfig', () => {
     expect(config.maxDolphins).toBeLessThanOrEqual(20);
   });
 
-  it('brings the matriarch back every 5 levels past the campaign', () => {
-    expect(getEndlessLevelConfig(15).matriarch).toBe(true);
+  it('brings the matriarch back every 10 levels past the campaign', () => {
     expect(getEndlessLevelConfig(20).matriarch).toBe(true);
-    expect(getEndlessLevelConfig(17).matriarch).toBe(false);
+    expect(getEndlessLevelConfig(30).matriarch).toBe(true);
+    expect(getEndlessLevelConfig(15).matriarch).toBe(false);
+    expect(getEndlessLevelConfig(25).matriarch).toBe(false);
   });
 });
 

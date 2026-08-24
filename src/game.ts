@@ -806,6 +806,35 @@ export class Game {
     }
   }
 
+  /** Endless mode: instead of being destroyed, the Matriarch flashes damaged and swims off - she'll be back. */
+  private fleeMatriarch(shark: Shark): void {
+    const sprite = this.sharkSprites.get(shark);
+    if (sprite) {
+      this.sharkSprites.delete(shark);
+      const fish = sprite.getChildByName('fish');
+      if (fish) (fish as unknown as { tint: number }).tint = 0xff4444;
+
+      const startX = sprite.x;
+      const start = performance.now();
+      const DURATION = 900;
+      const DRIFT = 260;
+      const animate = (now: number) => {
+        const t = Math.min(1, (now - start) / DURATION);
+        sprite.x = startX + t * DRIFT;
+        sprite.alpha = 1 - t;
+        if (t < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          this.entityContainer.removeChild(sprite);
+          sprite.destroy();
+        }
+      };
+      requestAnimationFrame(animate);
+    }
+    this.setStatus('The Matriarch flees, wounded...');
+    this.showBanner('Matriarch Flees!', 'storm', 2600);
+  }
+
   private addSharkSprite(shark: Shark): void {
     const container = new Container();
 
@@ -1749,6 +1778,9 @@ export class Game {
         const canDestroy = hitsAnyDolphin && this.getPodSize() >= this.sharkPodRequirement(shark.kind, shark.large);
         if (!canDestroy) {
           survivingSharks.push(shark);
+        } else if (shark === this.matriarch && this.mode === 'endless') {
+          this.particles.emit('hit', shark._x * scale + scale / 2, shark._y * scale + scale / 2, 16, { speed: 3, life: 0.6 });
+          this.fleeMatriarch(shark);
         } else {
           this.particles.emit('hit', shark._x * scale + scale / 2, shark._y * scale + scale / 2, 16, { speed: 3, life: 0.6 });
           this.sharksKilled++;
@@ -1763,7 +1795,7 @@ export class Game {
         this.sharksKilled += this.sharks.length;
         for (const s of this.sharks) this.removeSharkSprite(s);
         this.sharks = [];
-        this.tryUnlock('matriarchSlayer');
+        if (this.mode !== 'endless') this.tryUnlock('matriarchSlayer');
         this.levelComplete();
       }
     }
