@@ -1,6 +1,7 @@
 import './style.css';
 import { Game } from './game';
 import { sfx } from './sfx';
+import { clearRunCheckpoint, loadRunCheckpoint } from './runState';
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.getRegistrations().then((regs) => regs.forEach((r) => r.unregister())).catch((err) => console.warn('SW unregister failed:', err));
@@ -55,7 +56,12 @@ volumeSlider.addEventListener('input', () => {
   }
 });
 
+const titleContinueBtn = document.getElementById('titleContinueBtn') as HTMLButtonElement;
+const savedCheckpoint = loadRunCheckpoint();
+if (savedCheckpoint) titleContinueBtn.classList.remove('hidden');
+
 document.getElementById('titleStartBtn')!.addEventListener('click', () => {
+  clearRunCheckpoint();
   titleScreen.classList.add('hidden');
   narrativeScreen.classList.remove('hidden');
   bgMusic.play().catch((err) => console.warn('Music playback failed:', err));
@@ -96,6 +102,16 @@ const inputs = {
   const gameCanvas = game.getCanvas();
 
   inputs.startBtn.addEventListener('click', () => game.retry());
+  titleContinueBtn.addEventListener('click', () => {
+    if (!savedCheckpoint) return;
+    titleScreen.classList.add('hidden');
+    narrativeScreen.classList.add('hidden');
+    appContent.classList.remove('hidden');
+    bgMusic.play().catch((err) => console.warn('Music playback failed:', err));
+    sfx.resume();
+    game.resumeRun(savedCheckpoint);
+  });
+  document.getElementById('leaderboardBtn')!.addEventListener('click', () => game.showLeaderboard());
   document.getElementById('schoolBtn')!.addEventListener('click', () => game.formSchool());
   document.getElementById('megaShrimpYellow')!.addEventListener('click', () => game.chooseUpgrade('vitality'));
   document.getElementById('megaShrimpRed')!.addEventListener('click', () => game.chooseUpgrade('speed'));

@@ -19,11 +19,12 @@ import {
   SharkTextureSet,
 } from './sprites';
 import { sfx } from './sfx';
-import { LEVELS, LevelConfig, getLevelBackground } from './levels';
+import { LEVELS, LevelConfig, getLevelBackground, getLevelConfig } from './levels';
 import { CANVAS_SIZE, SIZE } from './constants';
 import { clampEntityY, directionDelta, wrapX } from './utils';
 import { Dolphin, Shark, MagicShrimp, Jellyfish } from './entities';
 import { loadScores, saveScore } from './scoring';
+import { RunCheckpoint, clearRunCheckpoint, saveRunCheckpoint } from './runState';
 
 const DOLPHIN_SPAWN_INTERVAL = 15;
 const EVENT_CHECK_INTERVAL = 60;
@@ -326,6 +327,7 @@ export class Game {
   reset(): void {
     this.running = false;
     if (this.timer) clearTimeout(this.timer);
+    clearRunCheckpoint();
     this.createEnvironment();
     this.initModel(this.getSelectedLevelConfig());
     this.setStatus('Ready');
@@ -333,7 +335,7 @@ export class Game {
   }
 
   retry(): void {
-    const config = LEVELS[this.currentLevel - 1] ?? LEVELS[0];
+    const config = getLevelConfig(this.currentLevel);
     if (this.sessionStartTime === 0) {
       this.sessionStartTime = Date.now();
     } else {
@@ -344,6 +346,47 @@ export class Game {
     this.startBtn.textContent = 'Retry';
     this.setStatus('Swimming');
     this.step();
+  }
+
+  /** Restores a checkpoint saved by a previous session and resumes play at that level. */
+  resumeRun(checkpoint: RunCheckpoint): boolean {
+    this.vitalityLives = checkpoint.vitalityLives;
+    this.speedBonusPct = checkpoint.speedBonusPct;
+    this.charismaBonusDolphins = checkpoint.charismaBonusDolphins;
+    this.sprintCooldownReduction = checkpoint.sprintCooldownReduction;
+    this.retries = checkpoint.retries;
+    this.totalRecruited = checkpoint.totalRecruited;
+    this.totalLost = checkpoint.totalLost;
+    this.sharksKilled = checkpoint.sharksKilled;
+    this.seenSharkKinds = new Set(checkpoint.seenSharkKinds);
+    this.seenLargeSharkKinds = new Set(checkpoint.seenLargeSharkKinds);
+    this.seenLargeSharkVariety = checkpoint.seenLargeSharkVariety;
+
+    if (!this.initModel(getLevelConfig(checkpoint.level), true)) return false;
+    this.sessionStartTime = Date.now() - checkpoint.elapsedSeconds * 1000;
+    this.running = true;
+    this.startBtn.textContent = 'Retry';
+    this.setStatus('Swimming');
+    this.step();
+    return true;
+  }
+
+  private saveCheckpoint(): void {
+    saveRunCheckpoint({
+      level: this.currentLevel,
+      vitalityLives: this.vitalityLives,
+      speedBonusPct: this.speedBonusPct,
+      charismaBonusDolphins: this.charismaBonusDolphins,
+      sprintCooldownReduction: this.sprintCooldownReduction,
+      retries: this.retries,
+      totalRecruited: this.totalRecruited,
+      totalLost: this.totalLost,
+      sharksKilled: this.sharksKilled,
+      elapsedSeconds: this.sessionStartTime > 0 ? (Date.now() - this.sessionStartTime) / 1000 : this.gameTime,
+      seenSharkKinds: [...this.seenSharkKinds],
+      seenLargeSharkKinds: [...this.seenLargeSharkKinds],
+      seenLargeSharkVariety: this.seenLargeSharkVariety,
+    });
   }
 
   togglePause(): void {
@@ -749,17 +792,15 @@ export class Game {
 
   private levelComplete(): void {
     this.levelCompleted = true;
-    if (this.currentLevel >= LEVELS.length) {
-      this.gameComplete();
-      return;
+    if (this.currentLevel === LEVELS.length) {
+      this.recordCampaignClear();
     }
     this.setStatus('All sharks destroyed!');
     this.showLevelUpChoice();
   }
 
-  private gameComplete(): void {
-    this.running = false;
-    if (this.timer) clearTimeout(this.timer);
+  /** Fires once, when the 10-level campaign is first cleared; the run then continues into endless waters. */
+  private recordCampaignClear(): void {
     const timeToSaveOcean = this.sessionStartTime > 0 ? (Date.now() - this.sessionStartTime) / 1000 : this.gameTime;
     saveScore({
       timeToSaveOcean,
@@ -768,10 +809,6 @@ export class Game {
       lost: this.totalLost,
       sharksKilled: this.sharksKilled,
     });
-    this.setStatus('You cleared all 10 levels! The ocean is safe.');
-    this.startBtn.textContent = 'Retry';
-    this.showBanner('Ocean Saved!', 'victory');
-    this.showLeaderboard();
   }
 
   showLeaderboard(): void {
@@ -805,7 +842,8 @@ export class Game {
 
   private showLevelUpChoice(): void {
     this.awaitingLevelUpChoice = true;
-    this.showBanner('Level Up!', 'levelup', 2200);
+    const bannerText = this.currentLevel === LEVELS.length ? 'Ocean Saved! Endless Waters Await...' : 'Level Up!';
+    this.showBanner(bannerText, 'levelup', 2600);
     this.levelUpOverlayEl.classList.remove('hidden');
   }
 
@@ -849,7 +887,7 @@ export class Game {
     this.awaitingNewWaters = false;
     this.newWatersPromptEl.classList.remove('visible');
     this.currentLevel += 1;
-    const config = LEVELS[this.currentLevel - 1];
+    const config = getLevelConfig(this.currentLevel);
 
     this.setStatus(`Level ${this.currentLevel}: hunt the sharks!`);
     this.showBanner(`Level ${this.currentLevel}`, 'victory', 2500);
@@ -875,6 +913,7 @@ export class Game {
     this.levelCompleted = false;
     this.spawnSharksForLevel(config);
     this.checkForNewSharks(config);
+    this.saveCheckpoint();
 
     await this.loadBackground(getLevelBackground(this.currentLevel));
   }
