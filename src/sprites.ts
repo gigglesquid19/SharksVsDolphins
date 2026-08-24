@@ -118,6 +118,19 @@ export function createSharkSprite(textures: SharkTextureSet): SharkFishSprite {
   return new SharkFishSprite(textures);
 }
 
+export function makeRadialGradientTexture(size: number, color: string): Texture {
+  const c = document.createElement('canvas');
+  c.width = size;
+  c.height = size;
+  const ctx = c.getContext('2d')!;
+  const grad = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  grad.addColorStop(0, color);
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size, size);
+  return Texture.from(c);
+}
+
 export function createJellyfishSprite(): Container {
   const container = new Container();
 

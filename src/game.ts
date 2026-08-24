@@ -8,12 +8,23 @@ import {
   Assets,
 } from 'pixi.js';
 import { ParticleSystem } from './particles';
-import { createDolphinSprite, createJellyfishSprite, createSharkSprite, sliceSharkStrip, SharkFishSprite, SharkKind, SharkTextureSet } from './sprites';
+import {
+  createDolphinSprite,
+  createJellyfishSprite,
+  createSharkSprite,
+  makeRadialGradientTexture,
+  sliceSharkStrip,
+  SharkFishSprite,
+  SharkKind,
+  SharkTextureSet,
+} from './sprites';
 import { sfx } from './sfx';
 import { LEVELS, LevelConfig, getLevelBackground } from './levels';
+import { CANVAS_SIZE, SIZE } from './constants';
+import { clampEntityY, directionDelta, wrapX } from './utils';
+import { Dolphin, Shark, MagicShrimp, Jellyfish } from './entities';
+import { loadScores, saveScore } from './scoring';
 
-const SIZE = 100;
-const CANVAS_SIZE = 600;
 const DOLPHIN_SPAWN_INTERVAL = 15;
 const EVENT_CHECK_INTERVAL = 60;
 const EVENT_CHANCE = 0.1;
@@ -23,20 +34,9 @@ const JELLYFISH_COUNT = 70;
 const STORM_VISIBILITY_RADIUS = 18;
 const HUNTING_MODE_POD_SIZE = 4;
 const LARGE_SHARK_SIZE_MULTIPLIER = 1.8;
-const CHARGE_DURATION = 1000;
-const CHARGE_COOLDOWN = 5000;
 const SPRINT_DURATION = 1000;
 const SPRINT_COOLDOWN = 10000;
 const SPRINT_SPEED = 2;
-const CHARGE_SPEED = 2;
-const CHARGE_MIN_DIST = 5;
-const CHARGE_MAX_DIST = 30;
-const AMBUSH_STALK_DURATION = 1200;
-const AMBUSH_LUNGE_DURATION = 1200;
-const AMBUSH_COOLDOWN = 3000;
-const AMBUSH_RANGE = 25;
-const AMBUSH_MIN_DIST = 2;
-const AMBUSH_SPEED = 3;
 const SHARK_BASE_SCALE = 0.6;
 const SHARK_ATTACK_TRIGGER_RADIUS = 6;
 const SHARK_KIND_SCALE: Record<SharkKind, number> = {
@@ -78,259 +78,6 @@ const LARGE_SHARK_INTRO_INFO: Partial<Record<SharkKind, { name: string; descript
 };
 
 type GameEventType = 'storm' | 'jellyfish';
-
-function wrapX(x: number): number {
-  return ((x % SIZE) + SIZE) % SIZE;
-}
-
-function clampX(x: number): number {
-  return Math.max(0, Math.min(SIZE, x));
-}
-
-function clampEntityY(y: number, margin: number): number {
-  return Math.min(SIZE - 1 - margin, Math.max(margin, y));
-}
-
-function directionDelta(current: number, last: number): number {
-  let d = current - last;
-  if (d > SIZE / 2) d -= SIZE;
-  if (d < -SIZE / 2) d += SIZE;
-  return d;
-}
-
-class Dolphin {
-  id: number;
-  _x: number;
-  _y: number;
-  lastX: number;
-  lastY: number;
-  isPlayer = false;
-  recruited = false;
-  speedBoostUntil = 0;
-  invulnerableUntil = 0;
-
-  constructor(i: number, y: number, x: number) {
-    this.id = i;
-    this._x = x;
-    this._y = y;
-    this.lastX = x;
-    this.lastY = y;
-  }
-
-  distanceBetween(other: { _x: number; _y: number }): number {
-    return Math.sqrt((this._x - other._x) ** 2 + (this._y - other._y) ** 2);
-  }
-
-  move(sharks: Shark[]): void {
-    if (this.isPlayer || this.recruited) return;
-
-    const avoidRadius = 20;
-    let nearestShark: Shark | null = null;
-    let nearestDist = Infinity;
-    for (const shark of sharks) {
-      const d = this.distanceBetween(shark);
-      if (d < nearestDist) {
-        nearestDist = d;
-        nearestShark = shark;
-      }
-    }
-
-    if (nearestShark && nearestDist <= avoidRadius) {
-      const dx = Math.sign(this._x - nearestShark._x) || (Math.random() < 0.5 ? 1 : -1);
-      const dy = Math.sign(this._y - nearestShark._y) || (Math.random() < 0.5 ? 1 : -1);
-      this._x = wrapX(this._x + dx * 2);
-      this._y = clampEntityY(this._y + dy * 2, 2);
-    } else {
-      if (Math.random() < 0.33) this._y = clampEntityY(this._y + 1, 2);
-      else this._y = clampEntityY(this._y - 1, 2);
-
-      if (Math.random() < 0.33) this._x = wrapX(this._x + 1);
-      else this._x = wrapX(this._x - 1);
-    }
-  }
-}
-
-class Shark {
-  id: number;
-  _x: number;
-  _y: number;
-  lastX: number;
-  lastY: number;
-  sizeMultiplier = 1;
-  speedMultiplier = 1;
-  large = false;
-  matriarch = false;
-  kind: SharkKind;
-  charging = false;
-  chargeEndTime = 0;
-  chargeCooldownEnd = 0;
-  chargeDx = 0;
-  chargeDy = 0;
-  ambushing = false;
-  stalking = false;
-  stalkEndTime = 0;
-  lungeEndTime = 0;
-  ambushCooldownEnd = 0;
-  ambushDx = 0;
-  ambushDy = 0;
-
-  constructor(i: number) {
-    this.id = i;
-    this._x = Math.floor(Math.random() * 100);
-    this._y = Math.floor(Math.random() * 100);
-    this.lastX = this._x;
-    this.lastY = this._y;
-    this.kind = 'tiger';
-  }
-
-  distanceBetween(other: { _x: number; _y: number }): number {
-    return Math.sqrt((this._x - other._x) ** 2 + (this._y - other._y) ** 2);
-  }
-
-  move(speed: number, player: Dolphin | null, sharks: Shark[], unlimitedRange = false, now: number = Date.now()): void {
-    if (!player) return;
-    const huntRadius = 25;
-    const distToPlayer = this.distanceBetween(player);
-    const margin = Math.ceil((24 * this.sizeMultiplier) / (CANVAS_SIZE / SIZE));
-    const keepX = this.kind === 'tiger' || this.matriarch ? clampX : wrapX;
-
-    if (this.kind === 'greatWhite' && this.large && !this.matriarch && sharks.every((s) => s.large)) {
-      if (this.charging) {
-        if (now < this.chargeEndTime) {
-          this._x = keepX(this._x + this.chargeDx * speed * this.speedMultiplier * CHARGE_SPEED);
-          this._y = clampEntityY(this._y + this.chargeDy * speed * this.speedMultiplier * CHARGE_SPEED, margin);
-          return;
-        } else {
-          this.charging = false;
-          this.chargeCooldownEnd = now + CHARGE_COOLDOWN;
-        }
-      } else if (now >= this.chargeCooldownEnd && distToPlayer >= CHARGE_MIN_DIST && distToPlayer <= CHARGE_MAX_DIST) {
-        const odx = directionDelta(player._x, this._x);
-        const ody = player._y - this._y;
-        const d = Math.sqrt(odx * odx + ody * ody);
-        if (d > 0) {
-          this.chargeDx = odx / d;
-          this.chargeDy = ody / d;
-          this.charging = true;
-          this.chargeEndTime = now + CHARGE_DURATION;
-          this._x = keepX(this._x + this.chargeDx * speed * this.speedMultiplier * CHARGE_SPEED);
-          this._y = clampEntityY(this._y + this.chargeDy * speed * this.speedMultiplier * CHARGE_SPEED, margin);
-          return;
-        }
-      }
-    }
-
-    if (this.kind === 'tiger' && this.large && sharks.every((s) => s.large)) {
-      if (this.ambushing) {
-        if (this.stalking) {
-          if (now >= this.stalkEndTime) {
-            this.stalking = false;
-            this.lungeEndTime = now + AMBUSH_LUNGE_DURATION;
-            const odx = directionDelta(player._x, this._x);
-            const ody = player._y - this._y;
-            const d = Math.sqrt(odx * odx + ody * ody);
-            if (d > 0) {
-              this.ambushDx = odx / d;
-              this.ambushDy = ody / d;
-            }
-          } else {
-            return;
-          }
-        }
-        if (!this.stalking && now < this.lungeEndTime) {
-          this._x = keepX(this._x + this.ambushDx * speed * this.speedMultiplier * AMBUSH_SPEED);
-          this._y = clampEntityY(this._y + this.ambushDy * speed * this.speedMultiplier * AMBUSH_SPEED, margin);
-          return;
-        } else if (!this.stalking) {
-          this.ambushing = false;
-          this.ambushCooldownEnd = now + AMBUSH_COOLDOWN;
-        }
-      } else if (now >= this.ambushCooldownEnd && distToPlayer >= AMBUSH_MIN_DIST && distToPlayer <= AMBUSH_RANGE) {
-        this.ambushing = true;
-        this.stalking = true;
-        this.stalkEndTime = now + AMBUSH_STALK_DURATION;
-        return;
-      }
-    }
-
-    if (unlimitedRange || distToPlayer <= huntRadius) {
-      const effectiveSpeed = speed * this.speedMultiplier * 0.7;
-      const dx = Math.sign(directionDelta(player._x, this._x));
-      const dy = Math.sign(player._y - this._y);
-
-      let sepDx = 0;
-      let sepDy = 0;
-      for (const other of sharks) {
-        if (other === this) continue;
-        const odx = directionDelta(this._x, other._x);
-        const ody = this._y - other._y;
-        const d = Math.sqrt(odx * odx + ody * ody);
-        if (d < 6 && d > 0) {
-          sepDx += odx / d;
-          sepDy += ody / d;
-        }
-      }
-
-      const moveX = dx + Math.sign(sepDx) * 0.5;
-      const moveY = dy + Math.sign(sepDy) * 0.5;
-      this._x = keepX(this._x + moveX * effectiveSpeed);
-      this._y = clampEntityY(this._y + moveY * effectiveSpeed, margin);
-    } else {
-      const wanderSpeed = 1 + Math.random() * 2.5;
-      if (Math.random() < 0.5) {
-        this._x = keepX(this._x + (Math.random() < 0.5 ? 1 : -1) * wanderSpeed);
-      }
-      if (Math.random() < 0.5) {
-        this._y = clampEntityY(this._y + (Math.random() < 0.5 ? 1 : -1) * wanderSpeed, margin);
-      }
-    }
-  }
-}
-
-class MagicShrimp {
-  _x: number;
-  _y: number;
-
-  constructor() {
-    this._x = Math.floor(Math.random() * 100);
-    this._y = Math.floor(Math.random() * 100);
-  }
-
-  distanceBetween(other: { _x: number; _y: number }): number {
-    return Math.sqrt((this._x - other._x) ** 2 + (this._y - other._y) ** 2);
-  }
-}
-
-class Jellyfish {
-  id: number;
-  _x: number;
-  _y: number;
-  speed: number;
-
-  constructor(id: number, y: number) {
-    this.id = id;
-    this._x = SIZE + Math.random() * 20;
-    this._y = y;
-    this.speed = 0.2 + Math.random() * 0.3;
-  }
-
-  distanceBetween(other: { _x: number; _y: number }): number {
-    return Math.sqrt((this._x - other._x) ** 2 + (this._y - other._y) ** 2);
-  }
-}
-
-function makeRadialGradientTexture(size: number, color: string): Texture {
-  const c = document.createElement('canvas');
-  c.width = size;
-  c.height = size;
-  const ctx = c.getContext('2d')!;
-  const grad = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-  grad.addColorStop(0, color);
-  grad.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, size, size);
-  return Texture.from(c);
-}
 
 export class Game {
   private canvas: HTMLCanvasElement;
@@ -1014,7 +761,7 @@ export class Game {
     this.running = false;
     if (this.timer) clearTimeout(this.timer);
     const timeToSaveOcean = this.sessionStartTime > 0 ? (Date.now() - this.sessionStartTime) / 1000 : this.gameTime;
-    this.saveScore({
+    saveScore({
       timeToSaveOcean,
       retries: this.retries,
       recruited: this.totalRecruited,
@@ -1027,31 +774,9 @@ export class Game {
     this.showLeaderboard();
   }
 
-  private saveScore(score: { timeToSaveOcean: number; retries: number; recruited: number; lost: number; sharksKilled: number }): void {
-    try {
-      const raw = localStorage.getItem('svsd-scores');
-      const scores: (typeof score & { date: string })[] = raw ? JSON.parse(raw) : [];
-      scores.push({ ...score, date: new Date().toLocaleString() });
-      scores.sort((a, b) => a.timeToSaveOcean - b.timeToSaveOcean);
-      localStorage.setItem('svsd-scores', JSON.stringify(scores.slice(0, 10)));
-    } catch (e) {
-      console.warn('Failed to save score', e);
-    }
-  }
-
-  private loadScores(): (({ timeToSaveOcean: number; retries: number; recruited: number; lost: number; sharksKilled: number }) & { date: string })[] {
-    try {
-      const raw = localStorage.getItem('svsd-scores');
-      return raw ? JSON.parse(raw) : [];
-    } catch (e) {
-      console.warn('Failed to load scores', e);
-      return [];
-    }
-  }
-
   showLeaderboard(): void {
     if (!this.leaderboardListEl) return;
-    const scores = this.loadScores();
+    const scores = loadScores();
     this.leaderboardListEl.innerHTML = '';
     if (scores.length === 0) {
       const row = document.createElement('tr');
