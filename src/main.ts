@@ -184,10 +184,19 @@ const inputs = {
 
   function applyFullscreenCanvasSize(): void {
     if (document.fullscreenElement) {
-      const size = Math.min(window.innerWidth, window.innerHeight);
+      // The top control bar floats fixed over the canvas in fullscreen; reserve real space
+      // for it (measured, since it can wrap onto two rows on a narrower window) so gameplay
+      // near the top edge is never hidden behind it.
+      const controlsEl = document.querySelector('.canvas-wrap .game-controls') as HTMLElement | null;
+      const gap = 12;
+      const reservedTop = controlsEl ? controlsEl.getBoundingClientRect().bottom + gap : 0;
+      canvasWrap.style.paddingTop = `${reservedTop}px`;
+
+      const size = Math.min(window.innerWidth, window.innerHeight - reservedTop);
       gameCanvas.style.width = `${size}px`;
       gameCanvas.style.height = `${size}px`;
     } else {
+      canvasWrap.style.paddingTop = '';
       gameCanvas.style.width = '';
       gameCanvas.style.height = '';
     }
