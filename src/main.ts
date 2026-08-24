@@ -140,6 +140,7 @@ const inputs = {
     if (e.key === 'Enter') submitInitials();
   });
   document.getElementById('schoolBtn')!.addEventListener('click', () => game.formSchool());
+  document.getElementById('megaPodBtn')!.addEventListener('click', () => game.summonMegaPod());
   document.getElementById('megaShrimpYellow')!.addEventListener('click', () => game.chooseUpgrade('vitality'));
   document.getElementById('megaShrimpRed')!.addEventListener('click', () => game.chooseUpgrade('speed'));
   document.getElementById('megaShrimpBlue')!.addEventListener('click', () => game.chooseUpgrade('charisma'));

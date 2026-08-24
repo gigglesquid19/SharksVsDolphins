@@ -157,6 +157,8 @@ export class Game {
   private vitalityLives = 0;
   private speedBonusPct = 0;
   private charismaBonusDolphins = 0;
+  private totalDolphinsSaved = 0;
+  private megaPodAvailable = false;
   private mode: GameMode = 'campaign';
   private currentLeaderboardBoard: LeaderboardBoard = 'campaign';
   private pendingScore:
@@ -185,6 +187,7 @@ export class Game {
   private newWatersPromptEl: HTMLDivElement;
   private pauseOverlayEl: HTMLDivElement;
   private schoolBtnWrap: HTMLDivElement;
+  private megaPodBtnWrap: HTMLDivElement | null = null;
   private disbandBtnWrap: HTMLDivElement | null = null;
   private disbandBtn: HTMLButtonElement | null = null;
   private levelSelect: HTMLSelectElement | null = null;
@@ -266,6 +269,7 @@ export class Game {
     this.newWatersPromptEl = inputs.newWatersPrompt;
     this.pauseOverlayEl = inputs.pauseOverlay;
     this.schoolBtnWrap = inputs.schoolBtnWrap;
+    this.megaPodBtnWrap = document.getElementById('megaPodBtnWrap') as HTMLDivElement | null;
     this.disbandBtnWrap = document.getElementById('disbandBtnWrap') as HTMLDivElement | null;
     this.disbandBtn = document.getElementById('disbandBtn') as HTMLButtonElement | null;
     this.disbandBtn?.addEventListener('click', () => this.switchDolphin());
@@ -426,6 +430,7 @@ export class Game {
     this.totalRecruited = checkpoint.totalRecruited;
     this.totalLost = checkpoint.totalLost;
     this.sharksKilled = checkpoint.sharksKilled;
+    this.totalDolphinsSaved = checkpoint.totalDolphinsSaved;
     this.seenSharkKinds = new Set(checkpoint.seenSharkKinds);
     this.seenLargeSharkKinds = new Set(checkpoint.seenLargeSharkKinds);
     this.seenLargeSharkVariety = checkpoint.seenLargeSharkVariety;
@@ -450,6 +455,7 @@ export class Game {
       totalRecruited: this.totalRecruited,
       totalLost: this.totalLost,
       sharksKilled: this.sharksKilled,
+      totalDolphinsSaved: this.totalDolphinsSaved,
       elapsedSeconds: this.sessionStartTime > 0 ? (Date.now() - this.sessionStartTime) / 1000 : this.gameTime,
       seenSharkKinds: [...this.seenSharkKinds],
       seenLargeSharkKinds: [...this.seenLargeSharkKinds],
@@ -482,6 +488,21 @@ export class Game {
       'Hunting Mode!',
       "Swim into a shark to ram and destroy it. The number above each shark is the pod size you need - it turns green once you're strong enough."
     );
+  }
+
+  /** Calls in every dolphin saved across the campaign so far to join the pod for the final push on the Matriarch. */
+  summonMegaPod(): void {
+    if (!this.megaPodAvailable || !this.player) return;
+    this.megaPodAvailable = false;
+    this.megaPodBtnWrap?.classList.add('hidden');
+
+    const count = this.totalDolphinsSaved;
+    for (let i = 0; i < count; i++) {
+      this.spawnRecruitedDolphin(this.player._x, this.player._y);
+    }
+    sfx.playRecruit();
+    this.setStatus(`Mega Pod summoned! +${count} dolphins`);
+    this.showBanner('Mega Pod Summoned!', 'victory', 2600);
   }
 
   switchDolphin(): void {
@@ -613,6 +634,15 @@ export class Game {
     this.setStatus('A lost dolphin appeared');
   }
 
+  /** Adds an already-recruited dolphin directly to the pod (bonus/summoned dolphins, not found-and-swum-to). */
+  private spawnRecruitedDolphin(x: number, y: number): void {
+    const dolphin = new Dolphin(this.dolphins.length, y, x);
+    dolphin.recruited = true;
+    this.totalRecruited++;
+    this.dolphins.push(dolphin);
+    this.addDolphinSprite(dolphin);
+  }
+
   private initModel(config = LEVELS[0], keepUpgrades = false): boolean {
     this.entityContainer.removeChildren();
     this.dolphinSprites.clear();
@@ -642,15 +672,12 @@ export class Game {
       this.totalLost = 0;
       this.sharksKilled = 0;
       this.sessionStartTime = 0;
+      this.totalDolphinsSaved = 0;
       this.leaderboardOverlayEl?.classList.add('hidden');
     }
 
     for (let i = 0; i < this.charismaBonusDolphins; i++) {
-      const bonusDolphin = new Dolphin(this.dolphins.length, py, px);
-      bonusDolphin.recruited = true;
-      this.totalRecruited++;
-      this.dolphins.push(bonusDolphin);
-      this.addDolphinSprite(bonusDolphin);
+      this.spawnRecruitedDolphin(px, py);
     }
 
     this.currentLevel = config.level;
@@ -744,6 +771,30 @@ export class Game {
       sprite.destroy();
       this.dolphinSprites.delete(dolphin);
     }
+  }
+
+  /** Detaches a dolphin's sprite from normal tracking and animates it swimming off-screen before destroying it. */
+  private departDolphinSprite(dolphin: Dolphin): void {
+    const sprite = this.dolphinSprites.get(dolphin);
+    if (!sprite) return;
+    this.dolphinSprites.delete(dolphin);
+
+    const startX = sprite.x;
+    const start = performance.now();
+    const DURATION = 650;
+    const DRIFT = 220;
+    const animate = (now: number) => {
+      const t = Math.min(1, (now - start) / DURATION);
+      sprite.x = startX + t * DRIFT;
+      sprite.alpha = 1 - t;
+      if (t < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        this.entityContainer.removeChild(sprite);
+        sprite.destroy();
+      }
+    };
+    requestAnimationFrame(animate);
   }
 
   private removeSharkSprite(shark: Shark): void {
@@ -1075,17 +1126,19 @@ export class Game {
     this.announceLevel(2500);
 
     if (this.player) {
+      if (this.mode === 'campaign') {
+        this.totalDolphinsSaved += this.getPodSize();
+      }
       for (const dolphin of this.dolphins) {
-        if (!dolphin.isPlayer) this.removeDolphinSprite(dolphin);
+        if (!dolphin.isPlayer) {
+          if (this.mode === 'campaign') this.departDolphinSprite(dolphin);
+          else this.removeDolphinSprite(dolphin);
+        }
       }
       this.dolphins = [this.player];
 
       for (let i = 0; i < this.charismaBonusDolphins; i++) {
-        const bonusDolphin = new Dolphin(this.dolphins.length, this.player._y, this.player._x);
-        bonusDolphin.recruited = true;
-        this.totalRecruited++;
-        this.dolphins.push(bonusDolphin);
-        this.addDolphinSprite(bonusDolphin);
+        this.spawnRecruitedDolphin(this.player._x, this.player._y);
       }
 
       this.player.invulnerableUntil = Date.now() + 5000;
@@ -1311,6 +1364,8 @@ export class Game {
     this.matriarchWarningShown = false;
     this.matriarchSmallCleared = false;
     this.matriarchSpawnerTimer = 0;
+    this.megaPodAvailable = false;
+    this.megaPodBtnWrap?.classList.add('hidden');
     if (config.matriarch) {
       this.matriarchWarningTime = this.gameTime + 25;
       this.matriarchSpawnTime = this.gameTime + 30;
@@ -1508,6 +1563,11 @@ export class Game {
         if (!this.matriarchSmallCleared) {
           this.matriarchSmallCleared = true;
           this.matriarchSpawnerTimer = this.gameTime + 20;
+          if (this.mode === 'campaign' && this.totalDolphinsSaved > 0) {
+            this.megaPodAvailable = true;
+            this.megaPodBtnWrap?.classList.remove('hidden');
+            this.setStatus('The dolphins you saved are ready to be summoned!');
+          }
         } else if (this.gameTime >= this.matriarchSpawnerTimer) {
           this.spawnMatriarchShark();
           this.matriarchSpawnerTimer = this.gameTime + 20;

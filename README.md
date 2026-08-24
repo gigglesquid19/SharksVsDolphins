@@ -114,6 +114,13 @@ Game Features
 - **Procedural storm events**: roughly every minute of play there's a chance
   of a 30-second storm that dims the screen and limits how far away you can
   see sharks.
+- **Dolphins Saved / Mega Pod finale (Campaign mode)**: at every level
+  transition, the size of your outgoing pod is added to a running "Dolphins
+  Saved" total for the run, and the departing companions swim off-screen
+  rather than just vanishing. On level 10, once the Matriarch's escort
+  sharks are cleared, a Summon Mega Pod button appears that calls every
+  saved dolphin back in at once for the final push. Not tracked in Endless
+  mode, which has no defined ending for the total to pay off at.
 - **Sound**: background music with a mute toggle and volume slider, plus
   procedurally synthesized sound effects (bite, recruit chime, shrimp
   pickup, storm rumble) via the Web Audio API.

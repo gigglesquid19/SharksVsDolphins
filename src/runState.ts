@@ -12,6 +12,7 @@ export interface RunCheckpoint {
   totalRecruited: number;
   totalLost: number;
   sharksKilled: number;
+  totalDolphinsSaved: number;
   elapsedSeconds: number;
   seenSharkKinds: SharkKind[];
   seenLargeSharkKinds: SharkKind[];

@@ -12,6 +12,7 @@ function checkpoint(overrides: Partial<RunCheckpoint> = {}): RunCheckpoint {
     totalRecruited: 5,
     totalLost: 1,
     sharksKilled: 4,
+    totalDolphinsSaved: 12,
     elapsedSeconds: 123.4,
     seenSharkKinds: ['tiger'],
     seenLargeSharkKinds: [],
