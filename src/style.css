@@ -314,8 +314,13 @@ button.school.ready {
   max-width: none;
   border-radius: 0;
 }
-.canvas-wrap:fullscreen .dpad {
-  display: none;
+.canvas-wrap:fullscreen .dpad-row {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  z-index: 5;
 }
 .canvas-wrap:fullscreen .stats {
   display: none;

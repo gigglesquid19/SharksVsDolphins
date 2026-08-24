@@ -152,10 +152,16 @@ const inputs = {
   document.getElementById('pauseRestartBtn')!.addEventListener('click', () => game.retry());
   document.getElementById('pauseResetBtn')!.addEventListener('click', () => game.reset());
 
+  const SCROLLING_KEYS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
+
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') {
       game.togglePause();
       return;
+    }
+    // Arrow keys scroll the page by default; that's what made the window "slide" during play.
+    if (SCROLLING_KEYS.has(e.key)) {
+      e.preventDefault();
     }
     game.setKey(e.key, true);
     if (e.code === 'Space') {
