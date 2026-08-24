@@ -32,6 +32,7 @@ import {
   NewEndlessScore,
 } from './scoring';
 import { RunCheckpoint, clearRunCheckpoint, saveRunCheckpoint } from './runState';
+import { hasSeenHint, markHintSeen, HintId } from './tutorialHints';
 
 export type GameMode = 'campaign' | 'endless';
 type LeaderboardBoard = 'campaign' | 'endless';
@@ -135,6 +136,8 @@ export class Game {
   private awaitingNewWaters = false;
   private awaitingLevelUpChoice = false;
   private awaitingSharkWarning = false;
+  private awaitingTutorialHint = false;
+  private hintQueue: { heading: string; text: string }[] = [];
   private seenSharkKinds = new Set<SharkKind>();
   private seenLargeSharkKinds = new Set<SharkKind>();
   private seenLargeSharkVariety = false;
@@ -193,6 +196,10 @@ export class Game {
   private initialsHeadingEl: HTMLElement | null = null;
   private initialsSummaryEl: HTMLElement | null = null;
   private initialsInputEl: HTMLInputElement | null = null;
+  private tutorialHintOverlayEl: HTMLDivElement | null = null;
+  private tutorialHintHeadingEl: HTMLElement | null = null;
+  private tutorialHintTextEl: HTMLElement | null = null;
+  private megaShrimpHintEl: HTMLElement | null = null;
   private levelUpOverlayEl: HTMLDivElement;
   private sharkWarningOverlayEl: HTMLDivElement;
   private sharkWarningListEl: HTMLDivElement;
@@ -267,6 +274,10 @@ export class Game {
     this.initialsHeadingEl = document.getElementById('initialsHeading') as HTMLElement | null;
     this.initialsSummaryEl = document.getElementById('initialsSummary') as HTMLElement | null;
     this.initialsInputEl = document.getElementById('initialsInput') as HTMLInputElement | null;
+    this.tutorialHintOverlayEl = document.getElementById('tutorialHintOverlay') as HTMLDivElement | null;
+    this.tutorialHintHeadingEl = document.getElementById('tutorialHintHeading') as HTMLElement | null;
+    this.tutorialHintTextEl = document.getElementById('tutorialHintText') as HTMLElement | null;
+    this.megaShrimpHintEl = document.getElementById('megaShrimpHint') as HTMLElement | null;
     this.levelUpOverlayEl = inputs.levelUpOverlay;
     this.sharkWarningOverlayEl = inputs.sharkWarningOverlay;
     this.sharkWarningListEl = inputs.sharkWarningList;
@@ -453,6 +464,11 @@ export class Game {
     this.setStatus('HUNTING MODE: ram sharks to destroy them');
     this.updateHuntingVisuals();
     this.onSchoolingChange?.(true);
+    this.queueTutorialHint(
+      'huntingMode',
+      'Hunting Mode!',
+      "Swim into a shark to ram and destroy it. The number above each shark is the pod size you need - it turns green once you're strong enough."
+    );
   }
 
   switchDolphin(): void {
@@ -471,7 +487,7 @@ export class Game {
   }
 
   private pauseGame(): void {
-    if (!this.running || this.paused || this.awaitingLevelUpChoice || this.awaitingSharkWarning) return;
+    if (!this.running || this.paused || this.awaitingLevelUpChoice || this.awaitingSharkWarning || this.awaitingTutorialHint) return;
     this.paused = true;
     if (this.timer) clearTimeout(this.timer);
     this.setStatus('Paused');
@@ -990,6 +1006,11 @@ export class Game {
     this.awaitingLevelUpChoice = true;
     const bannerText = this.mode === 'endless' && this.currentLevel === LEVELS.length ? 'Ocean Saved! Endless Waters Await...' : 'Level Up!';
     this.showBanner(bannerText, 'levelup', 2600);
+    if (this.megaShrimpHintEl) {
+      const firstTime = !hasSeenHint('megaShrimp');
+      this.megaShrimpHintEl.classList.toggle('hidden', !firstTime);
+      if (firstTime) markHintSeen('megaShrimp');
+    }
     this.levelUpOverlayEl.classList.remove('hidden');
   }
 
@@ -1118,6 +1139,35 @@ export class Game {
     this.awaitingSharkWarning = false;
     this.sharkWarningOverlayEl.classList.add('hidden');
     if (this.running && !this.paused) {
+      this.lastFrameTime = 0;
+      this.step();
+    }
+  }
+
+  /** Queues a one-time explanatory tooltip the first time a system (Form Pod, Hunting Mode) triggers. */
+  private queueTutorialHint(id: HintId, heading: string, text: string): void {
+    if (hasSeenHint(id)) return;
+    markHintSeen(id);
+    this.hintQueue.push({ heading, text });
+    this.tryShowNextHint();
+  }
+
+  private tryShowNextHint(): void {
+    if (this.awaitingTutorialHint || this.hintQueue.length === 0) return;
+    if (!this.tutorialHintOverlayEl || !this.tutorialHintTextEl) return;
+    const hint = this.hintQueue.shift()!;
+    this.awaitingTutorialHint = true;
+    if (this.tutorialHintHeadingEl) this.tutorialHintHeadingEl.textContent = hint.heading;
+    this.tutorialHintTextEl.textContent = hint.text;
+    this.tutorialHintOverlayEl.classList.remove('hidden');
+  }
+
+  dismissTutorialHint(): void {
+    if (!this.awaitingTutorialHint) return;
+    this.awaitingTutorialHint = false;
+    this.tutorialHintOverlayEl?.classList.add('hidden');
+    this.tryShowNextHint();
+    if (!this.awaitingTutorialHint && this.running && !this.paused) {
       this.lastFrameTime = 0;
       this.step();
     }
@@ -1494,7 +1544,7 @@ export class Game {
   }
 
   private step(): void {
-    if (!this.running || this.awaitingLevelUpChoice || this.awaitingSharkWarning) return;
+    if (!this.running || this.awaitingLevelUpChoice || this.awaitingSharkWarning || this.awaitingTutorialHint) return;
 
     const sharkSpeed = parseInt(this.sharkSpeedInput.value, 10) || 1;
 
@@ -1550,6 +1600,11 @@ export class Game {
       this.readyToSchool = true;
       this.schoolBtnWrap.classList.remove('hidden');
       this.setStatus('Pod ready! Tap Form Pod to hunt sharks');
+      this.queueTutorialHint(
+        'formPod',
+        'Pod Ready!',
+        `Your pod has reached ${HUNTING_MODE_POD_SIZE} dolphins. Tap Form Pod (or just keep swimming - it forms automatically) to enter Hunting Mode and start destroying sharks.`
+      );
     } else if (!canSchool && this.readyToSchool) {
       this.readyToSchool = false;
       this.schoolBtnWrap.classList.add('hidden');

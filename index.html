@@ -121,6 +121,7 @@
         <div class="level-up-panel">
           <h2>Level Up!</h2>
           <p>Choose a Mega Shrimp to permanently boost your pod:</p>
+          <p class="tutorial-hint-text hidden" id="megaShrimpHint">Vitality gives an extra life, Speed permanently boosts your swimming, Charisma adds a permanent pod member, and Boost shortens your sprint cooldown. Pick one - it lasts the rest of this campaign.</p>
           <div class="mega-shrimp-choices">
             <button id="megaShrimpYellow" class="mega-shrimp yellow">
               <span class="mega-shrimp-icon">🍤</span>
@@ -146,6 +147,13 @@
           <h2>⚠️ New Shark Spotted!</h2>
           <div class="shark-warning-list" id="sharkWarningList"></div>
           <button id="sharkWarningContinueBtn" class="school ready">Continue</button>
+        </div>
+      </div>
+      <div class="shark-warning-overlay hidden" id="tutorialHintOverlay">
+        <div class="shark-warning-panel">
+          <h2 id="tutorialHintHeading">Tip</h2>
+          <p class="tutorial-hint-text" id="tutorialHintText"></p>
+          <button id="tutorialHintContinueBtn" class="school ready">Got it</button>
         </div>
       </div>
       <div class="leaderboard-overlay hidden" id="leaderboardOverlay">

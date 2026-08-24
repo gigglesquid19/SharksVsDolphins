@@ -143,6 +143,7 @@ const inputs = {
   document.getElementById('megaShrimpBlue')!.addEventListener('click', () => game.chooseUpgrade('charisma'));
   document.getElementById('megaShrimpGreen')!.addEventListener('click', () => game.chooseUpgrade('boost'));
   document.getElementById('sharkWarningContinueBtn')!.addEventListener('click', () => game.dismissSharkWarning());
+  document.getElementById('tutorialHintContinueBtn')!.addEventListener('click', () => game.dismissTutorialHint());
   document.getElementById('leaderboardCloseBtn')!.addEventListener('click', () => game.hideLeaderboard());
   document.getElementById('resetBtn')!.addEventListener('click', () => game.reset());
   document.getElementById('fullscreenBtn')!.addEventListener('click', toggleFullscreen);
