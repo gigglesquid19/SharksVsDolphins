@@ -174,6 +174,7 @@ export class Game {
   private statStatus: HTMLElement;
   private sharkGuideList: HTMLElement;
   private lastLifeHeart: HTMLElement | null = null;
+  private levelBadgeNumberEl: HTMLElement | null = null;
   private bannerEl: HTMLDivElement;
   private bannerTimeout: ReturnType<typeof setTimeout> | null = null;
   private newWatersPromptEl: HTMLDivElement;
@@ -271,6 +272,7 @@ export class Game {
     this.sharkWarningListEl = inputs.sharkWarningList;
     this.onSchoolingChange = inputs.onSchoolingChange;
     this.lastLifeHeart = document.getElementById('lastLifeHeart');
+    this.levelBadgeNumberEl = document.getElementById('levelBadgeNumber');
 
     this.glowTexture = makeRadialGradientTexture(64, 'rgba(34, 211, 238, 0.45)');
   }
@@ -663,7 +665,17 @@ export class Game {
     this.updateStats();
     this.draw();
     this.checkForNewSharks(config);
+    this.announceLevel();
     return true;
+  }
+
+  private announceLevel(duration = 2200): void {
+    this.updateLevelBadge();
+    this.showBanner(`Level ${this.currentLevel}`, 'victory', duration);
+  }
+
+  private updateLevelBadge(): void {
+    if (this.levelBadgeNumberEl) this.levelBadgeNumberEl.textContent = String(this.currentLevel);
   }
 
   private addDolphinSprite(dolphin: Dolphin): void {
@@ -1024,7 +1036,7 @@ export class Game {
     const config = getLevelConfig(this.currentLevel);
 
     this.setStatus(`Level ${this.currentLevel}: hunt the sharks!`);
-    this.showBanner(`Level ${this.currentLevel}`, 'victory', 2500);
+    this.announceLevel(2500);
 
     if (this.player) {
       for (const dolphin of this.dolphins) {
