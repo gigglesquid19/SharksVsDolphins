@@ -58,8 +58,18 @@ step to produce plain HTML/JS/CSS output.
 
 How to Play
 --------------------
-1. Open the game and click **Start Game** on the title screen, then **Dive
-   In** past the story intro.
+1. Open the game and pick a mode on the title screen, then **Dive In** past
+   the story intro:
+   - **Campaign Mode**: the classic 10-level run. Pick a starting level,
+     progress is checkpointed at each level transition (`localStorage`), and
+     the title screen offers **Continue Campaign** to resume a run you left
+     mid-way. Clearing level 10 ends the run and prompts for the Campaign
+     leaderboard.
+   - **Endless Mode**: always starts at level 1 with no level picker, keeps
+     going past level 10 with escalating difficulty, and has no free resume
+     - a death ends the run and prompts for the Endless leaderboard. This is
+     the intended hook for a future pay-to-continue offer (see "Ideas for
+     Further Development").
 2. Click **Start** to begin swimming.
 3. Controls:
    - Desktop: Arrow keys or WASD.
@@ -140,6 +150,10 @@ Ideas for Further Development
   already were. That code is threaded through `step()`/`init()` with a lot
   of shared private state, so it needs either an interface redesign or
   broader test coverage first to extract safely.
+- Pay-to-continue on Endless Mode game over: the death handling in
+  `Game.gameOver()` already branches on endless mode and is the intended
+  hook, but no payment integration exists yet (that depends on the
+  Capacitor/AdMob/Play Billing work described in the Late August plan).
 
 Original Python Model
 -----------------------------

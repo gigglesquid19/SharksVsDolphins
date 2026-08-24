@@ -56,17 +56,18 @@ volumeSlider.addEventListener('input', () => {
   }
 });
 
+const levelSelectWrap = document.getElementById('levelSelectWrap') as HTMLSpanElement;
 const titleContinueBtn = document.getElementById('titleContinueBtn') as HTMLButtonElement;
+const initialsInputEl = document.getElementById('initialsInput') as HTMLInputElement;
 const savedCheckpoint = loadRunCheckpoint();
 if (savedCheckpoint) titleContinueBtn.classList.remove('hidden');
 
-document.getElementById('titleStartBtn')!.addEventListener('click', () => {
-  clearRunCheckpoint();
+function enterAppFromTitle(): void {
   titleScreen.classList.add('hidden');
   narrativeScreen.classList.remove('hidden');
   bgMusic.play().catch((err) => console.warn('Music playback failed:', err));
   sfx.resume();
-});
+}
 
 document.getElementById('narrativeContinueBtn')!.addEventListener('click', () => {
   narrativeScreen.classList.add('hidden');
@@ -102,8 +103,22 @@ const inputs = {
   const gameCanvas = game.getCanvas();
 
   inputs.startBtn.addEventListener('click', () => game.retry());
+
+  document.getElementById('titleCampaignBtn')!.addEventListener('click', () => {
+    clearRunCheckpoint();
+    game.setMode('campaign');
+    levelSelectWrap.classList.remove('hidden');
+    enterAppFromTitle();
+  });
+  document.getElementById('titleEndlessBtn')!.addEventListener('click', () => {
+    game.setMode('endless');
+    levelSelectWrap.classList.add('hidden');
+    enterAppFromTitle();
+  });
   titleContinueBtn.addEventListener('click', () => {
     if (!savedCheckpoint) return;
+    game.setMode('campaign');
+    levelSelectWrap.classList.remove('hidden');
     titleScreen.classList.add('hidden');
     narrativeScreen.classList.add('hidden');
     appContent.classList.remove('hidden');
@@ -111,7 +126,16 @@ const inputs = {
     sfx.resume();
     game.resumeRun(savedCheckpoint);
   });
+
   document.getElementById('leaderboardBtn')!.addEventListener('click', () => game.showLeaderboard());
+
+  function submitInitials(): void {
+    game.submitPendingScore(initialsInputEl.value);
+  }
+  document.getElementById('initialsSubmitBtn')!.addEventListener('click', submitInitials);
+  initialsInputEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') submitInitials();
+  });
   document.getElementById('schoolBtn')!.addEventListener('click', () => game.formSchool());
   document.getElementById('megaShrimpYellow')!.addEventListener('click', () => game.chooseUpgrade('vitality'));
   document.getElementById('megaShrimpRed')!.addEventListener('click', () => game.chooseUpgrade('speed'));

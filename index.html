@@ -23,8 +23,11 @@
   <div class="title-screen" id="titleScreen">
     <h1 class="title-heading">Sharks Vs Dolphins</h1>
     <p class="title-tagline">Swim, dodge, and recruit your pod to survive the open ocean.</p>
-    <button id="titleStartBtn" class="school ready">Start Game</button>
-    <button id="titleContinueBtn" class="school ready hidden">Continue Run</button>
+    <div class="title-mode-choices">
+      <button id="titleCampaignBtn" class="school ready">Campaign Mode<span class="title-mode-sub">Levels 1-10 Classic</span></button>
+      <button id="titleEndlessBtn" class="school ready">Endless Mode<span class="title-mode-sub">Survive as long as you can</span></button>
+    </div>
+    <button id="titleContinueBtn" class="secondary hidden">Continue Campaign</button>
   </div>
 
   <div class="narrative-screen hidden" id="narrativeScreen">
@@ -60,19 +63,21 @@
 
     <div class="panel canvas-wrap" id="canvasWrap">
       <div class="controls game-controls">
-        <label for="levelSelect" style="color: #f0f9ff; font-size: 0.9rem;">Level</label>
-        <select id="levelSelect" style="margin-right: 8px; padding: 4px 8px; border-radius: 6px; background: #0ea5e9; color: #f0f9ff; border: none; cursor: pointer;">
-          <option value="1" selected>1</option>
-          <option value="2">2</option>
-          <option value="3">3</option>
-          <option value="4">4</option>
-          <option value="5">5</option>
-          <option value="6">6</option>
-          <option value="7">7</option>
-          <option value="8">8</option>
-          <option value="9">9</option>
-          <option value="10">10</option>
-        </select>
+        <span id="levelSelectWrap">
+          <label for="levelSelect" style="color: #f0f9ff; font-size: 0.9rem;">Level</label>
+          <select id="levelSelect" style="margin-right: 8px; padding: 4px 8px; border-radius: 6px; background: #0ea5e9; color: #f0f9ff; border: none; cursor: pointer;">
+            <option value="1" selected>1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+            <option value="8">8</option>
+            <option value="9">9</option>
+            <option value="10">10</option>
+          </select>
+        </span>
         <button id="startBtn">Start</button>
         <button id="pauseBtn" class="secondary">Pause</button>
         <button id="resetBtn" class="secondary">Reset</button>
@@ -139,21 +144,24 @@
       </div>
       <div class="leaderboard-overlay hidden" id="leaderboardOverlay">
         <div class="leaderboard-panel">
-          <h2>Ocean Saved Leaderboard</h2>
+          <h2 id="leaderboardHeading">Campaign Leaderboard</h2>
+          <div class="leaderboard-tabs">
+            <button id="leaderboardTabCampaign" class="secondary active">Campaign</button>
+            <button id="leaderboardTabEndless" class="secondary">Endless</button>
+          </div>
           <table class="leaderboard-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Time</th>
-                <th>Retries</th>
-                <th>Recruited</th>
-                <th>Lost</th>
-                <th>Sharks</th>
-              </tr>
-            </thead>
+            <thead id="leaderboardHead"></thead>
             <tbody id="leaderboardList"></tbody>
           </table>
           <button id="leaderboardCloseBtn" class="school ready">Continue</button>
+        </div>
+      </div>
+      <div class="shark-warning-overlay hidden" id="initialsOverlay">
+        <div class="shark-warning-panel initials-panel">
+          <h2 id="initialsHeading">New Score!</h2>
+          <p id="initialsSummary" class="initials-summary"></p>
+          <input id="initialsInput" class="initials-input" maxlength="3" autocomplete="off" spellcheck="false" aria-label="Your initials">
+          <button id="initialsSubmitBtn" class="school ready">Save Score</button>
         </div>
       </div>
       <div class="dpad-row">

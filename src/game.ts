@@ -23,8 +23,19 @@ import { LEVELS, LevelConfig, getLevelBackground, getLevelConfig } from './level
 import { CANVAS_SIZE, SIZE } from './constants';
 import { clampEntityY, directionDelta, wrapX } from './utils';
 import { Dolphin, Shark, MagicShrimp, Jellyfish } from './entities';
-import { loadScores, saveScore } from './scoring';
+import {
+  loadCampaignScores,
+  loadEndlessScores,
+  saveCampaignScore,
+  saveEndlessScore,
+  NewCampaignScore,
+  NewEndlessScore,
+} from './scoring';
 import { RunCheckpoint, clearRunCheckpoint, saveRunCheckpoint } from './runState';
+
+export type GameMode = 'campaign' | 'endless';
+type LeaderboardBoard = 'campaign' | 'endless';
+const INITIALS_KEY = 'svsd-initials';
 
 const DOLPHIN_SPAWN_INTERVAL = 15;
 const EVENT_CHECK_INTERVAL = 60;
@@ -141,6 +152,12 @@ export class Game {
   private vitalityLives = 0;
   private speedBonusPct = 0;
   private charismaBonusDolphins = 0;
+  private mode: GameMode = 'campaign';
+  private currentLeaderboardBoard: LeaderboardBoard = 'campaign';
+  private pendingScore:
+    | { board: 'campaign'; score: Omit<NewCampaignScore, 'initials'> }
+    | { board: 'endless'; score: Omit<NewEndlessScore, 'initials'> }
+    | null = null;
 
   private pointerActive = false;
   private pointerDirX = 0;
@@ -167,6 +184,14 @@ export class Game {
   private levelSelect: HTMLSelectElement | null = null;
   private leaderboardOverlayEl: HTMLDivElement | null = null;
   private leaderboardListEl: HTMLElement | null = null;
+  private leaderboardHeadEl: HTMLElement | null = null;
+  private leaderboardHeadingEl: HTMLElement | null = null;
+  private leaderboardTabCampaignBtn: HTMLButtonElement | null = null;
+  private leaderboardTabEndlessBtn: HTMLButtonElement | null = null;
+  private initialsOverlayEl: HTMLDivElement | null = null;
+  private initialsHeadingEl: HTMLElement | null = null;
+  private initialsSummaryEl: HTMLElement | null = null;
+  private initialsInputEl: HTMLInputElement | null = null;
   private levelUpOverlayEl: HTMLDivElement;
   private sharkWarningOverlayEl: HTMLDivElement;
   private sharkWarningListEl: HTMLDivElement;
@@ -231,6 +256,16 @@ export class Game {
     this.levelSelect = document.getElementById('levelSelect') as HTMLSelectElement | null;
     this.leaderboardOverlayEl = document.getElementById('leaderboardOverlay') as HTMLDivElement | null;
     this.leaderboardListEl = document.getElementById('leaderboardList') as HTMLElement | null;
+    this.leaderboardHeadEl = document.getElementById('leaderboardHead') as HTMLElement | null;
+    this.leaderboardHeadingEl = document.getElementById('leaderboardHeading') as HTMLElement | null;
+    this.leaderboardTabCampaignBtn = document.getElementById('leaderboardTabCampaign') as HTMLButtonElement | null;
+    this.leaderboardTabEndlessBtn = document.getElementById('leaderboardTabEndless') as HTMLButtonElement | null;
+    this.leaderboardTabCampaignBtn?.addEventListener('click', () => this.showLeaderboard('campaign'));
+    this.leaderboardTabEndlessBtn?.addEventListener('click', () => this.showLeaderboard('endless'));
+    this.initialsOverlayEl = document.getElementById('initialsOverlay') as HTMLDivElement | null;
+    this.initialsHeadingEl = document.getElementById('initialsHeading') as HTMLElement | null;
+    this.initialsSummaryEl = document.getElementById('initialsSummary') as HTMLElement | null;
+    this.initialsInputEl = document.getElementById('initialsInput') as HTMLInputElement | null;
     this.levelUpOverlayEl = inputs.levelUpOverlay;
     this.sharkWarningOverlayEl = inputs.sharkWarningOverlay;
     this.sharkWarningListEl = inputs.sharkWarningList;
@@ -279,8 +314,14 @@ export class Game {
   }
 
   private getSelectedLevelConfig(): LevelConfig {
+    if (this.mode === 'endless') return LEVELS[0];
     const level = parseInt(this.levelSelect?.value ?? '1', 10);
     return LEVELS[level - 1] ?? LEVELS[0];
+  }
+
+  /** Sets which mode a fresh start/reset begins in. Campaign: pick a level 1-10, saves/resumes, ends at level 10. Endless: always starts at level 1, no free resume, continues past level 10 until death. */
+  setMode(mode: GameMode): void {
+    this.mode = mode;
   }
 
   private async loadSharkTextures(): Promise<void> {
@@ -350,6 +391,7 @@ export class Game {
 
   /** Restores a checkpoint saved by a previous session and resumes play at that level. */
   resumeRun(checkpoint: RunCheckpoint): boolean {
+    this.mode = 'campaign';
     this.vitalityLives = checkpoint.vitalityLives;
     this.speedBonusPct = checkpoint.speedBonusPct;
     this.charismaBonusDolphins = checkpoint.charismaBonusDolphins;
@@ -788,48 +830,140 @@ export class Game {
     this.setStatus('Eaten by a shark');
     this.startBtn.textContent = 'Retry';
     this.showBanner('Game Over', 'gameover');
+
+    // Endless runs end permanently on death (no free checkpoint resume) and record a
+    // depth/survival-time score; this is also the intended hook for a future pay-to-continue offer.
+    if (this.mode === 'endless') {
+      const timeSurvived = this.sessionStartTime > 0 ? (Date.now() - this.sessionStartTime) / 1000 : this.gameTime;
+      this.pendingScore = {
+        board: 'endless',
+        score: {
+          levelReached: this.currentLevel,
+          timeSurvived,
+          recruited: this.totalRecruited,
+          sharksKilled: this.sharksKilled,
+        },
+      };
+      this.showInitialsPrompt('Game Over', `Reached level ${this.currentLevel} - survived ${timeSurvived.toFixed(1)}s`);
+    }
   }
 
   private levelComplete(): void {
     this.levelCompleted = true;
-    if (this.currentLevel === LEVELS.length) {
+    if (this.mode === 'campaign' && this.currentLevel === LEVELS.length) {
       this.recordCampaignClear();
+      return;
     }
     this.setStatus('All sharks destroyed!');
     this.showLevelUpChoice();
   }
 
-  /** Fires once, when the 10-level campaign is first cleared; the run then continues into endless waters. */
+  /** Campaign-mode classic ending: clearing level 10 stops the run and prompts for the leaderboard. */
   private recordCampaignClear(): void {
+    this.running = false;
+    if (this.timer) clearTimeout(this.timer);
+    clearRunCheckpoint();
     const timeToSaveOcean = this.sessionStartTime > 0 ? (Date.now() - this.sessionStartTime) / 1000 : this.gameTime;
-    saveScore({
-      timeToSaveOcean,
-      retries: this.retries,
-      recruited: this.totalRecruited,
-      lost: this.totalLost,
-      sharksKilled: this.sharksKilled,
-    });
+    this.pendingScore = {
+      board: 'campaign',
+      score: {
+        timeToSaveOcean,
+        retries: this.retries,
+        recruited: this.totalRecruited,
+        lost: this.totalLost,
+        sharksKilled: this.sharksKilled,
+      },
+    };
+    this.setStatus('You cleared the campaign! The ocean is safe.');
+    this.startBtn.textContent = 'Retry';
+    this.showBanner('Ocean Saved!', 'victory');
+    this.showInitialsPrompt('Ocean Saved!', `Cleared in ${timeToSaveOcean.toFixed(1)}s`);
   }
 
-  showLeaderboard(): void {
-    if (!this.leaderboardListEl) return;
-    const scores = loadScores();
-    this.leaderboardListEl.innerHTML = '';
-    if (scores.length === 0) {
-      const row = document.createElement('tr');
-      const cell = document.createElement('td');
-      cell.colSpan = 6;
-      cell.textContent = 'No completed runs yet.';
-      row.appendChild(cell);
-      this.leaderboardListEl.appendChild(row);
+  private showInitialsPrompt(heading: string, summary: string): void {
+    if (!this.initialsOverlayEl || !this.initialsInputEl) return;
+    if (this.initialsHeadingEl) this.initialsHeadingEl.textContent = heading;
+    if (this.initialsSummaryEl) this.initialsSummaryEl.textContent = summary;
+    let remembered = '';
+    try {
+      remembered = localStorage.getItem(INITIALS_KEY) ?? '';
+    } catch (e) {
+      console.warn('Failed to read remembered initials', e);
+    }
+    this.initialsInputEl.value = remembered;
+    this.initialsOverlayEl.classList.remove('hidden');
+    this.initialsInputEl.focus();
+    this.initialsInputEl.select();
+  }
+
+  /** Saves the pending score (from a campaign clear or an endless game over) with the player's initials. */
+  submitPendingScore(rawInitials: string): void {
+    if (!this.pendingScore) return;
+    const clean = rawInitials.trim().slice(0, 3).toUpperCase() || 'AAA';
+    try {
+      localStorage.setItem(INITIALS_KEY, clean);
+    } catch (e) {
+      console.warn('Failed to save initials', e);
+    }
+
+    if (this.pendingScore.board === 'campaign') {
+      saveCampaignScore({ ...this.pendingScore.score, initials: clean });
     } else {
-      for (const [i, s] of scores.entries()) {
-        const row = document.createElement('tr');
-        row.innerHTML = `<td>${i + 1}</td><td>${s.timeToSaveOcean.toFixed(1)}s</td><td>${s.retries}</td><td>${s.recruited}</td><td>${s.lost}</td><td>${s.sharksKilled}</td>`;
-        this.leaderboardListEl.appendChild(row);
+      saveEndlessScore({ ...this.pendingScore.score, initials: clean });
+    }
+    const board = this.pendingScore.board;
+    this.pendingScore = null;
+    this.initialsOverlayEl?.classList.add('hidden');
+    this.showLeaderboard(board);
+  }
+
+  showLeaderboard(board: LeaderboardBoard = this.currentLeaderboardBoard): void {
+    if (!this.leaderboardListEl || !this.leaderboardHeadEl) return;
+    this.currentLeaderboardBoard = board;
+    this.leaderboardTabCampaignBtn?.classList.toggle('active', board === 'campaign');
+    this.leaderboardTabEndlessBtn?.classList.toggle('active', board === 'endless');
+    this.leaderboardListEl.innerHTML = '';
+
+    if (board === 'campaign') {
+      if (this.leaderboardHeadingEl) this.leaderboardHeadingEl.textContent = 'Campaign Leaderboard';
+      this.leaderboardHeadEl.innerHTML =
+        '<tr><th>#</th><th>Initials</th><th>Time</th><th>Retries</th><th>Recruited</th><th>Lost</th><th>Sharks</th></tr>';
+      const scores = loadCampaignScores();
+      if (scores.length === 0) {
+        this.renderEmptyLeaderboardRow(7, 'No completed campaign runs yet.');
+      } else {
+        for (const [i, s] of scores.entries()) {
+          const row = document.createElement('tr');
+          row.innerHTML = `<td>${i + 1}</td><td>${s.initials}</td><td>${s.timeToSaveOcean.toFixed(1)}s</td><td>${s.retries}</td><td>${s.recruited}</td><td>${s.lost}</td><td>${s.sharksKilled}</td>`;
+          this.leaderboardListEl.appendChild(row);
+        }
+      }
+    } else {
+      if (this.leaderboardHeadingEl) this.leaderboardHeadingEl.textContent = 'Endless Leaderboard';
+      this.leaderboardHeadEl.innerHTML = '<tr><th>#</th><th>Initials</th><th>Level</th><th>Survived</th><th>Recruited</th><th>Sharks</th></tr>';
+      const scores = loadEndlessScores();
+      if (scores.length === 0) {
+        this.renderEmptyLeaderboardRow(6, 'No endless runs yet.');
+      } else {
+        for (const [i, s] of scores.entries()) {
+          const row = document.createElement('tr');
+          row.innerHTML = `<td>${i + 1}</td><td>${s.initials}</td><td>${s.levelReached}</td><td>${s.timeSurvived.toFixed(1)}s</td><td>${s.recruited}</td><td>${s.sharksKilled}</td>`;
+          this.leaderboardListEl.appendChild(row);
+        }
       }
     }
+
     this.leaderboardOverlayEl?.classList.remove('hidden');
+  }
+
+  private renderEmptyLeaderboardRow(colSpan: number, text: string): void {
+    if (!this.leaderboardListEl) return;
+    const row = document.createElement('tr');
+    const cell = document.createElement('td');
+    cell.colSpan = colSpan;
+    cell.textContent = text;
+    row.appendChild(cell);
+    this.leaderboardListEl.appendChild(row);
   }
 
   hideLeaderboard(): void {
@@ -842,7 +976,7 @@ export class Game {
 
   private showLevelUpChoice(): void {
     this.awaitingLevelUpChoice = true;
-    const bannerText = this.currentLevel === LEVELS.length ? 'Ocean Saved! Endless Waters Await...' : 'Level Up!';
+    const bannerText = this.mode === 'endless' && this.currentLevel === LEVELS.length ? 'Ocean Saved! Endless Waters Await...' : 'Level Up!';
     this.showBanner(bannerText, 'levelup', 2600);
     this.levelUpOverlayEl.classList.remove('hidden');
   }
@@ -913,7 +1047,7 @@ export class Game {
     this.levelCompleted = false;
     this.spawnSharksForLevel(config);
     this.checkForNewSharks(config);
-    this.saveCheckpoint();
+    if (this.mode === 'campaign') this.saveCheckpoint();
 
     await this.loadBackground(getLevelBackground(this.currentLevel));
   }
