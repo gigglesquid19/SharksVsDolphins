@@ -114,6 +114,15 @@ class SfxEngine {
     });
   }
 
+  playAchievement(): void {
+    const ctx = this.ensureContext();
+    const now = ctx.currentTime;
+    const notes = [523.25, 659.25, 783.99, 1046.5, 1318.5];
+    notes.forEach((freq, i) => {
+      this.tone(ctx, freq, now + i * 0.07, 0.18, { type: 'triangle', gain: 0.25 });
+    });
+  }
+
   startStormRumble(): void {
     const ctx = this.ensureContext();
     if (this.stormNodes) return;

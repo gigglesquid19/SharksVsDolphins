@@ -352,6 +352,39 @@ button.school.ready {
 .game-banner.levelup { background: linear-gradient(135deg, #a855f7, #6366f1); color: #fff; box-shadow: 0 8px 30px rgba(168, 85, 247, 0.55); }
 .game-banner.statup { background: linear-gradient(135deg, #34d399, #0d9488); color: #020617; box-shadow: 0 8px 30px rgba(52, 211, 153, 0.55); }
 
+.achievement-toast {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translate(-50%, -14px);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 18px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #facc15, #f97316);
+  color: #020617;
+  box-shadow: 0 8px 30px rgba(250, 204, 21, 0.5);
+  z-index: 22;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  white-space: nowrap;
+}
+.achievement-toast.visible { opacity: 1; transform: translate(-50%, 0); }
+.achievement-toast-icon { font-size: 1.8rem; line-height: 1; }
+.achievement-toast-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+.achievement-toast-name {
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
 .pause-overlay {
   position: absolute;
   inset: 0;
@@ -601,6 +634,44 @@ button.mega-shrimp.green {
   border-color: rgba(56, 189, 248, 0.6);
   color: #22d3ee;
 }
+
+.achievements-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 50vh;
+  overflow-y: auto;
+  width: 100%;
+  max-width: 380px;
+}
+.achievement-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  text-align: left;
+  opacity: 0.55;
+}
+.achievement-row.unlocked {
+  opacity: 1;
+  background: rgba(250, 204, 21, 0.08);
+  border-color: rgba(250, 204, 21, 0.3);
+}
+.achievement-icon { font-size: 1.6rem; line-height: 1; flex-shrink: 0; }
+.achievement-copy { flex: 1; min-width: 0; }
+.achievement-name { font-weight: 800; font-size: 0.95rem; }
+.achievement-desc { color: var(--muted); font-size: 0.8rem; margin-top: 2px; }
+.achievement-status {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.achievement-row.unlocked .achievement-status { color: #facc15; }
 
 .initials-summary {
   margin: -8px 0 0;

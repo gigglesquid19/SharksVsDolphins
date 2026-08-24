@@ -129,6 +129,8 @@ const inputs = {
   });
 
   document.getElementById('leaderboardBtn')!.addEventListener('click', () => game.showLeaderboard());
+  document.getElementById('achievementsBtn')!.addEventListener('click', () => game.showAchievements());
+  document.getElementById('achievementsCloseBtn')!.addEventListener('click', () => game.hideAchievements());
 
   function submitInitials(): void {
     game.submitPendingScore(initialsInputEl.value);

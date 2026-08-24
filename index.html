@@ -84,6 +84,7 @@
         <button id="pauseBtn" class="secondary">Pause</button>
         <button id="resetBtn" class="secondary">Reset</button>
         <button id="leaderboardBtn" class="secondary">Leaderboard</button>
+        <button id="achievementsBtn" class="secondary">Achievements</button>
         <button id="fullscreenBtn" class="secondary">Fullscreen</button>
         <button id="muteBtn" class="secondary" aria-label="Mute music">Music: On</button>
         <button id="controlModeBtn" class="secondary">Controls: D-Pad</button>
@@ -99,6 +100,13 @@
       </div>
       <div class="last-life hidden" id="lastLifeHeart" style="position: absolute; bottom: 10px; left: 10px; font-size: 2.2rem; pointer-events: none;">❤️</div>
       <div class="game-banner" id="gameBanner"></div>
+      <div class="achievement-toast" id="achievementToast">
+        <span class="achievement-toast-icon" id="achievementToastIcon">🏆</span>
+        <div class="achievement-toast-copy">
+          <div class="achievement-toast-label">Achievement Unlocked</div>
+          <div class="achievement-toast-name" id="achievementToastName"></div>
+        </div>
+      </div>
       <div class="new-waters-prompt" id="newWatersPrompt">
         <span class="arrow">&#10148;</span>
         <span class="label">Next Level</span>
@@ -168,6 +176,13 @@
             <tbody id="leaderboardList"></tbody>
           </table>
           <button id="leaderboardCloseBtn" class="school ready">Continue</button>
+        </div>
+      </div>
+      <div class="leaderboard-overlay hidden" id="achievementsOverlay">
+        <div class="leaderboard-panel">
+          <h2>Achievements</h2>
+          <div class="achievements-list" id="achievementsList"></div>
+          <button id="achievementsCloseBtn" class="school ready">Continue</button>
         </div>
       </div>
       <div class="shark-warning-overlay hidden" id="initialsOverlay">

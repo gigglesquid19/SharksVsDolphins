@@ -19,7 +19,12 @@ Contents
   Mega Shrimp upgrade choices, banners, and the render loop.
 - `src/entities.ts` - the Dolphin, Shark, MagicShrimp, and Jellyfish classes
   and their movement logic (no Pixi/DOM dependencies).
-- `src/scoring.ts` - local top-10 leaderboard persistence (`localStorage`).
+- `src/scoring.ts` - local top-10 leaderboard persistence (`localStorage`),
+  separate boards for Campaign and Endless.
+- `src/achievements.ts` - the achievement definitions and unlock/seen
+  persistence (`localStorage`).
+- `src/tutorialHints.ts` - first-run tooltip seen/unseen persistence
+  (`localStorage`).
 - `src/utils.ts` / `src/constants.ts` - shared world-space math helpers
   (wrap/clamp/direction) and the SIZE/CANVAS_SIZE constants they use.
 - `src/levels.ts` - the ten-level campaign as data (shark composition,
@@ -114,6 +119,12 @@ Game Features
   pickup, storm rumble) via the Web Audio API.
 - **Pause menu**: freezes the simulation and timers; resume, restart, or
   reset from the overlay, or toggle with `Esc`/`P`.
+- **Achievements**: five one-time unlocks (first recruit, first Hunting Mode
+  kill, a flawless level, surviving a storm, defeating the Matriarch), each
+  with a toast + chime on unlock and a checklist viewable from the
+  Achievements button, persisted locally so they carry across runs.
+- **First-run tutorial hints**: short one-time tooltips explain Form Pod,
+  Hunting Mode, and the Mega Shrimp choices the first time each triggers.
 - **Mobile-first controls**: on-screen D-pad or a draggable joystick (your
   choice, remembered between sessions), large touch targets, and a
   fullscreen mode for phones and tablets.

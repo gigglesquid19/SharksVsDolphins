@@ -33,6 +33,7 @@ import {
 } from './scoring';
 import { RunCheckpoint, clearRunCheckpoint, saveRunCheckpoint } from './runState';
 import { hasSeenHint, markHintSeen, HintId } from './tutorialHints';
+import { ACHIEVEMENTS, AchievementId, getUnlockedMap, unlock } from './achievements';
 
 export type GameMode = 'campaign' | 'endless';
 type LeaderboardBoard = 'campaign' | 'endless';
@@ -147,6 +148,7 @@ export class Game {
   private totalRecruited = 0;
   private totalLost = 0;
   private sharksKilled = 0;
+  private lostThisLevel = 0;
   private sessionStartTime = 0;
   private sprinting = false;
   private sprintEndTime = 0;
@@ -200,6 +202,12 @@ export class Game {
   private tutorialHintHeadingEl: HTMLElement | null = null;
   private tutorialHintTextEl: HTMLElement | null = null;
   private megaShrimpHintEl: HTMLElement | null = null;
+  private achievementToastEl: HTMLElement | null = null;
+  private achievementToastIconEl: HTMLElement | null = null;
+  private achievementToastNameEl: HTMLElement | null = null;
+  private achievementToastTimeout: ReturnType<typeof setTimeout> | null = null;
+  private achievementsOverlayEl: HTMLDivElement | null = null;
+  private achievementsListEl: HTMLElement | null = null;
   private levelUpOverlayEl: HTMLDivElement;
   private sharkWarningOverlayEl: HTMLDivElement;
   private sharkWarningListEl: HTMLDivElement;
@@ -278,6 +286,11 @@ export class Game {
     this.tutorialHintHeadingEl = document.getElementById('tutorialHintHeading') as HTMLElement | null;
     this.tutorialHintTextEl = document.getElementById('tutorialHintText') as HTMLElement | null;
     this.megaShrimpHintEl = document.getElementById('megaShrimpHint') as HTMLElement | null;
+    this.achievementToastEl = document.getElementById('achievementToast') as HTMLElement | null;
+    this.achievementToastIconEl = document.getElementById('achievementToastIcon') as HTMLElement | null;
+    this.achievementToastNameEl = document.getElementById('achievementToastName') as HTMLElement | null;
+    this.achievementsOverlayEl = document.getElementById('achievementsOverlay') as HTMLDivElement | null;
+    this.achievementsListEl = document.getElementById('achievementsList') as HTMLElement | null;
     this.levelUpOverlayEl = inputs.levelUpOverlay;
     this.sharkWarningOverlayEl = inputs.sharkWarningOverlay;
     this.sharkWarningListEl = inputs.sharkWarningList;
@@ -643,6 +656,7 @@ export class Game {
     this.currentLevel = config.level;
     this.sharks = [];
     this.gameTime = 0;
+    this.lostThisLevel = 0;
     this.spawnSharksForLevel(config);
     this.draw();
 
@@ -878,6 +892,7 @@ export class Game {
 
   private levelComplete(): void {
     this.levelCompleted = true;
+    if (this.lostThisLevel === 0) this.tryUnlock('flawlessLevel');
     if (this.mode === 'campaign' && this.currentLevel === LEVELS.length) {
       this.recordCampaignClear();
       return;
@@ -1078,6 +1093,7 @@ export class Game {
     }
 
     this.levelCompleted = false;
+    this.lostThisLevel = 0;
     this.spawnSharksForLevel(config);
     this.checkForNewSharks(config);
     if (this.mode === 'campaign') this.saveCheckpoint();
@@ -1171,6 +1187,52 @@ export class Game {
       this.lastFrameTime = 0;
       this.step();
     }
+  }
+
+  /** Unlocks an achievement if it isn't already, and pops the toast if this is a new unlock. Non-blocking. */
+  private tryUnlock(id: AchievementId): void {
+    const def = unlock(id);
+    if (def) this.announceAchievement(def.icon, def.name);
+  }
+
+  private announceAchievement(icon: string, name: string): void {
+    sfx.playAchievement();
+    if (!this.achievementToastEl || !this.achievementToastNameEl) return;
+    if (this.achievementToastTimeout) {
+      clearTimeout(this.achievementToastTimeout);
+      this.achievementToastTimeout = null;
+    }
+    if (this.achievementToastIconEl) this.achievementToastIconEl.textContent = icon;
+    this.achievementToastNameEl.textContent = name;
+    this.achievementToastEl.classList.add('visible');
+    this.achievementToastTimeout = setTimeout(() => {
+      this.achievementToastEl?.classList.remove('visible');
+    }, 3200);
+  }
+
+  showAchievements(): void {
+    if (!this.achievementsListEl) return;
+    const unlocked = getUnlockedMap();
+    this.achievementsListEl.innerHTML = '';
+    for (const a of ACHIEVEMENTS) {
+      const date = unlocked[a.id];
+      const row = document.createElement('div');
+      row.className = `achievement-row${date ? ' unlocked' : ''}`;
+      row.innerHTML = `
+        <span class="achievement-icon">${date ? a.icon : '🔒'}</span>
+        <div class="achievement-copy">
+          <div class="achievement-name">${a.name}</div>
+          <div class="achievement-desc">${a.description}</div>
+        </div>
+        <span class="achievement-status">${date ? new Date(date).toLocaleDateString() : 'Locked'}</span>
+      `;
+      this.achievementsListEl.appendChild(row);
+    }
+    this.achievementsOverlayEl?.classList.remove('hidden');
+  }
+
+  hideAchievements(): void {
+    this.achievementsOverlayEl?.classList.add('hidden');
   }
 
   private getPodSize(): number {
@@ -1388,6 +1450,7 @@ export class Game {
       this.showBanner('Storm Passed', 'storm', 2000);
       this.stormOverlay.clear();
       sfx.stopStormRumble();
+      this.tryUnlock('stormSurvivor');
     } else if (this.activeEvent?.type === 'jellyfish') {
       this.endJellyfishSwarm();
       return;
@@ -1580,6 +1643,7 @@ export class Game {
           this.setStatus('Dolphin recruited');
           this.showBanner('Dolphin Recruited!', 'recruited', 2000);
           sfx.playRecruit();
+          this.tryUnlock('firstRecruit');
           break;
         }
       }
@@ -1629,6 +1693,7 @@ export class Game {
           this.particles.emit('hit', shark._x * scale + scale / 2, shark._y * scale + scale / 2, 16, { speed: 3, life: 0.6 });
           this.sharksKilled++;
           this.removeSharkSprite(shark);
+          this.tryUnlock('firstHuntingKill');
         }
       }
       this.sharks = survivingSharks;
@@ -1638,6 +1703,7 @@ export class Game {
         this.sharksKilled += this.sharks.length;
         for (const s of this.sharks) this.removeSharkSprite(s);
         this.sharks = [];
+        this.tryUnlock('matriarchSlayer');
         this.levelComplete();
       }
     }
@@ -1661,6 +1727,7 @@ export class Game {
               this.removeDolphinSprite(victim);
               this.dolphins = this.dolphins.filter((d) => d !== victim);
               this.totalLost++;
+              this.lostThisLevel++;
               this.setStatus('A dolphin was lost');
               this.showBanner('Dolphin Lost!', 'lost', 2000);
             } else if (this.vitalityLives > 0) {
@@ -1708,6 +1775,7 @@ export class Game {
           this.removeDolphinSprite(victim);
           this.dolphins = this.dolphins.filter((d) => d !== victim);
           this.totalLost++;
+          this.lostThisLevel++;
           this.setStatus('A dolphin was stung');
           this.showBanner('Dolphin Stung!', 'lost', 2000);
         }
