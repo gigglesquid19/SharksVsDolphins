@@ -1,0 +1,10 @@
+{
+  "name": "SharksVsDolphins",
+  "short_name": "SvsD",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#0b1120",
+  "description": "Shark and dolphin agent based survival game",
+  "icons": []
+}

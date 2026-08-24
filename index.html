@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0b1120">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>SharksVsDolphins</title>
+  <link rel="manifest" href="/manifest.json">
+</head>
+<body>
+  <div class="waves wave1"><svg viewBox="0 0 1600 90" preserveAspectRatio="none"><path d="M0,45 C200,90 400,0 600,45 C800,90 1000,0 1200,45 C1400,90 1600,0 1800,45 C2000,90 2200,0 2400,45 C2600,90 2800,0 3000,45 C3200,90 3200,90 3200,90 L3200,90 L0,90 Z" fill="#38bdf8"/></svg></div>
+  <div class="waves wave2"><svg viewBox="0 0 1600 90" preserveAspectRatio="none"><path d="M0,45 C200,0 400,90 600,45 C800,0 1000,90 1200,45 C1400,0 1600,90 1800,45 C2000,0 2200,90 2400,45 C2600,0 2800,90 3000,45 C3200,0 3200,0 3200,0 L3200,90 L0,90 Z" fill="#0ea5e9"/></svg></div>
+  <div class="waves wave3"><svg viewBox="0 0 1600 90" preserveAspectRatio="none"><path d="M0,45 C200,90 400,0 600,45 C800,90 1000,0 1200,45 C1400,90 1600,0 1800,45 C2000,90 2200,0 2400,45 C2600,90 2800,0 3000,45 C3200,90 3200,90 3200,90 L3200,90 L0,90 Z" fill="#22d3ee"/></svg></div>
+  <div class="bubbles" id="bubbles"></div>
+
+  <audio id="bgMusic" loop preload="auto">
+    <source src="/ambient-music.ogg" type="audio/ogg">
+    <source src="/ambient-music.mp3" type="audio/mpeg">
+  </audio>
+
+  <div class="title-screen" id="titleScreen">
+    <h1 class="title-heading">Sharks Vs Dolphins</h1>
+    <p class="title-tagline">Swim, dodge, and recruit your pod to survive the open ocean.</p>
+    <button id="titleStartBtn" class="school ready">Start Game</button>
+  </div>
+
+  <div class="narrative-screen hidden" id="narrativeScreen">
+    <div class="narrative-box">
+      <p>Far below the waves lies the Endless Blue, a vast ocean where dolphin pods once travelled freely between feeding grounds, coral cities, and deep-water sanctuaries.</p>
+      <p>Then one day everything changed...</p>
+      <p>The sharks began hunting in organized packs, driving dolphins from their territories and scattering pods across the ocean. Small groups of dolphins became isolated, vulnerable, and easy prey. Fear spread through the sea.</p>
+      <p>You are Echo, a young dolphin separated from your pod during a shark attack.</p>
+      <button id="narrativeContinueBtn" class="school ready">Dive In</button>
+    </div>
+  </div>
+
+  <div class="app-content hidden" id="appContent">
+    <h1>SharksVsDolphins</h1>
+
+    <div class="panel">
+      <div class="grid hidden">
+        <div class="field">
+          <label for="numSharks">Number of sharks</label>
+          <input id="numSharks" type="number" value="8" min="1" max="30">
+        </div>
+        <div class="field">
+          <label for="sharkSpeed">Shark speed</label>
+          <input id="sharkSpeed" type="number" value="1" min="1" max="5">
+        </div>
+        <div class="field full">
+          <label for="speed">Game speed (ms per frame)</label>
+          <input id="speed" type="number" value="80" min="20" max="500">
+        </div>
+      </div>
+      <div class="hint" id="hint">Use the arrow keys, WASD, or the on-screen D-pad to swim. On mobile you can also touch and hold anywhere on the water; the dolphin swims in that direction relative to the centre of the screen. Swim off the left or right edge to wrap around, Pac-Man style. Find lost dolphins to recruit them to your pod. Each dolphin is a life; if a shark catches you, one dolphin is lost. Once your pod reaches 4 dolphins, you enter HUNTING MODE and can destroy sharks by ramming them.</div>
+    </div>
+
+    <div class="panel canvas-wrap" id="canvasWrap">
+      <div class="controls game-controls">
+        <label for="levelSelect" style="color: #f0f9ff; font-size: 0.9rem;">Level</label>
+        <select id="levelSelect" style="margin-right: 8px; padding: 4px 8px; border-radius: 6px; background: #0ea5e9; color: #f0f9ff; border: none; cursor: pointer;">
+          <option value="1" selected>1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+          <option value="5">5</option>
+          <option value="6">6</option>
+          <option value="7">7</option>
+          <option value="8">8</option>
+          <option value="9">9</option>
+          <option value="10">10</option>
+        </select>
+        <button id="startBtn">Start</button>
+        <button id="pauseBtn" class="secondary">Pause</button>
+        <button id="resetBtn" class="secondary">Reset</button>
+        <button id="fullscreenBtn" class="secondary">Fullscreen</button>
+        <button id="muteBtn" class="secondary" aria-label="Mute music">Music: On</button>
+        <button id="controlModeBtn" class="secondary">Controls: D-Pad</button>
+        <div class="volume-control">
+          <label for="volumeSlider">Vol</label>
+          <input type="range" id="volumeSlider" min="0" max="100" value="35" aria-label="Volume">
+        </div>
+      </div>
+      <canvas id="simCanvas" width="600" height="600"></canvas>
+      <div class="last-life hidden" id="lastLifeHeart" style="position: absolute; bottom: 10px; left: 10px; font-size: 3rem; pointer-events: none;">❤️</div>
+      <div class="game-banner" id="gameBanner"></div>
+      <div class="new-waters-prompt" id="newWatersPrompt">
+        <span class="arrow">&#10148;</span>
+        <span class="label">Next Level</span>
+      </div>
+      <div class="school-btn-wrap hidden" id="schoolBtnWrap">
+        <button id="schoolBtn" class="school ready">Form Pod!</button>
+      </div>
+      <div class="disband-btn-wrap hidden" id="disbandBtnWrap" style="position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%);">
+        <button id="disbandBtn" class="school ready">Switch Dolphin</button>
+      </div>
+      <div class="pause-overlay hidden" id="pauseOverlay">
+        <div class="pause-panel">
+          <h2>Paused</h2>
+          <button id="pauseResumeBtn" class="school ready">Resume</button>
+          <button id="pauseRestartBtn" class="secondary">Restart</button>
+          <button id="pauseResetBtn" class="secondary">Reset</button>
+        </div>
+      </div>
+      <div class="level-up-overlay hidden" id="levelUpOverlay">
+        <div class="level-up-panel">
+          <h2>Level Up!</h2>
+          <p>Choose a Mega Shrimp to permanently boost your pod:</p>
+          <div class="mega-shrimp-choices">
+            <button id="megaShrimpYellow" class="mega-shrimp yellow">
+              <span class="mega-shrimp-icon">🍤</span>
+              <span class="mega-shrimp-label">Vitality</span>
+            </button>
+            <button id="megaShrimpRed" class="mega-shrimp red">
+              <span class="mega-shrimp-icon">🍤</span>
+              <span class="mega-shrimp-label">Speed</span>
+            </button>
+            <button id="megaShrimpBlue" class="mega-shrimp blue">
+              <span class="mega-shrimp-icon">🍤</span>
+              <span class="mega-shrimp-label">Charisma</span>
+            </button>
+            <button id="megaShrimpGreen" class="mega-shrimp green">
+              <span class="mega-shrimp-icon">🍤</span>
+              <span class="mega-shrimp-label">Boost</span>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="shark-warning-overlay hidden" id="sharkWarningOverlay">
+        <div class="shark-warning-panel">
+          <h2>⚠️ New Shark Spotted!</h2>
+          <div class="shark-warning-list" id="sharkWarningList"></div>
+          <button id="sharkWarningContinueBtn" class="school ready">Continue</button>
+        </div>
+      </div>
+      <div class="leaderboard-overlay hidden" id="leaderboardOverlay">
+        <div class="leaderboard-panel">
+          <h2>Ocean Saved Leaderboard</h2>
+          <table class="leaderboard-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Time</th>
+                <th>Retries</th>
+                <th>Recruited</th>
+                <th>Lost</th>
+                <th>Sharks</th>
+              </tr>
+            </thead>
+            <tbody id="leaderboardList"></tbody>
+          </table>
+          <button id="leaderboardCloseBtn" class="school ready">Continue</button>
+        </div>
+      </div>
+      <div class="dpad-row">
+        <div class="dpad" id="dpad">
+          <div class="dpad-btn dpad-up" data-key="ArrowUp">▲</div>
+          <div class="dpad-btn dpad-left" data-key="ArrowLeft">◀</div>
+          <div class="dpad-btn dpad-right" data-key="ArrowRight">▶</div>
+          <div class="dpad-btn dpad-down" data-key="ArrowDown">▼</div>
+        </div>
+        <div class="joystick hidden" id="joystick">
+          <div class="joystick-base" id="joystickBase">
+            <div class="joystick-thumb" id="joystickThumb"></div>
+          </div>
+        </div>
+        <div class="stats">
+          <div class="stat"><div class="stat-label">Time</div><span class="stat-value" id="statTime">0.0s</span></div>
+          <div class="stat stat-hidden"><div class="stat-label">Spawn</div><span class="stat-value" id="statSpawn">60.0s</span></div>
+          <div class="stat stat-hidden"><div class="stat-label">Shrimp</div><span class="stat-value" id="statShrimp">120.0s</span></div>
+          <div class="stat dolphin stat-hidden"><div class="stat-label">Dolphins</div><span class="stat-value" id="statDolphins">1</span></div>
+          <div class="stat shark stat-hidden"><div class="stat-label">Sharks</div><span class="stat-value" id="statSharks">0</span></div>
+          <div class="stat stat-hidden"><div class="stat-label">Status</div><span class="stat-value" id="statStatus" style="font-size: 0.85rem; font-weight: 700;">Ready</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel info">
+      Swim as the dolphin, avoid sharks, recruit lost dolphins to grow your pod, and watch for the magic shrimp at 2 minutes. Every dolphin counts as a life. Reach 4 dolphins to form a pod and turn the tables on the sharks. Clear all 10 increasingly difficult levels, picking a Mega Shrimp upgrade after each one, to save the ocean.
+    </div>
+
+    <div class="shark-guide" id="sharkGuide">
+      <h2>Shark Guide</h2>
+      <ul id="sharkGuideList"></ul>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
