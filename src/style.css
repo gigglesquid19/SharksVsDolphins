@@ -617,8 +617,8 @@ button.mega-shrimp.green {
   z-index: 20;
   display: flex;
   align-items: baseline;
-  gap: 5px;
-  padding: 6px 12px;
+  gap: 8px;
+  padding: 10px 18px;
   background: rgba(2, 6, 23, 0.75);
   border: 1px solid rgba(56, 189, 248, 0.4);
   border-radius: 999px;
@@ -627,13 +627,13 @@ button.mega-shrimp.green {
   backdrop-filter: blur(3px);
 }
 .level-badge-label {
-  font-size: 0.62rem;
+  font-size: 0.9rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   color: var(--muted);
 }
 .level-badge #levelBadgeNumber {
-  font-size: 1.1rem;
+  font-size: 1.8rem;
   font-weight: 800;
   color: #22d3ee;
   text-shadow: 0 0 10px rgba(34, 211, 238, 0.6);
