@@ -38,12 +38,12 @@ describe('getEndlessLevelConfig', () => {
 
 describe('getLevelBackground', () => {
   it('maps campaign levels 1-10 directly', () => {
-    expect(getLevelBackground(1)).toBe('levels/1.webp');
-    expect(getLevelBackground(10)).toBe('levels/10.webp');
+    expect(getLevelBackground(1)).toBe('/levels/1.webp');
+    expect(getLevelBackground(10)).toBe('/levels/10.webp');
   });
 
   it('cycles backgrounds for endless levels beyond 10', () => {
-    expect(getLevelBackground(11)).toBe('levels/1.webp');
-    expect(getLevelBackground(20)).toBe('levels/10.webp');
+    expect(getLevelBackground(11)).toBe('/levels/1.webp');
+    expect(getLevelBackground(20)).toBe('/levels/10.webp');
   });
 });

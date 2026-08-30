@@ -28,7 +28,9 @@ jobs:
           cache: npm
 
       - run: npm ci
-      - run: npm run build   # vite build -> dist/ (base: './' works under the /SharksVsDolphins/ subpath)
+      - run: npm run build   # vite build -> dist/
+        env:
+          VITE_BASE: /SharksVsDolphins/   # project sub-path; vite.config.ts reads this
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

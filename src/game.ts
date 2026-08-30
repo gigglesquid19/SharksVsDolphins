@@ -38,6 +38,10 @@ import { ACHIEVEMENTS, AchievementId, getUnlockedMap, unlock } from './achieveme
 
 export type GameMode = 'campaign' | 'endless';
 type LeaderboardBoard = 'campaign' | 'endless';
+
+// '/' for the app and dev, '/SharksVsDolphins/' for the GitHub Pages build - so
+// public/ assets loaded at runtime resolve under whatever sub-path is in use.
+const ASSET_BASE = import.meta.env.BASE_URL;
 const INITIALS_KEY = 'svsd-initials';
 
 const DOLPHIN_SPAWN_INTERVAL = 15;
@@ -376,9 +380,9 @@ export class Game {
 
   private async loadSharkTextures(): Promise<void> {
     const sources: { kind: SharkKind; move: string; attack: string }[] = [
-      { kind: 'greatWhite', move: '/sharks/spr_shark_move_strip9.png', attack: '/sharks/spr_shark_attack_strip9.png' },
-      { kind: 'hammerhead', move: '/sharks/spr_hammerhead_shark_move_strip9.png', attack: '/sharks/spr_hammerhead_shark_attack_strip9.png' },
-      { kind: 'tiger', move: '/sharks/spr_tiger_shark_move_strip9.png', attack: '/sharks/spr_tiger_shark_attack_strip9.png' },
+      { kind: 'greatWhite', move: `${ASSET_BASE}sharks/spr_shark_move_strip9.png`, attack: `${ASSET_BASE}sharks/spr_shark_attack_strip9.png` },
+      { kind: 'hammerhead', move: `${ASSET_BASE}sharks/spr_hammerhead_shark_move_strip9.png`, attack: `${ASSET_BASE}sharks/spr_hammerhead_shark_attack_strip9.png` },
+      { kind: 'tiger', move: `${ASSET_BASE}sharks/spr_tiger_shark_move_strip9.png`, attack: `${ASSET_BASE}sharks/spr_tiger_shark_attack_strip9.png` },
     ];
 
     await Promise.all(
@@ -638,7 +642,7 @@ export class Game {
   }
 
   private async createBackground(): Promise<void> {
-    await this.loadBackground('/OpenOceanBGImage.webp');
+    await this.loadBackground(`${ASSET_BASE}OpenOceanBGImage.webp`);
   }
 
   private async loadBackground(url: string): Promise<void> {

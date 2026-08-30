@@ -2,7 +2,11 @@ import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
-  base: './',
+  // Served from the domain root in the Capacitor Android app and in local dev,
+  // but from a project sub-path on GitHub Pages - the Pages workflow sets
+  // VITE_BASE=/SharksVsDolphins/. Vite rewrites index.html and CSS url()s from
+  // this; runtime asset paths in src/ use import.meta.env.BASE_URL to match.
+  base: process.env.VITE_BASE || '/',
   build: {
     outDir: 'dist',
     emptyOutDir: true,

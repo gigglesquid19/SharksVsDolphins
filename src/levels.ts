@@ -30,7 +30,8 @@ export const LEVELS: LevelConfig[] = [
 
 export function getLevelBackground(level: number): string {
   const bgIndex = ((level - 1) % LEVELS.length) + 1;
-  return `levels/${bgIndex}.webp`;
+  // BASE_URL is '/' for the app / dev and '/SharksVsDolphins/' on GitHub Pages.
+  return `${import.meta.env.BASE_URL}levels/${bgIndex}.webp`;
 }
 
 /**
