@@ -110,11 +110,17 @@ export class Shark {
     const margin = Math.ceil((24 * this.sizeMultiplier) / (CANVAS_SIZE / SIZE));
     const keepX = this.kind === 'tiger' || this.matriarch ? clampX : wrapX;
 
-    if (this.kind === 'greatWhite' && this.large && !this.matriarch && sharks.every((s) => s.large)) {
+    // The Matriarch gets this same charge ability once every escort is gone and she's alone -
+    // see updateMatriarch() in game.ts, which also bumps her speedMultiplier at that point.
+    const matriarchAlone = this.matriarch && sharks.length === 1;
+    if ((this.kind === 'greatWhite' && this.large && !this.matriarch && sharks.every((s) => s.large)) || matriarchAlone) {
+      // Twice as fast as an ordinary large great white's charge - she's meant to be the scariest
+      // thing in the water once she's down to her last stand.
+      const chargeSpeed = matriarchAlone ? CHARGE_SPEED * 2 : CHARGE_SPEED;
       if (this.charging) {
         if (now < this.chargeEndTime) {
-          this._x = keepX(this._x + this.chargeDx * speed * this.speedMultiplier * CHARGE_SPEED);
-          this._y = clampEntityY(this._y + this.chargeDy * speed * this.speedMultiplier * CHARGE_SPEED, margin);
+          this._x = keepX(this._x + this.chargeDx * speed * this.speedMultiplier * chargeSpeed);
+          this._y = clampEntityY(this._y + this.chargeDy * speed * this.speedMultiplier * chargeSpeed, margin);
           return;
         } else {
           this.charging = false;
@@ -129,8 +135,8 @@ export class Shark {
           this.chargeDy = ody / d;
           this.charging = true;
           this.chargeEndTime = now + CHARGE_DURATION;
-          this._x = keepX(this._x + this.chargeDx * speed * this.speedMultiplier * CHARGE_SPEED);
-          this._y = clampEntityY(this._y + this.chargeDy * speed * this.speedMultiplier * CHARGE_SPEED, margin);
+          this._x = keepX(this._x + this.chargeDx * speed * this.speedMultiplier * chargeSpeed);
+          this._y = clampEntityY(this._y + this.chargeDy * speed * this.speedMultiplier * chargeSpeed, margin);
           return;
         }
       }

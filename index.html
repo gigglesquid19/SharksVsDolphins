@@ -76,6 +76,14 @@
             <option value="9">9</option>
             <option value="10">10</option>
           </select>
+          <label id="startWithPodLabel" class="start-with-pod-label hidden">
+            <input type="checkbox" id="startWithPodCheckbox">
+            Start with 4 dolphins
+          </label>
+          <label id="startWith8PodLabel" class="start-with-pod-label hidden">
+            <input type="checkbox" id="startWith8PodCheckbox">
+            Start with 8 dolphins
+          </label>
         </span>
         <button id="startBtn">Start</button>
         <button id="pauseBtn" class="secondary">Pause</button>
@@ -210,6 +218,10 @@
           <div class="stat dolphin stat-hidden"><div class="stat-label">Dolphins</div><span class="stat-value" id="statDolphins">1</span></div>
           <div class="stat shark stat-hidden"><div class="stat-label">Sharks</div><span class="stat-value" id="statSharks">0</span></div>
           <div class="stat stat-hidden"><div class="stat-label">Status</div><span class="stat-value" id="statStatus" style="font-size: 0.85rem; font-weight: 700;">Ready</span></div>
+        </div>
+        <div class="sprint-btn-wrap">
+          <button id="sprintBtn" class="sprint-btn" aria-label="Sprint">⚡</button>
+          <div class="sprint-cooldown-ring" id="sprintCooldownRing"></div>
         </div>
       </div>
     </div>

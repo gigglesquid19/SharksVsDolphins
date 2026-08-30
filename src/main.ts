@@ -5,6 +5,16 @@ import { clearRunCheckpoint, loadRunCheckpoint } from './runState';
 import { registerSW } from 'virtual:pwa-register';
 import { Capacitor } from '@capacitor/core';
 
+// Android WebView's console bridge only relays file/line/message for uncaught errors and
+// promise rejections (no stack) - re-log through console.error, which it relays in full,
+// so crashes are diagnosable from `adb logcat` alone.
+window.addEventListener('error', (event) => {
+  console.error('[onerror]', event.error?.stack || event.message);
+});
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('[unhandledrejection]', event.reason?.stack || event.reason);
+});
+
 // Registers the Workbox-generated service worker (see vite.config.ts) so the built assets
 // are cached for offline play; auto-updates in the background when a new build is deployed.
 registerSW({ immediate: true });
@@ -64,6 +74,31 @@ const initialsInputEl = document.getElementById('initialsInput') as HTMLInputEle
 const savedCheckpoint = loadRunCheckpoint();
 if (savedCheckpoint) titleContinueBtn.classList.remove('hidden');
 
+// The "start with N dolphins" testing shortcuts only make sense on level 10 (the Matriarch
+// fight, otherwise a long grind to reach in a fresh run) - shown only while that's selected,
+// and mutually exclusive with each other (game.ts prefers the 8-dolphin one if both are checked,
+// but keeping them visually in sync avoids a misleading "both checked" state).
+const levelSelect = document.getElementById('levelSelect') as HTMLSelectElement;
+const startWithPodLabel = document.getElementById('startWithPodLabel') as HTMLLabelElement;
+const startWithPodCheckbox = document.getElementById('startWithPodCheckbox') as HTMLInputElement;
+const startWith8PodLabel = document.getElementById('startWith8PodLabel') as HTMLLabelElement;
+const startWith8PodCheckbox = document.getElementById('startWith8PodCheckbox') as HTMLInputElement;
+
+function updateStartWithPodVisibility(): void {
+  const isLevel10 = levelSelect.value === '10';
+  startWithPodLabel.classList.toggle('hidden', !isLevel10);
+  startWith8PodLabel.classList.toggle('hidden', !isLevel10);
+}
+levelSelect.addEventListener('change', updateStartWithPodVisibility);
+updateStartWithPodVisibility();
+
+startWithPodCheckbox.addEventListener('change', () => {
+  if (startWithPodCheckbox.checked) startWith8PodCheckbox.checked = false;
+});
+startWith8PodCheckbox.addEventListener('change', () => {
+  if (startWith8PodCheckbox.checked) startWithPodCheckbox.checked = false;
+});
+
 function enterAppFromTitle(): void {
   titleScreen.classList.add('hidden');
   narrativeScreen.classList.remove('hidden');
@@ -108,10 +143,6 @@ const inputs = {
   const game = new Game(canvas, inputs);
   await game.init();
   const gameCanvas = game.getCanvas();
-
-  if (Capacitor.isNativePlatform()) {
-    enableNativeCompactLayout();
-  }
 
   inputs.startBtn.addEventListener('click', () => game.retry());
 
@@ -218,8 +249,8 @@ const inputs = {
       // square, fill most of both dimensions independently (mild stretch, not a hard crop) so
       // the play area actually covers most of the screen. WIDTH_FILL/HEIGHT_FILL leave a small
       // breathing-room margin rather than going fully edge-to-edge.
-      const WIDTH_FILL = 0.95;
-      const HEIGHT_FILL = 0.85;
+      const WIDTH_FILL = 0.98;
+      const HEIGHT_FILL = 0.7;
       const availableHeight = window.innerHeight - reservedTop;
       gameCanvas.style.width = `${window.innerWidth * WIDTH_FILL}px`;
       gameCanvas.style.height = `${availableHeight * HEIGHT_FILL}px`;
@@ -287,6 +318,10 @@ const inputs = {
   window.addEventListener('resize', () => {
     if (isCompactLayout()) applyFullscreenCanvasSize();
   });
+
+  if (Capacitor.isNativePlatform()) {
+    enableNativeCompactLayout();
+  }
 
   const joystickBase = document.getElementById('joystickBase') as HTMLDivElement;
   const joystickThumb = document.getElementById('joystickThumb') as HTMLDivElement;
@@ -359,6 +394,48 @@ const inputs = {
   window.addEventListener('mouseup', () => {
     if (joystickActive) endJoystick();
   });
+
+  const sprintBtn = document.getElementById('sprintBtn') as HTMLButtonElement;
+
+  function pressSprint(): void {
+    sprintBtn.classList.add('active');
+    game.setKey(' ', true);
+  }
+  function releaseSprint(): void {
+    sprintBtn.classList.remove('active');
+    game.setKey(' ', false);
+  }
+
+  sprintBtn.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    pressSprint();
+  }, { passive: false });
+  sprintBtn.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    releaseSprint();
+  }, { passive: false });
+  sprintBtn.addEventListener('touchcancel', (e) => {
+    e.preventDefault();
+    releaseSprint();
+  }, { passive: false });
+  sprintBtn.addEventListener('mousedown', () => pressSprint());
+  sprintBtn.addEventListener('mouseup', () => releaseSprint());
+  sprintBtn.addEventListener('mouseleave', () => releaseSprint());
+
+  const sprintCooldownRing = document.getElementById('sprintCooldownRing') as HTMLDivElement;
+  let sprintWasReady = true;
+  function updateSprintCooldownVisual(): void {
+    const fraction = game.getSprintCooldownFraction();
+    sprintCooldownRing.style.setProperty('--remaining', String(1 - fraction));
+    const isReady = fraction >= 1;
+    if (isReady && !sprintWasReady) {
+      sprintBtn.classList.add('ready-flash');
+      setTimeout(() => sprintBtn.classList.remove('ready-flash'), 500);
+    }
+    sprintWasReady = isReady;
+    requestAnimationFrame(updateSprintCooldownVisual);
+  }
+  requestAnimationFrame(updateSprintCooldownVisual);
 
   function updatePointerDirection(clientX: number, clientY: number): void {
     const rect = gameCanvas.getBoundingClientRect();
