@@ -252,6 +252,22 @@ Known Issues / Before You Deploy Publicly
   repository root; the previous "no build step" GitHub Pages setup no
   longer applies now that the project uses Vite and TypeScript.
 
+Hosting / PWA
+--------------------
+`.github/workflows/pages.yml` builds `dist/` and deploys it to GitHub Pages on
+every push to `main`. For it to run, the repo's **Settings -> Pages -> Source**
+must be set to **"GitHub Actions"** (not "Deploy from a branch" - that publishes
+the raw, unbuilt source and the game will not start).
+
+Once deployed, `https://<user>.github.io/SharksVsDolphins/` serves the full
+installable PWA: open it in Chrome (desktop or Android) and choose
+"Install app" / "Add to Home screen" to run it standalone with the Workbox
+service worker caching assets for offline play. `vite.config.ts` sets
+`base: './'` so it works correctly under the `/SharksVsDolphins/` sub-path.
+
+The same `dist/` is what Capacitor wraps for the Android app (see
+`npm run build:android`), so the PWA and the native app always match.
+
 Ideas for Further Development
 -----------------------------
 - Android packaging via Capacitor or a Trusted Web Activity, plus PNG app
