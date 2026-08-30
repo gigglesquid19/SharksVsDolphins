@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:android": "npm run build && cap sync android",
     "preview": "vite preview",
     "test": "vitest run"
   },

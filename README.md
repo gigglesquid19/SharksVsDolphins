@@ -124,9 +124,14 @@ clone, or CI without the secret) the release build is simply left unsigned so
 debug builds and tests are never blocked. Produce the Play upload with:
 
 ```
-npm run build
+npm run build:android          # = npm run build + `cap sync android`
 cd android && ./gradlew bundleRelease   # -> app/build/outputs/bundle/release/app-release.aab
 ```
+
+The `cap sync` step is essential and easy to forget: Gradle builds from
+`android/app/src/main/assets/public/` (gitignored), which only picks up a new
+`dist/` when `cap copy`/`cap sync` has run. Skipping it silently ships stale
+web assets.
 
 How to Play
 --------------------
