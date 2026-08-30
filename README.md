@@ -1,5 +1,7 @@
 SharksVsDolphins
 =====================
+[![CI](https://github.com/gigglesquid19/SharksVsDolphins/actions/workflows/ci.yml/badge.svg)](https://github.com/gigglesquid19/SharksVsDolphins/actions/workflows/ci.yml)
+
 SharksVsDolphins started life as a Python agent-based model of deer and wolf
 population dynamics, and has since been rebuilt as a browser game. You play
 as Echo, a dolphin separated from your pod, trying to survive, regroup, and
