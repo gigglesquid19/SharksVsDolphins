@@ -1,11 +1,12 @@
 {
-  "name": "SharksVsDolphins",
+  "name": "Sharks vs Dolphins",
   "short_name": "SvsD",
   "start_url": ".",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#020617",
   "theme_color": "#0b1120",
-  "description": "Shark and dolphin agent based survival game",
+  "description": "Survive the open ocean as Echo the dolphin: dodge sharks, rebuild your pod, and turn the tables.",
   "icons": [
     { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
