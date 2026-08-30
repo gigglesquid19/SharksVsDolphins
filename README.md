@@ -232,18 +232,14 @@ copies. See Known Issues below for their license status.
 
 Known Issues / Before You Deploy Publicly
 ---------------------------------------------
-- The old copyrighted placeholder track (`public/ambient-music.mp3`, a
-  Nintendo song) has been removed and replaced by the six-track system in
-  `public/music/` (see Music above). **License status of the six new
-  tracks is not yet documented** - they need their source/license recorded
-  (a credits file, per Store Readiness below) before a public release,
-  even though none of them are commercial game music like the old
-  placeholder was.
-- Background images in `public/` and `Images/` should be checked for usage
-  rights before a public or commercial release. The shark sprite pack in
-  `public/sharks/` (sourced from `Images/Free Shark Enemy Pack`) is
-  confirmed clear: MutterPixel Studio's license permits commercial use with
-  no attribution required (see the pack's own `README.txt`).
+- **Asset licenses are documented in `CREDITS.md`.** Summary: the old
+  copyrighted placeholder track (a Nintendo song) is gone; all six
+  replacement tracks in `public/music/` are Pixabay, commercial-use OK. The
+  shark sprites are MutterPixel Studio (commercial OK). The level backgrounds
+  and app icon are Leonardo AI generations owned by the project author. Two
+  open caveats are noted in `CREDITS.md`: the MutterPixel pack's
+  "no redistribution as standalone files" clause vs. this repo being public,
+  and the limited copyright protection AI-generated images carry.
 - `npm run build` output (`dist/`) is what should be deployed, not the raw
   repository root; the previous "no build step" GitHub Pages setup no
   longer applies now that the project uses Vite and TypeScript.
