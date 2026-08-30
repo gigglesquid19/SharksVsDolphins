@@ -63,6 +63,69 @@ build` is required before deploying anywhere (see "Hosting" below), since
 the source references `.ts`/`.css` files directly and needs Vite's build
 step to produce plain HTML/JS/CSS output.
 
+Versioning
+--------------------
+The single source of truth for the app version is the `version` field in
+`package.json` (repo root). Bump it there and nothing else needs editing:
+
+```
+npm version patch    # bug-fix release   1.0.0 -> 1.0.1
+npm version minor    # new features      1.0.1 -> 1.1.0
+npm version major    # breaking / big    1.1.0 -> 2.0.0
+```
+
+`android/app/build.gradle` reads `package.json` at configure time and derives
+both Android version fields from it:
+
+- **`versionName`** - the semver string verbatim (`1.2.0`). This is what
+  players see on the Play Store listing.
+- **`versionCode`** - computed as `MAJOR*10000 + MINOR*100 + PATCH`, so
+  `1.0.0` -> `10000`, `1.4.2` -> `10402`, `2.0.0` -> `20000`. Google Play
+  requires this integer to increase on every upload; the formula guarantees
+  that as long as the semver goes up, and leaves room for up to 99 minor and
+  99 patch releases between steps. Any pre-release suffix (`1.2.0-beta.1`) is
+  ignored when computing the code.
+
+The first Play Console upload will therefore be `versionCode 10000` /
+`versionName 1.0.0` (the earlier local debug APKs were the Capacitor template
+default of `versionCode 1`, which is lower, so this is a clean increase).
+`capacitor.config.ts` intentionally does **not** set a version - keeping it in
+one place avoids the two drifting apart.
+
+Android launcher icon
+--------------------
+The launcher icon is generated from `Images/GameLogo.jpg` (a 1024x1024
+shark-vs-dolphin illustration) by `tools/generate_android_icons.py`, which
+writes the legacy square/round PNGs and the API-26+ adaptive-icon layers into
+`android/app/src/main/res/mipmap-*`. The whole scene lives in the adaptive
+*background* layer (blurred edge-extension fills the canvas, the sharp scene
+stays inside the safe zone); the *foreground* layer is deliberately empty.
+Re-run the script (`python tools/generate_android_icons.py`) whenever
+`GameLogo.jpg` changes, then rebuild. The web/PWA icons in `public/` are
+separate and still the older fin artwork.
+
+The same script also generates the Android 12+ launch-screen icon
+(`drawable-*/splash_icon.png`); the launch screen shows it centred on a
+deep-ocean fill (`@color/splashBackground`, matching the web manifest's
+`background_color`), configured in `android/app/src/main/res/values/styles.xml`.
+
+Android release signing
+--------------------
+The `release` build type is signed with the upload keystore described in
+`android/keystore/keystore.properties`. That file and the `.keystore` beside it
+are **gitignored and must be backed up somewhere safe** - losing the keystore
+means never being able to update the same Play Store listing again.
+
+`android/app/build.gradle` loads the properties file if it is present and signs
+`assembleRelease` / `bundleRelease` with it; if the file is absent (a fresh
+clone, or CI without the secret) the release build is simply left unsigned so
+debug builds and tests are never blocked. Produce the Play upload with:
+
+```
+npm run build
+cd android && ./gradlew bundleRelease   # -> app/build/outputs/bundle/release/app-release.aab
+```
+
 How to Play
 --------------------
 1. Open the game and pick a mode on the title screen, then **Dive In** past

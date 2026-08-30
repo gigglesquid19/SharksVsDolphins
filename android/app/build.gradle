@@ -1,5 +1,31 @@
 apply plugin: 'com.android.application'
 
+// --- App version: single source of truth is "version" in the repo-root package.json ---
+// Bump it there (e.g. `npm version patch|minor|major`) and both Android version fields follow.
+//   versionName - the human-readable semver string shown on the Play Store listing.
+//   versionCode - MAJOR*10000 + MINOR*100 + PATCH: a strictly-increasing integer that Google
+//                 Play requires to be higher on every upload. This scheme leaves room for up
+//                 to 99 minor and 99 patch releases per step (1.0.0 -> 10000, 1.4.2 -> 10402,
+//                 2.0.0 -> 20000). Any pre-release suffix (1.2.0-beta.1) is ignored for the code.
+def packageJson = new groovy.json.JsonSlurper().parseText(file("${rootDir}/../package.json").text)
+def versionParts = (packageJson.version as String).tokenize('.-')
+ext.appVersionName = packageJson.version
+ext.appVersionCode = versionParts[0].toInteger() * 10000 +
+                     versionParts[1].toInteger() * 100 +
+                     versionParts[2].toInteger()
+
+// --- Release signing ---
+// Credentials live in android/keystore/keystore.properties (gitignored, along with the
+// .keystore itself). When that file is absent - a fresh clone, or a CI checkout without the
+// secret - the release build is simply left unsigned instead of failing, so debug builds and
+// tests are never blocked. A real Play upload must run where the properties file is present.
+def keystorePropertiesFile = rootProject.file("keystore/keystore.properties")
+def keystoreProperties = new Properties()
+def hasReleaseKeystore = keystorePropertiesFile.exists()
+if (hasReleaseKeystore) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
 android {
     namespace = "com.sharksvsdolphins.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +33,8 @@ android {
         applicationId "com.sharksvsdolphins.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode project.ext.appVersionCode
+        versionName project.ext.appVersionName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,8 +42,19 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (hasReleaseKeystore) {
+                storeFile rootProject.file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
+        }
+    }
     buildTypes {
         release {
+            if (hasReleaseKeystore) signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">SharksVsDolphins</string>
-    <string name="title_activity_main">SharksVsDolphins</string>
+    <string name="app_name">Sharks vs Dolphins</string>
+    <string name="title_activity_main">Sharks vs Dolphins</string>
     <string name="package_name">com.sharksvsdolphins.app</string>
     <string name="custom_url_scheme">com.sharksvsdolphins.app</string>
 </resources>

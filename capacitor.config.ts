@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.sharksvsdolphins.app',
-  appName: 'SharksVsDolphins',
+  appName: 'Sharks vs Dolphins',
   webDir: 'dist'
 };
 

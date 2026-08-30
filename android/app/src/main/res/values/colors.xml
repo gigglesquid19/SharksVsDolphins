@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Overrides the Capacitor library defaults (indigo/pink) with the game's ocean palette.
+         These names are the ones AppTheme in styles.xml already references. -->
+    <color name="colorPrimary">#0b1120</color>
+    <color name="colorPrimaryDark">#020617</color>
+    <color name="colorAccent">#38bdf8</color>
+
+    <!-- Launch screen: deep-ocean fill behind the centred app icon. Matches the web
+         manifest's background_color so the PWA and the native app open the same way. -->
+    <color name="splashBackground">#020617</color>
+</resources>
