@@ -220,7 +220,10 @@ number changes - a same-level retry leaves the current track alone):
 Source `.mp3`s for both sets also live in `audio/Ambient/` and
 `audio/Boss/` (the project's convention for original/source assets, mirroring
 `Images/` for the level backgrounds) - `public/music/` holds the served
-copies. See Known Issues below for their license status.
+copies, re-encoded from the 256 kbps sources to LAME VBR V3 (~175 kbps) to
+roughly halve the download without an audible drop. See `CREDITS.md` for
+sources and licenses. To re-derive the served copies from source, run them
+through `ffmpeg -i <src> -c:a libmp3lame -q:a 3 -ar 44100 -ac 2 -map_metadata -1`.
 - **Pause menu**: freezes the simulation and timers; resume, restart, or
   reset from the overlay, or toggle with `Esc`/`P`.
 - **Achievements**: five one-time unlocks (first recruit, first Hunting Mode
