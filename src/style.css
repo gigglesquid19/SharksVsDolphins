@@ -436,7 +436,7 @@ button.school.mega-pod:hover:not(:disabled) { box-shadow: 0 6px 22px rgba(168, 8
 
 .achievement-toast {
   position: absolute;
-  top: 16px;
+  top: calc(var(--stage-top, 0px) + 16px);
   left: 50%;
   transform: translate(-50%, -14px);
   display: flex;
@@ -853,9 +853,12 @@ button.mega-shrimp.green {
   text-align: left;
 }
 
+/* --stage-top is the height of the controls row, measured in main.ts. HUD overlays anchor
+   below it so they sit over the water instead of covering the Start/Pause buttons - the
+   badge used to render on top of Start, hiding it completely at some window widths. */
 .level-badge {
   position: absolute;
-  top: 10px;
+  top: calc(var(--stage-top, 0px) + 10px);
   right: 10px;
   z-index: 20;
   display: flex;
@@ -884,7 +887,7 @@ button.mega-shrimp.green {
 
 .dolphins-saved-badge {
   position: absolute;
-  top: 10px;
+  top: calc(var(--stage-top, 0px) + 10px);
   left: 10px;
   z-index: 20;
   display: flex;
@@ -909,7 +912,7 @@ button.mega-shrimp.green {
 /* Persisted Pearl balance - shown in both modes, tucked under the level badge. */
 .pearls-badge {
   position: absolute;
-  top: 76px;
+  top: calc(var(--stage-top, 0px) + 76px);
   right: 10px;
   z-index: 20;
   display: flex;

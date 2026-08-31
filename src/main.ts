@@ -41,9 +41,39 @@ registerSW({ immediate: true });
 const canvas = document.getElementById('simCanvas') as HTMLCanvasElement;
 const canvasWrap = document.getElementById('canvasWrap') as HTMLDivElement;
 
+// The HUD badges (level, dolphins saved, pearls) and the achievement toast are positioned
+// against .canvas-wrap, whose first child is the controls row - without this they render on
+// top of the buttons and can completely hide Start, which looks exactly like a frozen game.
+// Publish the controls' height as --stage-top so they anchor below it (see style.css); the
+// row wraps to 2-3 lines depending on window width, so it must be measured, not hard-coded.
+// Module scope, not inside main(), so the observers are live before `await game.init()`.
+const controlsRow = document.querySelector('.canvas-wrap .game-controls') as HTMLElement | null;
+function syncStageTop(): void {
+  if (!controlsRow) return;
+  // Compact/fullscreen floats the bar over the canvas and already pads the wrap for it.
+  const compact = !!document.fullscreenElement || canvasWrap.classList.contains('compact');
+  const offset = compact
+    ? 0
+    : controlsRow.getBoundingClientRect().bottom - canvasWrap.getBoundingClientRect().top;
+  canvasWrap.style.setProperty('--stage-top', `${Math.max(0, Math.round(offset))}px`);
+}
+
 const titleScreen = document.getElementById('titleScreen') as HTMLDivElement;
 const narrativeScreen = document.getElementById('narrativeScreen') as HTMLDivElement;
 const appContent = document.getElementById('appContent') as HTMLDivElement;
+
+if (controlsRow && 'ResizeObserver' in window) {
+  const ro = new ResizeObserver(syncStageTop);
+  ro.observe(controlsRow);
+  ro.observe(canvasWrap);
+}
+window.addEventListener('resize', syncStageTop);
+// .canvas-wrap has no box until #appContent is revealed, so measure again on that transition.
+new MutationObserver(() => requestAnimationFrame(syncStageTop)).observe(appContent, {
+  attributes: true,
+  attributeFilter: ['class'],
+});
+syncStageTop();
 
 const bgMusic = document.getElementById('bgMusic') as HTMLAudioElement;
 const muteBtn = document.getElementById('muteBtn') as HTMLButtonElement;
@@ -219,6 +249,7 @@ document.getElementById('narrativeContinueBtn')!.addEventListener('click', () =>
   dolphinNameField.classList.add('hidden');
   narrativeScreen.classList.add('hidden');
   appContent.classList.remove('hidden');
+  syncStageTop();
 });
 
 const inputs = {
@@ -293,6 +324,7 @@ const inputs = {
     titleScreen.classList.add('hidden');
     narrativeScreen.classList.add('hidden');
     appContent.classList.remove('hidden');
+    syncStageTop();
     bgMusic.play().catch((err) => console.warn('Music playback failed:', err));
     sfx.resume();
     game.resumeRun(checkpoint);
@@ -447,6 +479,7 @@ const inputs = {
     document.getElementById('fullscreenBtn')?.classList.add('hidden');
     moveControlsIntoPauseMenu();
     applyFullscreenCanvasSize();
+    syncStageTop();
   }
 
   document.addEventListener('fullscreenchange', () => {
@@ -458,6 +491,7 @@ const inputs = {
       restoreControlsFromPauseMenu();
     }
     applyFullscreenCanvasSize();
+    syncStageTop();
   });
 
   window.addEventListener('resize', () => {
