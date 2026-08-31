@@ -206,7 +206,7 @@ export class Game {
   private seenSharkKinds = new Set<SharkKind>();
   private seenLargeSharkKinds = new Set<SharkKind>();
   private seenLargeSharkVariety = false;
-  private autoFormedThisLevel = false;
+  private autoFormedForThisPod = false;
   private currentLevel = 1;
   private retries = 0;
   private totalRecruited = 0;
@@ -972,7 +972,7 @@ export class Game {
       this.levelCompleteTimer = null;
     }
     this.levelCompleted = false;
-    this.autoFormedThisLevel = false;
+    this.autoFormedForThisPod = false;
     this.sprinting = false;
     this.sprintEndTime = 0;
     this.sprintCooldownEnd = 0;
@@ -1920,7 +1920,7 @@ export class Game {
       }
 
       this.player.invulnerableUntil = Date.now() + 5000;
-      this.autoFormedThisLevel = false;
+      this.autoFormedForThisPod = false;
     }
 
     this.levelCompleted = false;
@@ -2674,6 +2674,11 @@ export class Game {
       this.setStatus('Hunting mode lost');
       this.updateHuntingVisuals();
       this.onSchoolingChange?.(false);
+      // Arm the auto-form again for the pod you rebuild. This latch used to be per level, so
+      // losing your pod below the threshold once meant Hunting Mode never came back on its own
+      // - every shark stayed indestructible for the rest of the level however many dolphins you
+      // recruited, while the hint still promised the pod forms automatically.
+      this.autoFormedForThisPod = false;
     }
 
     if (canSchool && !this.huntingMode && !this.readyToSchool) {
@@ -2690,8 +2695,8 @@ export class Game {
       this.schoolBtnWrap.classList.add('hidden');
     }
 
-    if (!this.autoFormedThisLevel && this.player && this.player.invulnerableUntil <= Date.now() && canSchool && !this.huntingMode) {
-      this.autoFormedThisLevel = true;
+    if (!this.autoFormedForThisPod && this.player && this.player.invulnerableUntil <= Date.now() && canSchool && !this.huntingMode) {
+      this.autoFormedForThisPod = true;
       this.formSchool();
       this.setStatus('Pod Formed');
       this.showBanner('Pod Formed!', 'victory', 1500);
