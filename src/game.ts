@@ -2025,10 +2025,25 @@ export class Game {
     return this.dolphins.filter((d) => d.isPlayer || d.recruited).length;
   }
 
+  /** Radius at which a shark can bite the pod. Deliberately tight - see sharkRamRadius. */
   private sharkHitRadius(shark: Shark): number {
     if (shark.matriarch) return 10;
     if (shark.kind === 'greatWhite' && shark.large) return 6;
     return 4;
+  }
+
+  /**
+   * Radius at which the pod can destroy a shark. Scaled to the drawn sprite
+   * (SHARK_KIND_SCALE x sizeMultiplier - see the draw loop), because a large tiger is 2.5x
+   * the size of a small one but used to share its 4-unit hitbox: you could sprint visibly
+   * *through* one and have the ram not register. Kept separate from (and never smaller than)
+   * the bite radius, so generous player hitboxes don't also make sharks more dangerous.
+   */
+  private sharkRamRadius(shark: Shark): number {
+    const bite = this.sharkHitRadius(shark);
+    if (shark.matriarch) return bite;
+    const drawScale = SHARK_KIND_SCALE[shark.kind] * shark.sizeMultiplier;
+    return Math.max(bite, 4 * Math.sqrt(drawScale));
   }
 
   private sharkPodRequirement(kind: SharkKind, large: boolean): number {
@@ -2526,8 +2541,9 @@ export class Game {
       const survivingSharks: Shark[] = [];
       let matriarchJustDefeated = false;
       for (const shark of this.sharks) {
-        const hitRadius = this.sharkHitRadius(shark);
-        const hitsAnyDolphin = this.dolphins.some((d) => shark.distanceBetween(d) < hitRadius);
+        // Any pod member landing the hit counts, not just the dolphin you're steering.
+        const ramRadius = this.sharkRamRadius(shark);
+        const hitsAnyDolphin = this.dolphins.some((d) => shark.distanceBetween(d) < ramRadius);
 
         // In Campaign mode the Matriarch can only be hurt while the Mega Pod is active, and only
         // by sprinting into her - each ram flashes her and counts toward MATRIARCH_HITS_REQUIRED,

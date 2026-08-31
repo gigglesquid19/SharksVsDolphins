@@ -49,7 +49,8 @@ describe('Shark', () => {
     shark.kind = 'tiger';
     const player = new Dolphin(0, 50, 60);
     shark.move(1, player, [shark], false, 0);
-    expect(shark._x).toBeCloseTo(50.7);
+    // Straight line toward the player at the pursuit speed (speed x speedMultiplier x 0.95).
+    expect(shark._x).toBeCloseTo(50.95);
     expect(shark._y).toBe(50);
   });
 

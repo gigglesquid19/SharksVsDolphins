@@ -163,13 +163,11 @@ export class Shark {
           this.chargeCooldownEnd = now + CHARGE_COOLDOWN;
         }
       } else if (now >= this.chargeCooldownEnd && distToPlayer >= CHARGE_MIN_DIST && distToPlayer <= CHARGE_MAX_DIST) {
-        // Lead the target: aim at where the player will be, not where they are. The dash runs
-        // ~12 ticks; a partial lead means a hard turn during the wind-up still dodges it.
-        const LEAD_TICKS = 7;
-        const predX = wrapX(player._x + (player._x - player.lastX) * LEAD_TICKS);
-        const predY = clampEntityY(player._y + (player._y - player.lastY) * LEAD_TICKS, margin);
-        const odx = directionDelta(predX, this._x);
-        const ody = predY - this._y;
+        // Aims straight at the player, deliberately without leading the target: a predicted
+        // intercept sent the charge into empty water whenever the player turned, which read as
+        // far less threatening than a shark barrelling directly at you.
+        const odx = directionDelta(player._x, this._x);
+        const ody = player._y - this._y;
         const d = Math.sqrt(odx * odx + ody * ody);
         if (d > 0) {
           this.chargeDx = odx / d;
@@ -263,7 +261,11 @@ export class Shark {
       desY += sepDy * 3;
 
       this.steer(desX, desY, flanking ? 0.28 : 0.18);
-      const effectiveSpeed = speed * this.speedMultiplier * 0.7 * (podThreat ? 0.7 : 1);
+      // 0.95, not the original 0.7: that figure was tuned against the old 8-direction movement,
+      // which stepped a full unit on BOTH axes at once (~1.41x the distance on a diagonal). A
+      // unit heading caps total movement at 1, so the same constant made every diagonal chase
+      // ~29% slower and sharks stopped feeling threatening.
+      const effectiveSpeed = speed * this.speedMultiplier * 0.95 * (podThreat ? 0.7 : 1);
       this._x = keepX(this._x + this.headingX * effectiveSpeed);
       this._y = clampEntityY(this._y + this.headingY * effectiveSpeed, margin);
     } else {
