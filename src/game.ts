@@ -61,7 +61,7 @@ const HUNTING_MODE_POD_SIZE = 4;
 const MATRIARCH_HITS_REQUIRED = 3;
 const MATRIARCH_HIT_COOLDOWN_MS = 900;
 const LARGE_SHARK_SIZE_MULTIPLIER = 1.8;
-const SPRINT_DURATION = 200;
+const SPRINT_DURATION = 300;
 const SPRINT_COOLDOWN = 10000;
 const SPRINT_SPEED = 2;
 const SHARK_BASE_SCALE = 0.6;
@@ -121,8 +121,13 @@ export class Game {
 
   private running = false;
   private timer: ReturnType<typeof setTimeout> | null = null;
-  private startTime = 0;
+  /** Seconds of actual play in the current level attempt (resets on retry). Drives spawn /
+   * event timers and the on-screen clock. Advances only while step() runs, so time spent on
+   * a pause / overlay does not count. */
   private gameTime = 0;
+  /** Seconds of actual play across the whole run - survives retries and level transitions,
+   * resets only on a fresh start. This is the leaderboard time. */
+  private runElapsed = 0;
   private nextDolphinSpawnTime = 60;
   private lastFrameTime = 0;
   private magicShrimp: MagicShrimp | null = null;
@@ -503,7 +508,8 @@ export class Game {
     this.seenLargeSharkVariety = checkpoint.seenLargeSharkVariety;
 
     if (!this.initModel(getLevelConfig(checkpoint.level), true)) return false;
-    this.sessionStartTime = Date.now() - checkpoint.elapsedSeconds * 1000;
+    this.sessionStartTime = Date.now();
+    this.runElapsed = checkpoint.elapsedSeconds;
     this.running = true;
     this.startBtn.textContent = 'Retry';
     this.setStatus('Swimming');
@@ -523,7 +529,7 @@ export class Game {
       totalLost: this.totalLost,
       sharksKilled: this.sharksKilled,
       totalDolphinsSaved: this.totalDolphinsSaved,
-      elapsedSeconds: this.sessionStartTime > 0 ? (Date.now() - this.sessionStartTime) / 1000 : this.gameTime,
+      elapsedSeconds: this.runElapsed,
       seenSharkKinds: [...this.seenSharkKinds],
       seenLargeSharkKinds: [...this.seenLargeSharkKinds],
       seenLargeSharkVariety: this.seenLargeSharkVariety,
@@ -776,6 +782,7 @@ export class Game {
       this.totalLost = 0;
       this.sharksKilled = 0;
       this.sessionStartTime = 0;
+      this.runElapsed = 0;
       this.totalDolphinsSaved = 0;
       this.lastMusicLevel = 0;
       this.syncedSharkKills = 0;
@@ -810,7 +817,6 @@ export class Game {
     this.spawnSharksForLevel(config);
     this.draw();
 
-    this.startTime = 0;
     this.nextDolphinSpawnTime = this.dolphinSpawnInterval;
     this.lastFrameTime = 0;
     this.magicShrimp = null;
@@ -1164,7 +1170,7 @@ export class Game {
     // Endless runs end permanently on death (no free checkpoint resume) and record a
     // depth/survival-time score; this is also the intended hook for a future pay-to-continue offer.
     if (this.mode === 'endless') {
-      const timeSurvived = this.sessionStartTime > 0 ? (Date.now() - this.sessionStartTime) / 1000 : this.gameTime;
+      const timeSurvived = this.runElapsed;
       this.pendingScore = {
         board: 'endless',
         score: {
@@ -1232,7 +1238,7 @@ export class Game {
     this.running = false;
     if (this.timer) clearTimeout(this.timer);
     clearRunCheckpoint();
-    const timeToSaveOcean = this.sessionStartTime > 0 ? (Date.now() - this.sessionStartTime) / 1000 : this.gameTime;
+    const timeToSaveOcean = this.runElapsed;
     this.pendingScore = {
       board: 'campaign',
       score: {
@@ -2320,11 +2326,13 @@ export class Game {
       }
     }
 
-    const dt = this.lastFrameTime === 0 ? 0 : (now - this.lastFrameTime) / 1000;
+    // Clamp the frame delta: a resume from pause already contributes 0 (lastFrameTime is
+    // reset to 0), and this caps a backgrounded-tab / GC stall so the world doesn't
+    // fast-forward - it just runs slow for a moment instead.
+    const dt = this.lastFrameTime === 0 ? 0 : Math.min((now - this.lastFrameTime) / 1000, 0.25);
     this.lastFrameTime = now;
-
-    if (this.startTime === 0) this.startTime = now;
-    this.gameTime = (now - this.startTime) / 1000;
+    this.gameTime += dt;
+    this.runElapsed += dt;
 
     // Lifetime stats: count this frame's play time, record the play-day once per run,
     // and flush accumulated totals to storage every ~20s so a force-quit loses little.
