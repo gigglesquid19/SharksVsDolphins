@@ -439,7 +439,15 @@ const inputs = {
 
   function updatePointerDirection(clientX: number, clientY: number): void {
     const rect = gameCanvas.getBoundingClientRect();
-    game.setPointer(true, (clientX - rect.left) / rect.width - 0.5, (clientY - rect.top) / rect.height - 0.5);
+    // Offset from the canvas centre in world proportions (~[-0.5, 0.5] per axis). Divide by
+    // the deflection that should mean "full speed" (~45% of the way to the edge) so the
+    // magnitude matches the joystick's 0..1 convention; movePlayer() clamps anything past 1.
+    const REACH = 0.45;
+    game.setPointer(
+      true,
+      ((clientX - rect.left) / rect.width - 0.5) / REACH,
+      ((clientY - rect.top) / rect.height - 0.5) / REACH,
+    );
   }
 
   gameCanvas.addEventListener('touchstart', (e) => {

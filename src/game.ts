@@ -1821,23 +1821,42 @@ export class Game {
   private movePlayer(): void {
     if (!this.player) return;
     const boosted = Date.now() < this.player.speedBoostUntil;
-    const speed = (boosted ? 4 : 2) * (1 + this.speedBonusPct) * (this.sprinting ? SPRINT_SPEED : 1);
+    const maxSpeed = (boosted ? 4 : 2) * (1 + this.speedBonusPct) * (this.sprinting ? SPRINT_SPEED : 1);
+
+    // dx/dy is a unit direction; throttle (0..1) scales the step so a half-pushed
+    // joystick / a touch near the centre moves slower than a full deflection.
     let dx = 0;
     let dy = 0;
+    let throttle = 1;
 
     if (this.pointerActive) {
-      const deadZone = 0.08;
-      if (Math.abs(this.pointerDirX) > deadZone) dx = Math.sign(this.pointerDirX);
-      if (Math.abs(this.pointerDirY) > deadZone) dy = Math.sign(this.pointerDirY);
+      // pointerDirX/Y is an analog vector from main.ts: ~0 at rest, magnitude ~1 at
+      // full deflection (joystick edge, or a touch ~45% of the way to the canvas edge).
+      const mag = Math.hypot(this.pointerDirX, this.pointerDirY);
+      const DEAD_ZONE = 0.12;
+      if (mag > DEAD_ZONE) {
+        dx = this.pointerDirX / mag;
+        dy = this.pointerDirY / mag;
+        // Remap deflection [DEAD_ZONE, 0.9] onto speed [0.35, 1]: a light touch still
+        // moves at a usable pace, and full speed is reached just before the edge.
+        const t = Math.min(1, (mag - DEAD_ZONE) / (0.9 - DEAD_ZONE));
+        throttle = 0.35 + t * 0.65;
+      }
     } else {
-      if (this.keys['ArrowUp'] || this.keys['w'] || this.keys['W']) dy = -1;
-      if (this.keys['ArrowDown'] || this.keys['s'] || this.keys['S']) dy = 1;
-      if (this.keys['ArrowLeft'] || this.keys['a'] || this.keys['A']) dx = -1;
-      if (this.keys['ArrowRight'] || this.keys['d'] || this.keys['D']) dx = 1;
+      if (this.keys['ArrowUp'] || this.keys['w'] || this.keys['W']) dy -= 1;
+      if (this.keys['ArrowDown'] || this.keys['s'] || this.keys['S']) dy += 1;
+      if (this.keys['ArrowLeft'] || this.keys['a'] || this.keys['A']) dx -= 1;
+      if (this.keys['ArrowRight'] || this.keys['d'] || this.keys['D']) dx += 1;
+      const mag = Math.hypot(dx, dy);
+      if (mag > 0) {
+        dx /= mag; // normalise so a diagonal isn't ~1.4x faster than a cardinal
+        dy /= mag;
+      }
     }
 
     if (dx !== 0 || dy !== 0) {
-      const rawX = this.player._x + dx * speed;
+      const step = maxSpeed * throttle;
+      const rawX = this.player._x + dx * step;
       if (this.awaitingNewWaters && dx > 0 && rawX >= SIZE) {
         this.player._x = 2;
         this.player.lastX = 2;
@@ -1845,7 +1864,7 @@ export class Game {
       } else {
         this.player._x = wrapX(rawX);
       }
-      this.player._y = clampEntityY(this.player._y + dy * speed, 2);
+      this.player._y = clampEntityY(this.player._y + dy * step, 2);
     }
   }
 
