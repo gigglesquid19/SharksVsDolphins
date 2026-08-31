@@ -24,10 +24,10 @@ export class Dolphin {
   recruited = false;
   speedBoostUntil = 0;
   invulnerableUntil = 0;
-  // Persistent unit heading, eased toward the desired direction so a pod member banks into a
-  // turn instead of snapping to it (see Game.moveTowards). 0,0 until it first moves.
-  headingX = 0;
-  headingY = 0;
+  // Pod members carry a velocity that eases toward what the formation slot asks for, so they
+  // bank into turns and glide to a stop instead of snapping (see Game.moveTowards).
+  velX = 0;
+  velY = 0;
 
   constructor(i: number, y: number, x: number) {
     this.id = i;

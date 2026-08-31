@@ -134,6 +134,8 @@ export class Game {
   private dolphins: Dolphin[] = [];
   private sharks: Shark[] = [];
   private player: Dolphin | null = null;
+  /** Orientation of the pod formation, in radians - eased toward the player's heading. */
+  private podHeading = 0;
   private dolphinSpawnInterval = DOLPHIN_SPAWN_INTERVAL;
 
   private running = false;
@@ -942,6 +944,7 @@ export class Game {
     this.lastFrameTime = 0;
     this.magicShrimp = null;
     this.shrimpSpawned = false;
+    this.podHeading = 0;
     this.playerHitCooldownUntil = 0;
     this.hideBanner();
     this.activeEvent = null;
@@ -1290,32 +1293,34 @@ export class Game {
     const dy = ty - dolphin._y;
     const dist = Math.hypot(dx, dy);
 
-    // Settled in the slot: hold position rather than jitter around it on the spot.
-    const ARRIVE_RADIUS = 0.4;
-    if (dist < ARRIVE_RADIUS) return;
+    // Velocity the slot is asking for: full speed far out, easing to zero on arrival. There is
+    // deliberately no "close enough, stop" threshold - against a slot that is itself moving, a
+    // cutoff makes a follower flick between moving and frozen every few ticks, which is exactly
+    // what read as shaking.
+    // CATCH_UP lets a follower briefly outpace the player to close a gap. Capped at the
+    // player's own speed it could never recover the ground lost while easing through a turn,
+    // so the pod slowly strung out behind instead of holding formation.
+    const SLOW_RADIUS = 3;
+    const CATCH_UP = 1.5;
+    const wanted = Math.min(speed * CATCH_UP, (dist / SLOW_RADIUS) * speed);
+    const desiredVX = dist > 0.001 ? (dx / dist) * wanted : 0;
+    const desiredVY = dist > 0.001 ? (dy / dist) * wanted : 0;
 
-    const desiredX = dx / dist;
-    const desiredY = dy / dist;
+    // Ease the actual velocity toward it rather than adopting it outright: turns arc, and a
+    // follower coasts to a halt in its slot instead of stopping dead.
+    const SMOOTH = 0.22;
+    dolphin.velX += (desiredVX - dolphin.velX) * SMOOTH;
+    dolphin.velY += (desiredVY - dolphin.velY) * SMOOTH;
 
-    // Travelling: ease the heading so the turn arcs. Close to the slot, steer straight at it -
-    // an easing heading would orbit the target instead of settling into it.
-    const TURN_RADIUS = 6;
-    if (dist > TURN_RADIUS && (dolphin.headingX !== 0 || dolphin.headingY !== 0)) {
-      const TURN = 0.3;
-      dolphin.headingX += (desiredX - dolphin.headingX) * TURN;
-      dolphin.headingY += (desiredY - dolphin.headingY) * TURN;
-      const len = Math.hypot(dolphin.headingX, dolphin.headingY) || 1;
-      dolphin.headingX /= len;
-      dolphin.headingY /= len;
-    } else {
-      dolphin.headingX = desiredX;
-      dolphin.headingY = desiredY;
+    // Below a twentieth of a world unit per tick there is nothing left to show; park it so a
+    // settled pod is completely still.
+    if (Math.hypot(dolphin.velX, dolphin.velY) < 0.05) {
+      dolphin.velX = 0;
+      dolphin.velY = 0;
+      return;
     }
-
-    // Slow down over the last few units, and never step past the slot.
-    const step = Math.min(speed * Math.min(1, dist / TURN_RADIUS), dist);
-    dolphin._x = wrapX(dolphin._x + dolphin.headingX * step);
-    dolphin._y = clampEntityY(dolphin._y + dolphin.headingY * step, 2);
+    dolphin._x = wrapX(dolphin._x + dolphin.velX);
+    dolphin._y = clampEntityY(dolphin._y + dolphin.velY, 2);
   }
 
   private moveFollowers(): void {
@@ -1328,8 +1333,22 @@ export class Game {
     // grows with the pod, so density - and spacing - stays roughly constant at any pod size.
     const GOLDEN_ANGLE = 2.39996;
     const MAX_RADIUS = 35;
+
+    // The formation is oriented by the player's heading, not by a clock. It used to spin with
+    // `gameTime * 0.5`, so every slot orbited the player forever - the pod could never settle
+    // and kept shuffling even while the player stood still. Now it holds station and only
+    // sweeps round as the player actually turns.
+    const pdx = directionDelta(this.player._x, this.player.lastX);
+    const pdy = this.player._y - this.player.lastY;
+    if (Math.hypot(pdx, pdy) > 0.05) {
+      let diff = Math.atan2(pdy, pdx) - this.podHeading;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      this.podHeading += diff * 0.15;
+    }
+
     followers.forEach((dolphin, idx) => {
-      const angle = idx * GOLDEN_ANGLE + this.gameTime * 0.5;
+      const angle = idx * GOLDEN_ANGLE + this.podHeading;
       const radius = Math.min(MAX_RADIUS, 4 + 2 * Math.sqrt(idx));
       // Not rounded: quantising the slot to whole units made it hop between cells, which the
       // follower then chased - another source of the twitchy look.
