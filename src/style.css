@@ -947,7 +947,7 @@ button.mega-shrimp.green {
   padding: 24px;
   overflow-y: auto;
   background:
-    linear-gradient(180deg, rgba(2, 6, 23, 0.86), rgba(2, 6, 23, 0.92)),
+    linear-gradient(180deg, rgba(2, 6, 23, 0.5), rgba(2, 6, 23, 0.72)),
     url('/shop-bg.webp') center / cover no-repeat;
 }
 .store-screen.hidden { display: none; }
@@ -956,8 +956,9 @@ button.mega-shrimp.green {
   width: 100%;
   max-width: 720px;
   margin: auto;
-  background: var(--panel);
-  backdrop-filter: blur(16px);
+  /* Slightly translucent so the blurred shop scene reads through the panel too. */
+  background: rgba(9, 15, 30, 0.72);
+  backdrop-filter: blur(14px);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--radius);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55);
