@@ -1276,11 +1276,46 @@ export class Game {
     this.shrimpSprite = container;
   }
 
+  /**
+   * Swims a pod member toward its formation slot the way the player moves: a continuous
+   * heading rather than 8-direction snapping, eased into a turn, and slowed on approach.
+   *
+   * The old version stepped `Math.sign(delta) * speed` on each axis, so a follower always
+   * moved a full step in one of 8 directions - it overshot its slot, reversed on the next
+   * tick, and flip-flopped its facing, which read as shaky and clunky next to the player's
+   * analog movement.
+   */
   private moveTowards(dolphin: Dolphin, tx: number, ty: number, speed: number): void {
-    const dx = Math.sign(directionDelta(tx, dolphin._x));
-    const dy = Math.sign(ty - dolphin._y);
-    dolphin._x = wrapX(dolphin._x + dx * speed);
-    dolphin._y = clampEntityY(dolphin._y + dy * speed, 2);
+    const dx = directionDelta(tx, dolphin._x);
+    const dy = ty - dolphin._y;
+    const dist = Math.hypot(dx, dy);
+
+    // Settled in the slot: hold position rather than jitter around it on the spot.
+    const ARRIVE_RADIUS = 0.4;
+    if (dist < ARRIVE_RADIUS) return;
+
+    const desiredX = dx / dist;
+    const desiredY = dy / dist;
+
+    // Travelling: ease the heading so the turn arcs. Close to the slot, steer straight at it -
+    // an easing heading would orbit the target instead of settling into it.
+    const TURN_RADIUS = 6;
+    if (dist > TURN_RADIUS && (dolphin.headingX !== 0 || dolphin.headingY !== 0)) {
+      const TURN = 0.3;
+      dolphin.headingX += (desiredX - dolphin.headingX) * TURN;
+      dolphin.headingY += (desiredY - dolphin.headingY) * TURN;
+      const len = Math.hypot(dolphin.headingX, dolphin.headingY) || 1;
+      dolphin.headingX /= len;
+      dolphin.headingY /= len;
+    } else {
+      dolphin.headingX = desiredX;
+      dolphin.headingY = desiredY;
+    }
+
+    // Slow down over the last few units, and never step past the slot.
+    const step = Math.min(speed * Math.min(1, dist / TURN_RADIUS), dist);
+    dolphin._x = wrapX(dolphin._x + dolphin.headingX * step);
+    dolphin._y = clampEntityY(dolphin._y + dolphin.headingY * step, 2);
   }
 
   private moveFollowers(): void {
@@ -1296,8 +1331,10 @@ export class Game {
     followers.forEach((dolphin, idx) => {
       const angle = idx * GOLDEN_ANGLE + this.gameTime * 0.5;
       const radius = Math.min(MAX_RADIUS, 4 + 2 * Math.sqrt(idx));
-      const tx = wrapX(this.player!._x + Math.round(Math.cos(angle) * radius));
-      const ty = clampEntityY(this.player!._y + Math.round(Math.sin(angle) * radius), 2);
+      // Not rounded: quantising the slot to whole units made it hop between cells, which the
+      // follower then chased - another source of the twitchy look.
+      const tx = wrapX(this.player!._x + Math.cos(angle) * radius);
+      const ty = clampEntityY(this.player!._y + Math.sin(angle) * radius, 2);
       this.moveTowards(dolphin, tx, ty, followerSpeed);
     });
   }
