@@ -22,7 +22,7 @@ import {
 import { sfx } from './sfx';
 import { LEVELS, LevelConfig, getLevelBackground, getLevelConfig } from './levels';
 import { CANVAS_SIZE, SIZE } from './constants';
-import { clampEntityY, directionDelta, wrapX } from './utils';
+import { clampEntityY, directionDelta, sweptDistance, wrapX } from './utils';
 import { Dolphin, Shark, MagicShrimp, Jellyfish } from './entities';
 import {
   loadCampaignScores,
@@ -78,6 +78,11 @@ const LARGE_SHARK_SIZE_MULTIPLIER = 1.8;
 // The tiger sprite draws at half the scale of the other two kinds (SHARK_KIND_SCALE), which
 // left small tigers looking undersized against them - a third bigger reads much better.
 const SMALL_TIGER_SIZE_MULTIPLIER = 1.33;
+// Large-tiger cloak: it drops out of sight while still hunting you, holds that for twenty
+// seconds, then has to spend twenty visible ones recharging. Only comes out once the small
+// sharks are gone, so it is an endgame threat rather than something you meet on level one.
+const CLOAK_DURATION_MS = 20000;
+const CLOAK_COOLDOWN_MS = 20000;
 const SPRINT_DURATION = 300;
 const SPRINT_COOLDOWN = 10000;
 const SPRINT_SPEED = 2;
@@ -87,7 +92,10 @@ const SHAKE_MAGNITUDE = 3.5;
 const SHAKE_DURATION_MS = 200;
 const COMBO_RESET_SECONDS = 2.5;
 const SHARK_BASE_SCALE = 0.6;
-const SHARK_ATTACK_TRIGGER_RADIUS = 6;
+// How far outside its bite reach a shark opens its jaws - pure anticipation. This used to be a
+// flat 6-unit trigger while the bite itself needed 4 units and only ever tested the dolphin you
+// were steering, so the animation regularly played over a follower with no bite behind it.
+const SHARK_ATTACK_ANTICIPATION = 1.5;
 const SHARK_KIND_SCALE: Record<SharkKind, number> = {
   greatWhite: 2,
   hammerhead: 2,
@@ -114,7 +122,8 @@ const SHARK_INTRO_INFO: Partial<Record<SharkKind, { name: string; description: s
 const LARGE_SHARK_INTRO_INFO: Partial<Record<SharkKind, { name: string; description: string }>> = {
   tiger: {
     name: 'Large Tiger Shark',
-    description: 'Large tigers can freeze and lunge straight at you. Keep moving.',
+    description:
+      'Large tigers can freeze and lunge straight at you. With the small sharks gone they also vanish from sight while still hunting - they only surface once they have fed. Keep moving.',
   },
   hammerhead: {
     name: 'Large Hammerhead Shark',
@@ -1127,6 +1136,9 @@ export class Game {
     const sprite = this.sharkSprites.get(shark);
     if (!sprite) return;
     this.sharkSprites.delete(shark);
+    // A cloaked tiger killed mid-cloak still gets its send-off: the draw loop no longer owns
+    // this sprite, so nothing would turn it back on.
+    sprite.visible = true;
 
     const fish = sprite.getChildByName('fish') as unknown as { tint: number } | null;
     const baseScaleX = sprite.scale.x;
@@ -2091,8 +2103,36 @@ export class Game {
   /** Radius at which a shark can bite the pod. Deliberately tight - see sharkRamRadius. */
   private sharkHitRadius(shark: Shark): number {
     if (shark.matriarch) return 10;
-    if (shark.kind === 'greatWhite' && shark.large) return 6;
-    return 4;
+    const base = shark.kind === 'greatWhite' && shark.large ? 6 : 4;
+    // Every shark used to bite from the same 4-unit hitbox regardless of how big it was drawn -
+    // a hammerhead renders at twice a tiger's scale, a large tiger at 2.5x - so their jaws
+    // visibly closed over a dolphin with nothing happening. Scaled to the sprite like
+    // sharkRamRadius, though more conservatively: this is the radius that hurts the player.
+    const drawScale = SHARK_KIND_SCALE[shark.kind] * shark.sizeMultiplier;
+    return Math.max(base, 3 * Math.sqrt(drawScale));
+  }
+
+  /**
+   * Whether a shark made contact with the pod during this tick, swept rather than sampled at the
+   * tick boundary so a fast pass-through still registers.
+   *
+   * Contact with *any* pod member counts, not just the dolphin you are steering. The bite used
+   * to test the steered dolphin alone while the jaws-open animation fired on any dolphin within
+   * six units, so sharks - hammerheads worst of all, they are drawn at twice a tiger's scale on
+   * the same 4-unit hitbox - visibly chewed on your followers with nothing happening.
+   */
+  private sharkContactsPod(shark: Shark): boolean {
+    if (!this.player) return false;
+    const radius = this.sharkHitRadius(shark);
+    return this.dolphins.some((d) => (d.isPlayer || d.recruited) && sweptDistance(shark, d) < radius);
+  }
+
+  /**
+   * How close a dolphin has to be for a shark to open its jaws. Kept just outside the reach that
+   * actually bites, so the animation is anticipation rather than a lie.
+   */
+  private sharkAttackTell(shark: Shark): number {
+    return this.sharkHitRadius(shark) + SHARK_ATTACK_ANTICIPATION;
   }
 
   /**
@@ -2107,6 +2147,47 @@ export class Game {
     if (shark.matriarch) return bite;
     const drawScale = SHARK_KIND_SCALE[shark.kind] * shark.sizeMultiplier;
     return Math.max(bite, 4 * Math.sqrt(drawScale));
+  }
+
+  /** Large tigers only cloak once every small shark is dead - see CLOAK_DURATION_MS. */
+  private canCloak(shark: Shark): boolean {
+    return shark.kind === 'tiger' && shark.large && !shark.matriarch;
+  }
+
+  /**
+   * Runs the large-tiger cloak cycle. A cloaked tiger is drawn nowhere but keeps hunting
+   * normally, so the only warning you get is the puff of water it leaves behind as it goes.
+   */
+  private updateCloaks(now: number): void {
+    const smallSharksLeft = this.sharks.some((s) => !s.large);
+    for (const shark of this.sharks) {
+      if (!this.canCloak(shark)) continue;
+      if (shark.cloaked) {
+        if (now >= shark.cloakEndTime) this.revealShark(shark, now);
+      } else if (!smallSharksLeft && now >= shark.cloakCooldownEnd) {
+        shark.cloaked = true;
+        shark.cloakEndTime = now + CLOAK_DURATION_MS;
+        this.emitCloakBurst(shark);
+        this.setStatus('A tiger shark vanishes...');
+        this.showBanner('It Vanished!', 'storm', 1500);
+      }
+    }
+  }
+
+  /** Drops the cloak and starts the recharge - on timeout, or the moment it takes a dolphin. */
+  private revealShark(shark: Shark, now: number): void {
+    if (!shark.cloaked) return;
+    shark.cloaked = false;
+    shark.cloakCooldownEnd = now + CLOAK_COOLDOWN_MS;
+    this.emitCloakBurst(shark);
+  }
+
+  private emitCloakBurst(shark: Shark): void {
+    const scale = CANVAS_SIZE / SIZE;
+    this.particles.emit('hit', shark._x * scale + scale / 2, shark._y * scale + scale / 2, 12, {
+      speed: 1.8,
+      life: 0.7,
+    });
   }
 
   private sharkPodRequirement(kind: SharkKind, large: boolean): number {
@@ -2397,6 +2478,7 @@ export class Game {
       // same charge/sprint ability large great whites get (see Shark.move in entities.ts).
       if (!this.matriarchEnraged && this.sharks.length === 1 && this.sharks[0] === this.matriarch) {
         this.matriarchEnraged = true;
+        this.matriarch.enraged = true;
         this.matriarch.speedMultiplier = GREAT_WHITE_LARGE_SPEED_BONUS;
         this.setStatus('The Matriarch is enraged!');
         this.showBanner('The Matriarch is Enraged!', 'storm', 2200);
@@ -2542,17 +2624,25 @@ export class Game {
     this.moveFollowers();
 
     if (this.activeEvent?.type !== 'jellyfish') {
+      this.updateCloaks(now);
       const podSize = this.getPodSize();
+      // Once every remaining shark is large, none of them lose track any more: the end of a
+      // level becomes a chase rather than hide-and-seek. Great whites and hammerheads already
+      // track the player from anywhere; this is what brings large tigers up to that, and is the
+      // behaviour the README and the shark guide have always described.
+      const allSharksLarge = this.sharks.length > 0 && this.sharks.every((s) => s.large);
       for (const shark of this.sharks) {
-        const unlimitedRange = shark.kind === 'greatWhite' || shark.kind === 'hammerhead';
-        // A pod big enough to ram this shark makes it wary (Matriarch excepted - she's a boss),
-        // but NOT while the player is boosting: a wary shark holds a buffer of 8 units, which is
-        // wider than a large shark's ram radius (6.3 for a tiger), so it parked itself exactly
-        // outside kill range from the instant the pod qualified - and a large shark can only be
-        // destroyed by a 300ms boost on a 10s cooldown. Boost-ramming one was near impossible.
-        // Now the boost makes them commit: they stop backing off the moment you dash.
+        const unlimitedRange = allSharksLarge || shark.kind === 'greatWhite' || shark.kind === 'hammerhead';
+        // A pod big enough to ram this shark makes it wary, but only the small ones. Large
+        // sharks (and the Matriarch - she's a boss) always press the attack: watching something
+        // that never loses track of you and can vanish at will also back away from your pod read
+        // as the shark fleeing rather than stalking, and it kept them off screen where you could
+        // not boost-ram them anyway. Wariness is cancelled by a boost for the same reason: a
+        // wary shark holds a 5-unit buffer, wider than the 4.6 a small tiger can be rammed from,
+        // so it would otherwise park itself exactly outside kill range.
         const podThreat =
           !shark.matriarch &&
+          !shark.large &&
           this.huntingMode &&
           !this.sprinting &&
           podSize >= this.sharkPodRequirement(shark.kind, shark.large);
@@ -2611,9 +2701,11 @@ export class Game {
       const survivingSharks: Shark[] = [];
       let matriarchJustDefeated = false;
       for (const shark of this.sharks) {
-        // Any pod member landing the hit counts, not just the dolphin you're steering.
+        // Any pod member landing the hit counts, not just the dolphin you're steering, and the
+        // whole tick counts, not just where everyone ended up on it - a boosting pod covers
+        // several units per tick and used to sail straight through a shark without connecting.
         const ramRadius = this.sharkRamRadius(shark);
-        const hitsAnyDolphin = this.dolphins.some((d) => shark.distanceBetween(d) < ramRadius);
+        const hitsAnyDolphin = this.dolphins.some((d) => sweptDistance(shark, d) < ramRadius);
 
         // In Campaign mode the Matriarch can only be hurt while the Mega Pod is active, and only
         // by sprinting into her - each ram flashes her and counts toward MATRIARCH_HITS_REQUIRED,
@@ -2686,7 +2778,7 @@ export class Game {
     if (this.activeEvent?.type !== 'jellyfish') {
       if (this.player && now >= this.playerHitCooldownUntil && now >= this.player.invulnerableUntil) {
         for (const shark of this.sharks) {
-          if (shark.distanceBetween(this.player) < this.sharkHitRadius(shark)) {
+          if (this.sharkContactsPod(shark)) {
             sfx.playBite();
             // The Matriarch takes two pod members per bite; every other shark takes one.
             const bite = shark.matriarch ? 2 : 1;
@@ -2700,6 +2792,8 @@ export class Game {
             if (victims.length > 0) {
               this.playerHitCooldownUntil = now + 1000;
               this.resetKillCombo();
+              // Feeding gives a cloaked tiger away - it surfaces and has to recharge.
+              this.revealShark(shark, now);
               for (const v of victims) {
                 this.particles.emit('hit', v._x * scale + scale / 2, v._y * scale + scale / 2, 12, { speed: 2, life: 0.6 });
                 this.removeDolphinSprite(v);
@@ -2945,7 +3039,8 @@ export class Game {
       }
 
       if (fish instanceof SharkFishSprite) {
-        const closeToDolphin = this.dolphins.some((d) => shark.distanceBetween(d) < SHARK_ATTACK_TRIGGER_RADIUS);
+        const tell = this.sharkAttackTell(shark);
+        const closeToDolphin = this.dolphins.some((d) => shark.distanceBetween(d) < tell);
         fish.setAttacking(closeToDolphin);
       }
 
@@ -2963,7 +3058,9 @@ export class Game {
       glow.width = 48 * SHARK_KIND_SCALE[shark.kind] * shark.sizeMultiplier;
       glow.height = 48 * SHARK_KIND_SCALE[shark.kind] * shark.sizeMultiplier;
 
-      if (this.activeEvent?.type === 'storm' && this.player) {
+      if (shark.cloaked) {
+        sprite.visible = false;
+      } else if (this.activeEvent?.type === 'storm' && this.player) {
         sprite.visible = shark.distanceBetween(this.player) <= STORM_VISIBILITY_RADIUS;
       } else {
         sprite.visible = true;

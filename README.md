@@ -306,9 +306,16 @@ Game Features
 - **Level 2, Deep Sea**: swimming through the New Waters prompt loads a new
   background and a tougher shark composition (small and large sharks). Large
   sharks survive a ram until the pod meets their number (per level, shown above
-  each shark) *and* you Boost into them, and once all small
-  sharks are gone, remaining large sharks will hunt you across the entire
-  map regardless of distance.
+  each shark) *and* you Boost into them. They are also more alert: a large shark
+  picks you up from 40 units away where a small one only notices you at 25, and
+  once all small sharks are gone, every remaining large shark will hunt you
+  across the entire map regardless of distance. Great whites and hammerheads
+  never lose track of you at all.
+- **Large tigers cloak**: with the small sharks cleared, a large tiger drops out
+  of sight completely for 20 seconds while it keeps hunting you, then has to
+  spend 20 visible seconds recharging. Taking a dolphin gives it away
+  immediately - it surfaces and starts the recharge early. Watch for the puff of
+  water it leaves as it goes.
 - **Procedural events**: roughly every minute of play there's a chance of a
   30-second **storm** that dims the screen and limits how far you can see
   sharks, or a **jellyfish swarm** - a wall of jellyfish drifting across the

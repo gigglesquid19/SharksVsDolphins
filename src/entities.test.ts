@@ -172,6 +172,79 @@ describe('Shark.move idle search', () => {
   });
 });
 
+describe('Shark.move hunt radius', () => {
+  // A single tick tells the two branches apart deterministically: a pursuer takes a step of
+  // exactly speed x speedMultiplier x 0.95 straight at the player, a searcher takes one of
+  // x 0.6 in a random direction. Running many ticks would be flaky, because a searcher that
+  // happens to wander inside the radius legitimately re-acquires the player.
+  const PURSUIT_STEP = 0.95;
+  const CRUISE_STEP = 0.6;
+
+  /** A small decoy keeps sharks.every(large) false, so a large tiger does not enter its ambush. */
+  function step(shark: Shark, player: Dolphin): number {
+    const bx = shark._x;
+    const by = shark._y;
+    shark.move(1, player, [shark, testShark(95, 95)], false, NOW);
+    return Math.hypot(shark._x - bx, shark._y - by);
+  }
+
+  it('a large shark still hunts a player 30 units away', () => {
+    const p = playerAt(50, 50);
+    const big = testShark(80, 50, { large: true });
+    expect(step(big, p)).toBeCloseTo(PURSUIT_STEP, 5);
+    expect(big._x).toBeLessThan(80); // moved toward the player
+  });
+
+  it('a small shark at the same distance has lost track and is searching', () => {
+    const p = playerAt(50, 50);
+    const small = testShark(80, 50);
+    expect(step(small, p)).toBeCloseTo(CRUISE_STEP, 5);
+  });
+
+  it('a large shark still loses track past its wider radius', () => {
+    const p = playerAt(50, 50);
+    const big = testShark(95, 50, { large: true });
+    expect(step(big, p)).toBeCloseTo(CRUISE_STEP, 5);
+  });
+});
+
+describe('Shark.move Matriarch charge', () => {
+  function matriarch(x: number, y: number): Shark {
+    return testShark(x, y, { kind: 'greatWhite', large: true, matriarch: true, sizeMultiplier: 3.6 });
+  }
+
+  /** A charge covers far more ground in one tick than the ~1 unit ordinary pursuit manages. */
+  function firstStep(m: Shark, p: Dolphin, others: Shark[]): number {
+    const bx = m._x;
+    const by = m._y;
+    m.move(1, p, [m, ...others], true, NOW);
+    return Math.hypot(m._x - bx, m._y - by);
+  }
+
+  it('charges once enraged even though she keeps calling in fresh escorts', () => {
+    // She summons a great white every 20 seconds, so gating the charge on "she is the only shark
+    // left" switched it off again the moment each escort arrived - she spent the fight cruising.
+    const p = playerAt(50, 50);
+    const m = matriarch(70, 50);
+    m.enraged = true;
+    const escort = testShark(90, 90, { kind: 'greatWhite', large: true });
+    expect(firstStep(m, p, [escort])).toBeGreaterThan(2);
+  });
+
+  it('still charges while she genuinely is the last shark in the water', () => {
+    const p = playerAt(50, 50);
+    const m = matriarch(70, 50);
+    expect(firstStep(m, p, [])).toBeGreaterThan(2);
+  });
+
+  it('does not charge before she is enraged and escorts are still alive', () => {
+    const p = playerAt(50, 50);
+    const m = matriarch(70, 50);
+    const escort = testShark(90, 90, { kind: 'greatWhite', large: true });
+    expect(firstStep(m, p, [escort])).toBeLessThan(2);
+  });
+});
+
 describe('Shark.move large-hammerhead flank', () => {
   it('approaches at an angle, not straight at a distant player', () => {
     const p = playerAt(30, 90);
@@ -202,28 +275,24 @@ describe('Shark.move pod-threat', () => {
     expect(wary.distanceBetween(p)).toBeGreaterThan(3);
   });
 
-  it('holds a buffer wider than a large shark can be rammed from, so the retreat must be cancellable', () => {
-    // Large sharks are only destroyed by a boost-ram, and Game.sharkRamRadius gives a large
-    // tiger 4 * sqrt(2.5) = 6.32. The wary buffer is 8, so a retreating large shark sits
-    // outside kill range: game.ts must clear podThreat while the player sprints, or the shark
-    // is unkillable. This pins the numbers that make that necessary.
-    const LARGE_BUFFER = 8;
-    const largeTigerRamRadius = 4 * Math.sqrt(1 * 2.5); // 6.32
-    const largeHammerheadRamRadius = 4 * Math.sqrt(2 * 1.8); // 7.59
-    expect(largeTigerRamRadius).toBeLessThan(LARGE_BUFFER);
-    expect(largeHammerheadRamRadius).toBeLessThan(LARGE_BUFFER);
+  it('holds a buffer wider than the shark can be rammed from, so the retreat must be cancellable', () => {
+    // Game.sharkRamRadius gives a small tiger 4 * sqrt(1.33) = 4.61, inside the 5-unit wary
+    // buffer - so a retreating shark sits exactly outside kill range: game.ts must clear
+    // podThreat while the player sprints, or a wary shark is unkillable. Pins those numbers.
+    const BUFFER = 5;
+    const smallTigerRamRadius = 4 * Math.sqrt(1 * 1.33); // 4.61
+    expect(smallTigerRamRadius).toBeLessThan(BUFFER);
 
-    // Behaviourally: a wary large shark reaches beyond ram range, i.e. it can sit where a boost
-    // cannot reach it. Uses a hammerhead - a large tiger would enter its ambush stalk and freeze
-    // (it stays frozen here because `now` is fixed), and a great white would start a charge.
+    // Behaviourally: a wary shark reaches beyond ram range, i.e. it can sit where a ram cannot
+    // reach it. Only small sharks are ever given podThreat - large ones always commit.
     const p = playerAt(50, 50);
-    const s = testShark(56, 50, { kind: 'hammerhead', large: true, sizeMultiplier: 1.8 });
+    const s = testShark(54, 50, { kind: 'tiger', sizeMultiplier: 1.33 });
     let furthest = 0;
     for (let i = 0; i < 15; i++) {
       s.move(1, p, [s], true, NOW, true);
       furthest = Math.max(furthest, s.distanceBetween(p));
     }
-    expect(furthest).toBeGreaterThan(largeHammerheadRamRadius);
+    expect(furthest).toBeGreaterThan(smallTigerRamRadius);
   });
 
   it('still presses toward the player from outside the buffer', () => {

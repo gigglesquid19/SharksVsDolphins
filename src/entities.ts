@@ -11,6 +11,10 @@ const AMBUSH_STALK_DURATION = 1200;
 const AMBUSH_LUNGE_DURATION = 1200;
 const AMBUSH_COOLDOWN = 3000;
 const AMBUSH_RANGE = 25;
+// How far a shark notices the player. A large shark is a bigger, older animal and picks the
+// pod up sooner; beyond this it loses track and drops into the idle search cruise.
+const HUNT_RADIUS = 25;
+const LARGE_HUNT_RADIUS = 40;
 const AMBUSH_MIN_DIST = 2;
 const AMBUSH_SPEED = 3;
 // Idle "searching" cruise: how far the wander angle can drift per tick (radians), how quickly
@@ -18,6 +22,8 @@ const AMBUSH_SPEED = 3;
 const WANDER_TURN = 0.5;
 const WANDER_STEER = 0.12;
 const WANDER_SPEED = 0.6;
+/** How far a wary small shark tries to stay off a pod that can destroy it. */
+const POD_THREAT_BUFFER = 5;
 
 export class Dolphin {
   id: number;
@@ -105,6 +111,13 @@ export class Shark {
   flankSign = 0;
   /** Direction the shark is idly cruising in, random-walked while searching. */
   wanderAngle = 0;
+  // Large-tiger cloak: it vanishes from view while still tracking you, and is forced back into
+  // sight the moment it takes a dolphin. Driven by Game.updateCloaks - see CLOAK_DURATION_MS.
+  cloaked = false;
+  cloakEndTime = 0;
+  cloakCooldownEnd = 0;
+  /** Matriarch only: set once every escort has been destroyed, and never cleared again. */
+  enraged = false;
 
   constructor(i: number) {
     this.id = i;
@@ -152,18 +165,21 @@ export class Shark {
     podThreat = false,
   ): void {
     if (!player) return;
-    const huntRadius = 25;
+    const huntRadius = this.large ? LARGE_HUNT_RADIUS : HUNT_RADIUS;
     const distToPlayer = this.distanceBetween(player);
     const margin = Math.ceil((24 * this.sizeMultiplier) / (CANVAS_SIZE / SIZE));
     const keepX = this.kind === 'tiger' || this.matriarch ? clampX : wrapX;
 
-    // The Matriarch gets this same charge ability once every escort is gone and she's alone -
-    // see updateMatriarch() in game.ts, which also bumps her speedMultiplier at that point.
-    const matriarchAlone = this.matriarch && sharks.length === 1;
-    if ((this.kind === 'greatWhite' && this.large && !this.matriarch && sharks.every((s) => s.large)) || matriarchAlone) {
+    // The Matriarch gets this same charge ability once every escort is gone - see
+    // updateMatriarch() in game.ts, which also bumps her speedMultiplier at that point. It keys
+    // off the sticky `enraged` flag rather than a live headcount, because she calls in a fresh
+    // great white every 20 seconds: counting the sharks in the water switched her charge back
+    // off the instant each escort arrived, so she spent the fight cruising instead of charging.
+    const matriarchUnleashed = this.matriarch && (this.enraged || sharks.length === 1);
+    if ((this.kind === 'greatWhite' && this.large && !this.matriarch && sharks.every((s) => s.large)) || matriarchUnleashed) {
       // Twice as fast as an ordinary large great white's charge - she's meant to be the scariest
       // thing in the water once she's down to her last stand.
-      const chargeSpeed = matriarchAlone ? CHARGE_SPEED * 2 : CHARGE_SPEED;
+      const chargeSpeed = matriarchUnleashed ? CHARGE_SPEED * 2 : CHARGE_SPEED;
       if (this.charging) {
         if (now < this.chargeEndTime) {
           this._x = keepX(this._x + this.chargeDx * speed * this.speedMultiplier * chargeSpeed);
@@ -247,12 +263,11 @@ export class Shark {
       }
 
       // Hunting Mode + a pod big enough to destroy this shark: hang back but keep pressing.
-      if (podThreat) {
-        const buffer = this.large ? 8 : 5;
-        if (dist < buffer) {
-          desX = toPlayerX - (toPlayerX / dist) * buffer * 1.6;
-          desY = toPlayerY - (toPlayerY / dist) * buffer * 1.6;
-        }
+      // Only small sharks are ever sent here - Game decides who gets to be wary, and large ones
+      // now always commit - so this is a single buffer rather than one per size.
+      if (podThreat && dist < POD_THREAT_BUFFER) {
+        desX = toPlayerX - (toPlayerX / dist) * POD_THREAT_BUFFER * 1.6;
+        desY = toPlayerY - (toPlayerY / dist) * POD_THREAT_BUFFER * 1.6;
       }
 
       // Boids-style separation from nearby sharks.
