@@ -36,8 +36,10 @@ Contents
   (wrap/clamp/direction) and the SIZE/CANVAS_SIZE constants they use.
 - `src/levels.ts` - the ten-level campaign as data (shark composition,
   counts, speed scaling, pod requirements) rather than per-level code.
-- `src/sprites.ts` - PixiJS Graphics/texture factories for dolphins, sharks,
-  and jellyfish.
+- `src/sprites.ts` - sprite factories. The dolphin is a countershaded body
+  rendered once to a shared texture (from `DEFAULT_DOLPHIN_PALETTE` - swap it
+  for cosmetic skins later) plus a live fluke that `game.ts` animates; sharks
+  are the MutterPixel PNG strips; the jellyfish is procedural Graphics.
 - `src/particles.ts` - lightweight pooled particle system (bubbles, wakes,
   hit sparks, sparkles).
 - `src/sfx.ts` - procedurally synthesized sound effects (Web Audio API, no

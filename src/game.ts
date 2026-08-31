@@ -2393,15 +2393,25 @@ export class Game {
 
       const fish = sprite.getChildByName('fish') as Container;
       const tail = fish.getChildByName('tail') as Container;
-      tail.rotation = Math.sin(t * 12 + dolphin.id) * 0.35;
 
       const dx = directionDelta(dolphin._x, dolphin.lastX);
-      if (Math.abs(dx) > 0.01) {
-        const dir = dx > 0 ? 1 : -1;
-        fish.scale.set(dir, 1);
-      }
-
+      const dy = dolphin._y - dolphin.lastY;
       const boosted = now < dolphin.speedBoostUntil;
+      const fast = boosted || this.sprinting;
+
+      // Whole-body swim: fluke beat, a counter-rotating body arch, a slow vertical bob,
+      // a bank into vertical movement, and a forward stretch when moving fast.
+      const beat = t * (fast ? 15 : 9) + dolphin.id * 1.7;
+      tail.rotation = Math.sin(beat) * (fast ? 0.6 : 0.45);
+      const stretch = fast ? 1.14 : 1;
+
+      // Keep facing the last horizontal heading; only flip when actually moving sideways.
+      let dir = Math.sign(fish.scale.x) || 1;
+      if (Math.abs(dx) > 0.01) dir = dx > 0 ? 1 : -1;
+      fish.scale.set(dir * stretch, 1 / stretch);
+      fish.rotation = Math.sin(beat - 0.8) * 0.05 + dir * Math.max(-1.4, Math.min(1.4, dy)) * 0.12;
+      fish.y = Math.sin(t * 4.5 + dolphin.id) * 0.7;
+
       const invulnerable = now < dolphin.invulnerableUntil;
       const boostRing = sprite.getChildByName('boostRing') as Graphics;
       const invulRing = sprite.getChildByName('invulRing') as Graphics;
