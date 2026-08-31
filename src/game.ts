@@ -81,7 +81,7 @@ const SHARK_INTRO_INFO: Partial<Record<SharkKind, { name: string; description: s
   },
   greatWhite: {
     name: 'Great White Shark',
-    description: 'Older Great Whites grow far larger and can take a large pod of dolphins to defeat.',
+    description: 'Older Great Whites grow far larger - it takes a big pod and a Boost dash to bring one down.',
   },
 };
 
@@ -163,6 +163,7 @@ export class Game {
   private sessionStartTime = 0;
   // Lifetime-achievement bookkeeping (see flushLifetimeStats / src/lifetimeStats.ts).
   private syncedSharkKills = 0;
+  private lastBoostNudgeTime = 0;
   private unsyncedPlaySeconds = 0;
   private lifetimeFlushAt = 0;
   private playDayRecorded = false;
@@ -775,6 +776,7 @@ export class Game {
       this.totalDolphinsSaved = 0;
       this.lastMusicLevel = 0;
       this.syncedSharkKills = 0;
+      this.lastBoostNudgeTime = 0;
       this.unsyncedPlaySeconds = 0;
       this.lifetimeFlushAt = 20;
       this.playDayRecorded = false;
@@ -1488,7 +1490,8 @@ export class Game {
     if (config.largeSharkCount > 0 && !this.seenLargeSharkVariety) {
       warnings.push({
         name: 'Larger Shark Varieties',
-        description: 'Some sharks in these waters are larger and stronger. You will need more dolphins to defeat them.',
+        description:
+          "These waters hold larger, stronger sharks. A big pod alone won't finish one - you have to Boost (Space, or the ⚡ button) into it while your pod meets its number. Upgrade Boost between levels to dash more often.",
       });
       this.seenLargeSharkVariety = true;
     }
@@ -2163,8 +2166,16 @@ export class Game {
           continue;
         }
 
-        const canDestroy = hitsAnyDolphin && this.getPodSize() >= this.sharkPodRequirement(shark.kind, shark.large);
+        // Large sharks (Endless Matriarch included) need a big enough pod AND a Sprint at
+        // the moment of contact - a plain ram no longer works. Only this.sprinting counts;
+        // the Magic-Shrimp speed boost deliberately does not.
+        const meetsPod = this.getPodSize() >= this.sharkPodRequirement(shark.kind, shark.large);
+        const canDestroy = hitsAnyDolphin && meetsPod && (!shark.large || this.sprinting);
         if (!canDestroy) {
+          if (hitsAnyDolphin && meetsPod && shark.large && !this.sprinting && this.gameTime - this.lastBoostNudgeTime > 2) {
+            this.lastBoostNudgeTime = this.gameTime;
+            this.setStatus('Boost into it!');
+          }
           survivingSharks.push(shark);
         } else if (shark === this.matriarch && this.mode === 'endless') {
           this.particles.emit('hit', shark._x * scale + scale / 2, shark._y * scale + scale / 2, 16, { speed: 3, life: 0.6 });
@@ -2452,7 +2463,8 @@ export class Game {
       if (reqText) {
         const req = this.sharkPodRequirement(shark.kind, shark.large);
         const canDestroy = this.getPodSize() >= req;
-        reqText.text = String(req);
+        // The bolt on large sharks flags that a Boost dash is also required, not just the pod.
+        reqText.text = shark.large ? `⚡${req}` : String(req);
         reqText.style.fill = canDestroy ? '#22c55e' : '#ef4444';
         reqText.y = -40 * baseScale;
       }

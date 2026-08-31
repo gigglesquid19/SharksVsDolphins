@@ -221,12 +221,15 @@ Game Features
   - Player dolphin: 30 seconds of double speed.
   - Another dolphin: 30 seconds of invulnerability to sharks.
   - A shark: grows larger and gains a permanent speed boost.
-- **Hunting Mode**: once your pod reaches 4, ramming sharks destroys them.
-  Clearing every shark completes the level.
+- **Hunting Mode**: once your pod reaches 4, ramming *small* sharks destroys
+  them. *Large* sharks (marked with a ⚡ and a higher number) also need you to
+  be **Boosting** - tap Space, or the ⚡ button - into them at the moment of
+  contact; a big pod alone will not finish one. Clearing every shark completes
+  the level.
 - **Level 2, Deep Sea**: swimming through the New Waters prompt loads a new
   background and a tougher shark composition (small and large sharks). Large
-  sharks survive ramming until the pod is big enough (a per-level requirement,
-  shown above each shark), and once all small
+  sharks survive a ram until the pod meets their number (per level, shown above
+  each shark) *and* you Boost into them, and once all small
   sharks are gone, remaining large sharks will hunt you across the entire
   map regardless of distance.
 - **Procedural storm events**: roughly every minute of play there's a chance
