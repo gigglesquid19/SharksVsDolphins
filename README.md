@@ -309,9 +309,12 @@ Game Features
   each shark) *and* you Boost into them, and once all small
   sharks are gone, remaining large sharks will hunt you across the entire
   map regardless of distance.
-- **Procedural storm events**: roughly every minute of play there's a chance
-  of a 30-second storm that dims the screen and limits how far away you can
-  see sharks.
+- **Procedural events**: roughly every minute of play there's a chance of a
+  30-second **storm** that dims the screen and limits how far you can see
+  sharks, or a **jellyfish swarm** - a wall of jellyfish drifting across the
+  water that stings any dolphin it touches. The pod stays together through the
+  swarm; thread the whole group through the gaps (getting everyone through
+  unstung unlocks an achievement).
 - **Dolphins Saved / Mega Pod finale (Campaign mode)**: at every level
   transition, the size of your outgoing pod is added to a running "Dolphins
   Saved" total for the run, and the departing companions swim off-screen

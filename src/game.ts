@@ -69,7 +69,7 @@ const EVENT_CHECK_INTERVAL = 60;
 const EVENT_CHANCE = 0.1;
 const EVENT_DURATION = 30;
 const JELLYFISH_SWARM_DURATION = 45;
-const JELLYFISH_COUNT = 70;
+const JELLYFISH_COUNT = 50;
 const STORM_VISIBILITY_RADIUS = 18;
 const HUNTING_MODE_POD_SIZE = 4;
 const MATRIARCH_HITS_REQUIRED = 3;
@@ -134,8 +134,6 @@ export class Game {
   private dolphins: Dolphin[] = [];
   private sharks: Shark[] = [];
   private player: Dolphin | null = null;
-  private originalPlayer: Dolphin | null = null;
-  private disbanded = false;
   private dolphinSpawnInterval = DOLPHIN_SPAWN_INTERVAL;
 
   private running = false;
@@ -269,8 +267,6 @@ export class Game {
   private pauseOverlayEl: HTMLDivElement;
   private schoolBtnWrap: HTMLDivElement;
   private megaPodBtnWrap: HTMLDivElement | null = null;
-  private disbandBtnWrap: HTMLDivElement | null = null;
-  private disbandBtn: HTMLButtonElement | null = null;
   private levelSelect: HTMLSelectElement | null = null;
   private leaderboardOverlayEl: HTMLDivElement | null = null;
   private leaderboardListEl: HTMLElement | null = null;
@@ -369,9 +365,6 @@ export class Game {
     this.pauseOverlayEl = inputs.pauseOverlay;
     this.schoolBtnWrap = inputs.schoolBtnWrap;
     this.megaPodBtnWrap = document.getElementById('megaPodBtnWrap') as HTMLDivElement | null;
-    this.disbandBtnWrap = document.getElementById('disbandBtnWrap') as HTMLDivElement | null;
-    this.disbandBtn = document.getElementById('disbandBtn') as HTMLButtonElement | null;
-    this.disbandBtn?.addEventListener('click', () => this.switchDolphin());
     this.levelSelect = document.getElementById('levelSelect') as HTMLSelectElement | null;
     this.leaderboardOverlayEl = document.getElementById('leaderboardOverlay') as HTMLDivElement | null;
     this.leaderboardListEl = document.getElementById('leaderboardList') as HTMLElement | null;
@@ -718,21 +711,6 @@ export class Game {
     this.levelComplete();
   }
 
-  switchDolphin(): void {
-    if (!this.player || this.dolphins.length <= 1 || this.activeEvent?.type !== 'jellyfish') return;
-    if (!this.disbanded) {
-      this.originalPlayer = this.player;
-      this.disbanded = true;
-    }
-    const idx = this.dolphins.indexOf(this.player);
-    this.dolphins[idx].isPlayer = false;
-    const nextIdx = (idx + 1) % this.dolphins.length;
-    const next = this.dolphins[nextIdx];
-    next.isPlayer = true;
-    this.player = next;
-    this.setStatus('Switched to another dolphin');
-  }
-
   private pauseGame(): void {
     if (!this.running || this.paused || this.awaitingLevelUpChoice || this.awaitingSharkWarning || this.awaitingRunSummary || this.awaitingTutorialHint || this.awaitingMilestone || this.awaitingContinue) return;
     this.paused = true;
@@ -938,9 +916,6 @@ export class Game {
     this.lastFrameTime = 0;
     this.magicShrimp = null;
     this.shrimpSpawned = false;
-    this.disbanded = false;
-    this.originalPlayer = null;
-    if (this.disbandBtnWrap) this.disbandBtnWrap.classList.add('hidden');
     this.playerHitCooldownUntil = 0;
     this.hideBanner();
     this.activeEvent = null;
@@ -1283,7 +1258,7 @@ export class Game {
   }
 
   private moveFollowers(): void {
-    if (!this.player || this.disbanded) return;
+    if (!this.player) return;
     const boosted = Date.now() < this.player.speedBoostUntil;
     const followerSpeed = (boosted ? 4 : 2) * (1 + this.speedBonusPct) * (this.sprinting ? SPRINT_SPEED : 1);
     const followers = this.dolphins.filter((d) => d.recruited && !d.isPlayer);
@@ -2180,20 +2155,11 @@ export class Game {
       this.jellyfishContainer.addChild(sprite);
       this.jellyfishSprites.set(jelly, sprite);
     }
-    this.setStatus('Jellyfish swarm! Navigate through');
+    this.setStatus('Jellyfish swarm! Keep the pod moving');
     this.showBanner('Jellyfish Swarm!', 'storm', 2500);
-    if (this.disbandBtnWrap) this.disbandBtnWrap.classList.remove('hidden');
   }
 
   private endJellyfishSwarm(): void {
-    this.disbanded = false;
-    if (this.disbandBtnWrap) this.disbandBtnWrap.classList.add('hidden');
-    if (this.originalPlayer && this.dolphins.includes(this.originalPlayer)) {
-      if (this.player && this.player !== this.originalPlayer) this.player.isPlayer = false;
-      this.originalPlayer.isPlayer = true;
-      this.player = this.originalPlayer;
-    }
-    this.originalPlayer = null;
     this.clearJellyfish();
     this.activeEvent = null;
     this.setStatus('The swarm has passed');
