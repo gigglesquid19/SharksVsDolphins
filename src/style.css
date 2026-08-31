@@ -1042,6 +1042,38 @@ button.mega-shrimp.green {
 .store-buy:hover:not(:disabled) { box-shadow: 0 4px 16px rgba(14, 165, 233, 0.5); }
 .store-buy:disabled { opacity: 0.45; cursor: default; }
 .store-buy .pearl-icon { width: 14px; height: 14px; }
+.store-item.locked { border-style: dashed; opacity: 0.9; }
+.store-item.locked .store-skin-preview { opacity: 0.75; }
+
+/* --- Share (run-summary + Level 50 milestone) --- */
+.share-btn {
+  background: linear-gradient(135deg, #22d3ee, #0ea5e9);
+  box-shadow: none;
+}
+.share-btn:hover:not(:disabled) { box-shadow: 0 4px 16px rgba(34, 211, 238, 0.5); }
+
+.milestone-panel { text-align: center; }
+.milestone-panel #milestoneText {
+  color: var(--text);
+  line-height: 1.5;
+  margin: 4px 0 8px;
+}
+.milestone-reward {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+}
+.milestone-reward-caption {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--muted);
+}
 
 .new-waters-prompt {
   position: absolute;

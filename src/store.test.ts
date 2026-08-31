@@ -8,6 +8,7 @@ import {
   equipSkin,
   equippedSkinId,
   getStoreState,
+  grantSkin,
   nextUpgradeCost,
   ownsSkin,
   upgradeLevel,
@@ -71,6 +72,20 @@ describe('skins', () => {
     awardPearls(5);
     expect(buySkin('gold')).toBe(false);
     expect(ownsSkin('gold')).toBe(false);
+  });
+
+  it('grants a reward skin with no Pearl cost, and only once', () => {
+    awardPearls(50);
+    expect(grantSkin('voyager')).toBe(true);
+    expect(ownsSkin('voyager')).toBe(true);
+    expect(getPearls()).toBe(50);
+    expect(grantSkin('voyager')).toBe(false); // already owned
+  });
+
+  it('will not sell the reward skin', () => {
+    awardPearls(1000);
+    expect(buySkin('voyager')).toBe(false);
+    expect(ownsSkin('voyager')).toBe(false);
   });
 });
 

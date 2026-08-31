@@ -114,6 +114,17 @@ export function buySkin(id: string): boolean {
   return true;
 }
 
+/** Adds a skin to the collection with no Pearl cost (e.g. a share reward). No-op if already owned. */
+export function grantSkin(id: string): boolean {
+  const skin = skinById(id);
+  if (skin.id !== id) return false;
+  const state = load();
+  if (state.ownedSkins.includes(id)) return false;
+  state.ownedSkins.push(id);
+  save(state);
+  return true;
+}
+
 /** Equips an owned skin. */
 export function equipSkin(id: string): boolean {
   const state = load();

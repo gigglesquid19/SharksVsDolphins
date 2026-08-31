@@ -12,6 +12,7 @@ import {
   createDolphinSprite,
   createJellyfishSprite,
   createSharkSprite,
+  makeDolphinBodyCanvas,
   makeRadialGradientTexture,
   sliceSharkStrip,
   SharkFishSprite,
@@ -44,8 +45,9 @@ import {
   PEARLS_FLAWLESS_CAMPAIGN_BONUS,
 } from './pearls';
 import { getDolphinName } from './profile';
-import { endlessStartBonuses, equippedSkinId } from './store';
+import { endlessStartBonuses, equippedSkinId, grantSkin, ownsSkin } from './store';
 import { skinById } from './skins';
+import { shareMilestone, SHARE_REWARD_SKIN } from './share';
 import { playGames } from './playGames';
 
 export type GameMode = 'campaign' | 'endless';
@@ -168,6 +170,10 @@ export class Game {
   private awaitingSharkWarning = false;
   private awaitingRunSummary = false;
   private awaitingTutorialHint = false;
+  /** The Endless "Level 50!" share overlay is open (gates the loop like the other awaiting* flags). */
+  private awaitingMilestone = false;
+  /** Set when level 50 is cleared in Endless, so the levelComplete timer shows the milestone overlay. */
+  private pendingMilestone = false;
   /** Achievement ids unlocked during the current run, for the run-summary card. */
   private achievementsThisRun: string[] = [];
   private hintQueue: { heading: string; text: string }[] = [];
@@ -259,6 +265,10 @@ export class Game {
   private runSummaryNameEl: HTMLElement | null = null;
   private runSummaryStatsEl: HTMLElement | null = null;
   private runSummaryAchievementsEl: HTMLElement | null = null;
+  private runSummaryShareBtnEl: HTMLButtonElement | null = null;
+  private milestoneOverlayEl: HTMLDivElement | null = null;
+  private milestoneTextEl: HTMLElement | null = null;
+  private milestoneRewardEl: HTMLElement | null = null;
   private tutorialHintOverlayEl: HTMLDivElement | null = null;
   private tutorialHintHeadingEl: HTMLElement | null = null;
   private tutorialHintTextEl: HTMLElement | null = null;
@@ -357,6 +367,10 @@ export class Game {
     this.runSummaryNameEl = document.getElementById('runSummaryName');
     this.runSummaryStatsEl = document.getElementById('runSummaryStats');
     this.runSummaryAchievementsEl = document.getElementById('runSummaryAchievements');
+    this.runSummaryShareBtnEl = document.getElementById('runSummaryShareBtn') as HTMLButtonElement | null;
+    this.milestoneOverlayEl = document.getElementById('milestoneOverlay') as HTMLDivElement | null;
+    this.milestoneTextEl = document.getElementById('milestoneText');
+    this.milestoneRewardEl = document.getElementById('milestoneReward');
     this.tutorialHintOverlayEl = document.getElementById('tutorialHintOverlay') as HTMLDivElement | null;
     this.tutorialHintHeadingEl = document.getElementById('tutorialHintHeading') as HTMLElement | null;
     this.tutorialHintTextEl = document.getElementById('tutorialHintText') as HTMLElement | null;
@@ -650,7 +664,7 @@ export class Game {
   }
 
   private pauseGame(): void {
-    if (!this.running || this.paused || this.awaitingLevelUpChoice || this.awaitingSharkWarning || this.awaitingRunSummary || this.awaitingTutorialHint) return;
+    if (!this.running || this.paused || this.awaitingLevelUpChoice || this.awaitingSharkWarning || this.awaitingRunSummary || this.awaitingTutorialHint || this.awaitingMilestone) return;
     this.paused = true;
     if (this.timer) clearTimeout(this.timer);
     this.flushLifetimeStats();
@@ -884,6 +898,9 @@ export class Game {
     this.sharkWarningOverlayEl.classList.add('hidden');
     this.awaitingRunSummary = false;
     this.runSummaryOverlayEl?.classList.add('hidden');
+    this.awaitingMilestone = false;
+    this.pendingMilestone = false;
+    this.milestoneOverlayEl?.classList.add('hidden');
     this.paused = false;
     this.pauseOverlayEl.classList.add('hidden');
     this.loadBackground(getLevelBackground(config.level)).catch((err) => console.warn('Background load failed:', err));
@@ -1239,6 +1256,7 @@ export class Game {
     this.flushLifetimeStats();
     const pearls = pearlsForLevel(this.currentLevel, this.lostThisLevel === 0);
     this.awardRunPearls(pearls);
+    if (this.mode === 'endless' && this.currentLevel === 50) this.pendingMilestone = true;
     this.saveDolphinsAndDepart();
     this.setStatus('All sharks destroyed!');
 
@@ -1254,6 +1272,9 @@ export class Game {
       this.levelCompleteTimer = null;
       if (isCampaignFinale) {
         this.recordCampaignClear();
+      } else if (this.pendingMilestone) {
+        this.pendingMilestone = false;
+        this.showMilestone();
       } else {
         this.showLevelUpChoice();
       }
@@ -1355,7 +1376,82 @@ export class Game {
         .join('');
     }
 
+    // The Share button (and its Voyager-skin reward) is a campaign-clear thing only.
+    if (this.runSummaryShareBtnEl) {
+      this.runSummaryShareBtnEl.classList.toggle('hidden', board !== 'campaign');
+      this.runSummaryShareBtnEl.textContent = 'Share';
+      this.runSummaryShareBtnEl.disabled = false;
+    }
+
     this.runSummaryOverlayEl.classList.remove('hidden');
+  }
+
+  /** Campaign-clear Share button: opens the share sheet and, on success, grants the Voyager skin once. */
+  async shareCampaign(): Promise<void> {
+    if (this.runSummaryShareBtnEl) this.runSummaryShareBtnEl.disabled = true;
+    const shared = await shareMilestone('campaign', getDolphinName());
+    if (shared) {
+      this.claimShareReward();
+      if (this.runSummaryShareBtnEl) this.runSummaryShareBtnEl.textContent = 'Shared ✓';
+    } else if (this.runSummaryShareBtnEl) {
+      this.runSummaryShareBtnEl.disabled = false;
+    }
+  }
+
+  /** Endless "Level 50!" milestone overlay - pauses the run until the player shares or taps Keep Diving. */
+  private showMilestone(): void {
+    this.awaitingMilestone = true;
+    if (this.milestoneTextEl) {
+      this.milestoneTextEl.textContent = `${getDolphinName()} dove deeper than almost anyone. Share the dive?`;
+    }
+    this.renderShareReward();
+    this.milestoneOverlayEl?.classList.remove('hidden');
+  }
+
+  async shareEndless50(): Promise<void> {
+    const shared = await shareMilestone('endless50', getDolphinName());
+    if (shared) this.claimShareReward();
+    this.renderShareReward();
+  }
+
+  /** "Keep Diving": closes the milestone overlay and continues to the normal level-up choice. */
+  dismissMilestone(): void {
+    if (!this.awaitingMilestone) return;
+    this.awaitingMilestone = false;
+    this.milestoneOverlayEl?.classList.add('hidden');
+    this.showLevelUpChoice();
+  }
+
+  /** Grants the share-reward skin the first time a milestone is shared. Idempotent. */
+  private claimShareReward(): void {
+    if (grantSkin(SHARE_REWARD_SKIN)) {
+      this.setStatus('Voyager skin unlocked!');
+      this.showBanner('Voyager Skin Unlocked!', 'statup', 2600);
+    }
+  }
+
+  /** Paints the reward preview + caption into #milestoneReward (also used to refresh after a share). */
+  private renderShareReward(): void {
+    if (!this.milestoneRewardEl) return;
+    const owned = ownsSkin(SHARE_REWARD_SKIN);
+    const skin = skinById(SHARE_REWARD_SKIN);
+    this.milestoneRewardEl.innerHTML = '';
+
+    const preview = document.createElement('canvas');
+    preview.className = 'store-skin-preview';
+    preview.width = 132;
+    preview.height = 88;
+    const pctx = preview.getContext('2d');
+    if (pctx) {
+      const body = makeDolphinBodyCanvas(skin.palette);
+      pctx.drawImage(body, 0, 0, body.width, body.height, 0, 0, preview.width, preview.height);
+    }
+    this.milestoneRewardEl.appendChild(preview);
+
+    const caption = document.createElement('div');
+    caption.className = 'milestone-reward-caption';
+    caption.textContent = owned ? 'Voyager skin unlocked ✓' : `Share to unlock the ${skin.name} skin`;
+    this.milestoneRewardEl.appendChild(caption);
   }
 
   /** Saves the pending score to the local + Play Games leaderboards under the dolphin's name. */
@@ -2159,7 +2255,7 @@ export class Game {
   }
 
   private step(): void {
-    if (!this.running || this.awaitingLevelUpChoice || this.awaitingSharkWarning || this.awaitingRunSummary || this.awaitingTutorialHint) return;
+    if (!this.running || this.awaitingLevelUpChoice || this.awaitingSharkWarning || this.awaitingRunSummary || this.awaitingTutorialHint || this.awaitingMilestone) return;
 
     const sharkSpeed = parseInt(this.sharkSpeedInput.value, 10) || 1;
 

@@ -9,17 +9,20 @@ import { DEFAULT_DOLPHIN_PALETTE, DolphinPalette } from './sprites';
 export interface DolphinSkin {
   id: string;
   name: string;
-  /** Pearl cost. `classic` is 0 and owned from the start. */
+  /** Pearl cost. `classic` is 0 and owned from the start; `reward` skins are also 0 but not for sale. */
   price: number;
+  /** `store` skins are bought with Pearls; `reward` skins are earned (e.g. by sharing a milestone). */
+  source: 'store' | 'reward';
   palette: DolphinPalette;
 }
 
 export const DOLPHIN_SKINS: DolphinSkin[] = [
-  { id: 'classic', name: 'Classic Blue', price: 0, palette: DEFAULT_DOLPHIN_PALETTE },
+  { id: 'classic', name: 'Classic Blue', price: 0, source: 'store', palette: DEFAULT_DOLPHIN_PALETTE },
   {
     id: 'reef',
     name: 'Reef Green',
     price: 180,
+    source: 'store',
     palette: {
       back: '#123f38',
       mid: '#2f8f7a',
@@ -35,6 +38,7 @@ export const DOLPHIN_SKINS: DolphinSkin[] = [
     id: 'rose',
     name: 'Rose',
     price: 200,
+    source: 'store',
     palette: {
       back: '#4a1d3d',
       mid: '#b6408f',
@@ -50,6 +54,7 @@ export const DOLPHIN_SKINS: DolphinSkin[] = [
     id: 'orca',
     name: 'Orca',
     price: 240,
+    source: 'store',
     palette: {
       back: '#0e1013',
       mid: '#20242b',
@@ -65,6 +70,7 @@ export const DOLPHIN_SKINS: DolphinSkin[] = [
     id: 'albino',
     name: 'Albino',
     price: 280,
+    source: 'store',
     palette: {
       back: '#c9b8bd',
       mid: '#ddccd0',
@@ -80,6 +86,7 @@ export const DOLPHIN_SKINS: DolphinSkin[] = [
     id: 'gold',
     name: 'Golden',
     price: 320,
+    source: 'store',
     palette: {
       back: '#5a3410',
       mid: '#b3792a',
@@ -95,6 +102,7 @@ export const DOLPHIN_SKINS: DolphinSkin[] = [
     id: 'shadow',
     name: 'Abyssal',
     price: 380,
+    source: 'store',
     palette: {
       back: '#0b0e1a',
       mid: '#232a44',
@@ -103,6 +111,23 @@ export const DOLPHIN_SKINS: DolphinSkin[] = [
       fin: '#151a2e',
       finEdge: 'rgba(0,0,0,0.5)',
       rim: 'rgba(120,130,180,0.5)',
+      eye: '#0a1420',
+    },
+  },
+  {
+    // Not for sale - earned by sharing a milestone (see src/share.ts / SHARE_REWARD_SKIN).
+    id: 'voyager',
+    name: 'Voyager',
+    price: 0,
+    source: 'reward',
+    palette: {
+      back: '#1a2f6b',
+      mid: '#3f5fd0',
+      flank: '#5fd0e6',
+      belly: '#eafcff',
+      fin: '#2a3f8f',
+      finEdge: 'rgba(12,20,44,0.45)',
+      rim: 'rgba(180,255,255,0.95)',
       eye: '#0a1420',
     },
   },

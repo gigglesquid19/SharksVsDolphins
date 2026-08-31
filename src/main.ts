@@ -251,7 +251,10 @@ const inputs = {
   document.getElementById('achievementsCloseBtn')!.addEventListener('click', () => game.hideAchievements());
 
   document.getElementById('runSummarySaveBtn')!.addEventListener('click', () => game.submitPendingScore());
+  document.getElementById('runSummaryShareBtn')!.addEventListener('click', () => void game.shareCampaign());
   document.getElementById('runSummarySkipBtn')!.addEventListener('click', () => game.dismissRunSummary());
+  document.getElementById('milestoneShareBtn')!.addEventListener('click', () => void game.shareEndless50());
+  document.getElementById('milestoneContinueBtn')!.addEventListener('click', () => game.dismissMilestone());
   document.getElementById('schoolBtn')!.addEventListener('click', () => game.formSchool());
   document.getElementById('megaPodBtn')!.addEventListener('click', () => game.summonMegaPod());
   document.getElementById('megaShrimpYellow')!.addEventListener('click', () => game.chooseUpgrade('vitality'));

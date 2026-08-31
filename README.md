@@ -36,8 +36,11 @@ Contents
 - `src/store.ts` - the Store: persisted purchases (`localStorage`) of permanent
   Endless-mode stat upgrades and dolphin skins, plus the derived Endless starting
   bonuses.
-- `src/skins.ts` - the dolphin skin catalogue (palette swaps, prices).
+- `src/skins.ts` - the dolphin skin catalogue (palette swaps, prices; `source`
+  marks the share-only reward skin).
 - `src/storeView.ts` - renders and wires the Store screen.
+- `src/share.ts` - Web Share API wrapper (clipboard fallback) for the campaign /
+  Level 50 milestone Share buttons and the Voyager-skin reward.
 - `src/tutorialHints.ts` - first-run tooltip seen/unseen persistence
   (`localStorage`).
 - `src/music.ts` - the ambient/boss track lists and random-pick helper (see
@@ -207,10 +210,17 @@ How to Play
      (Vitality, Speed, Charisma, Boost Cooldown, and Boost Duration - they seed
      an Endless run's starting stats and stack with the Mega Shrimp picks you
      make during the run; Campaign is unaffected) and **dolphin skins** (palette
-     recolours of the whole pod, one equipped at a time).
+     recolours of the whole pod, one equipped at a time). The **Voyager** skin
+     can't be bought - it shows as "Share to unlock" until earned.
    Both endings show a **run-summary card** - dolphin name, a stat breakdown,
    and any achievements unlocked that run - then let you save the score (under
    your dolphin's name) to the leaderboard, or Skip.
+   - **Share**: clearing the Campaign, and clearing **Level 50** in Endless
+     (a milestone card that pauses the run), each offer a **Share** button. The
+     first successful share unlocks the exclusive **Voyager** skin. A real
+     social post can't be detected, so the reward fires whenever the OS share
+     sheet completes without being cancelled (or a clipboard-copy fallback
+     succeeds).
 2. Click **Start** to begin swimming.
 3. Controls:
    - Desktop: Arrow keys or WASD.
@@ -278,6 +288,10 @@ Game Features
   Charisma, Boost Cooldown, Boost Duration - all tiered) and dolphin skins
   (`src/skins.ts` - palette recolours applied to the whole pod). Purchases
   persist in `localStorage`.
+- **Milestone sharing** (`src/share.ts`): a Share button on the campaign-clear
+  run-summary card and on a "Level 50!" milestone card in Endless (which pauses
+  the run until you Share or Keep Diving). The first successful share grants the
+  exclusive **Voyager** skin - shown as "Share to unlock" in the Store until then.
 - **Sound**: dynamic background music (see Music below) with a mute toggle
   and volume slider, plus procedurally synthesized sound effects (bite,
   recruit chime, shrimp pickup, storm rumble) via the Web Audio API.

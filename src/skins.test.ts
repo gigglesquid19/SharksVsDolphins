@@ -19,8 +19,18 @@ describe('DOLPHIN_SKINS', () => {
     }
   });
 
-  it('prices every non-classic skin above zero', () => {
-    for (const skin of DOLPHIN_SKINS.slice(1)) expect(skin.price).toBeGreaterThan(0);
+  it('prices every store skin except classic above zero', () => {
+    for (const skin of DOLPHIN_SKINS) {
+      if (skin.id === 'classic' || skin.source === 'reward') continue;
+      expect(skin.source).toBe('store');
+      expect(skin.price).toBeGreaterThan(0);
+    }
+  });
+
+  it('has a share-only reward skin', () => {
+    const voyager = DOLPHIN_SKINS.find((s) => s.id === 'voyager');
+    expect(voyager?.source).toBe('reward');
+    expect(voyager?.price).toBe(0);
   });
 });
 

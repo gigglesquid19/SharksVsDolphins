@@ -74,6 +74,8 @@ export function setupStore(opts: { onPearlsChange: () => void }): { open: () => 
         item.className = 'store-item';
         if (owned) item.classList.add('owned');
         if (isEquipped) item.classList.add('equipped');
+        const lockedReward = skin.source === 'reward' && !owned;
+        if (lockedReward) item.classList.add('locked');
 
         const preview = document.createElement('canvas');
         preview.className = 'store-skin-preview';
@@ -102,6 +104,9 @@ export function setupStore(opts: { onPearlsChange: () => void }): { open: () => 
           btn.addEventListener('click', () => {
             if (equipSkin(skin.id)) refresh();
           });
+        } else if (lockedReward) {
+          btn.textContent = '🔒 Share to unlock';
+          btn.disabled = true;
         } else {
           btn.innerHTML = `<img class="pearl-icon" alt="" src="${pearlIconSrc()}"> ${skin.price}`;
           btn.disabled = balance < skin.price;
