@@ -75,6 +75,9 @@ const HUNTING_MODE_POD_SIZE = 4;
 const MATRIARCH_HITS_REQUIRED = 3;
 const MATRIARCH_HIT_COOLDOWN_MS = 900;
 const LARGE_SHARK_SIZE_MULTIPLIER = 1.8;
+// The tiger sprite draws at half the scale of the other two kinds (SHARK_KIND_SCALE), which
+// left small tigers looking undersized against them - a third bigger reads much better.
+const SMALL_TIGER_SIZE_MULTIPLIER = 1.33;
 const SPRINT_DURATION = 300;
 const SPRINT_COOLDOWN = 10000;
 const SPRINT_SPEED = 2;
@@ -2145,6 +2148,7 @@ export class Game {
     for (let i = 0; i < config.normalSharkCount; i++) {
       const shark = new Shark(id++);
       shark.kind = config.sharkKinds[Math.floor(Math.random() * config.sharkKinds.length)];
+      if (shark.kind === 'tiger') shark.sizeMultiplier = SMALL_TIGER_SIZE_MULTIPLIER;
       shark.speedMultiplier = config.sharkSpeedMultiplier * (shark.kind === 'hammerhead' ? HAMMERHEAD_SPEED_BONUS : 1);
       this.randomizeSharkSpawnPosition(shark);
       shark._y = clampEntityY(shark._y, 4);
