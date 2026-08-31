@@ -2,6 +2,7 @@ import './style.css';
 import { Game } from './game';
 import { sfx } from './sfx';
 import { clearRunCheckpoint, loadRunCheckpoint } from './runState';
+import { getDolphinName, hasNamedDolphin, setDolphinName } from './profile';
 import { registerSW } from 'virtual:pwa-register';
 import { Capacitor } from '@capacitor/core';
 
@@ -70,8 +71,33 @@ volumeSlider.addEventListener('input', () => {
 
 const levelSelectWrap = document.getElementById('levelSelectWrap') as HTMLSpanElement;
 const titleContinueBtn = document.getElementById('titleContinueBtn') as HTMLButtonElement;
-const initialsInputEl = document.getElementById('initialsInput') as HTMLInputElement;
 const savedCheckpoint = loadRunCheckpoint();
+
+// --- Dolphin name ---
+const narrativeNameEl = document.getElementById('narrativeName') as HTMLElement;
+const dolphinNameField = document.getElementById('dolphinNameField') as HTMLLabelElement;
+const dolphinNameInput = document.getElementById('dolphinNameInput') as HTMLInputElement;
+const pauseNameInput = document.getElementById('pauseNameInput') as HTMLInputElement;
+
+function refreshDolphinName(): void {
+  const name = getDolphinName();
+  narrativeNameEl.textContent = name;
+  dolphinNameInput.value = name;
+  pauseNameInput.value = name;
+}
+refreshDolphinName();
+// Only prompt on the narrative screen the first time; after that it's the pause menu.
+dolphinNameField.classList.toggle('hidden', hasNamedDolphin());
+
+dolphinNameInput.addEventListener('change', () => {
+  setDolphinName(dolphinNameInput.value);
+  refreshDolphinName();
+});
+pauseNameInput.addEventListener('change', () => {
+  setDolphinName(pauseNameInput.value);
+  refreshDolphinName();
+});
+
 if (savedCheckpoint) titleContinueBtn.classList.remove('hidden');
 
 // The "start with N dolphins" testing shortcuts only make sense on level 10 (the Matriarch
@@ -107,6 +133,9 @@ function enterAppFromTitle(): void {
 }
 
 document.getElementById('narrativeContinueBtn')!.addEventListener('click', () => {
+  setDolphinName(dolphinNameInput.value);
+  refreshDolphinName();
+  dolphinNameField.classList.add('hidden');
   narrativeScreen.classList.add('hidden');
   appContent.classList.remove('hidden');
 });
@@ -173,13 +202,8 @@ const inputs = {
   document.getElementById('achievementsBtn')!.addEventListener('click', () => game.showAchievements());
   document.getElementById('achievementsCloseBtn')!.addEventListener('click', () => game.hideAchievements());
 
-  function submitInitials(): void {
-    game.submitPendingScore(initialsInputEl.value);
-  }
-  document.getElementById('initialsSubmitBtn')!.addEventListener('click', submitInitials);
-  initialsInputEl.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') submitInitials();
-  });
+  document.getElementById('runSummarySaveBtn')!.addEventListener('click', () => game.submitPendingScore());
+  document.getElementById('runSummarySkipBtn')!.addEventListener('click', () => game.dismissRunSummary());
   document.getElementById('schoolBtn')!.addEventListener('click', () => game.formSchool());
   document.getElementById('megaPodBtn')!.addEventListener('click', () => game.summonMegaPod());
   document.getElementById('megaShrimpYellow')!.addEventListener('click', () => game.chooseUpgrade('vitality'));

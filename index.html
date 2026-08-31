@@ -34,7 +34,11 @@
       <p>Far below the waves lies the Endless Blue, a vast ocean where dolphin pods once travelled freely between feeding grounds, coral cities, and deep-water sanctuaries.</p>
       <p>Then one day everything changed...</p>
       <p>The sharks began hunting in organized packs, driving dolphins from their territories and scattering pods across the ocean. Small groups of dolphins became isolated, vulnerable, and easy prey. Fear spread through the sea.</p>
-      <p>You are Echo, a young dolphin separated from your pod during a shark attack.</p>
+      <p>You are <span id="narrativeName">Echo</span>, a young dolphin separated from your pod during a shark attack.</p>
+      <label id="dolphinNameField" class="dolphin-name-field hidden">
+        Name your dolphin
+        <input id="dolphinNameInput" type="text" maxlength="14" autocomplete="off" spellcheck="false" placeholder="Echo">
+      </label>
       <button id="narrativeContinueBtn" class="school ready">Dive In</button>
     </div>
   </div>
@@ -134,6 +138,10 @@
           <button id="pauseResumeBtn" class="school ready">Resume</button>
           <button id="pauseRestartBtn" class="secondary">Restart</button>
           <button id="pauseResetBtn" class="secondary">Reset</button>
+          <label class="pause-name">
+            Dolphin name
+            <input id="pauseNameInput" type="text" maxlength="14" autocomplete="off" spellcheck="false">
+          </label>
           <div class="pause-settings" id="pauseSettingsList"></div>
         </div>
       </div>
@@ -202,12 +210,14 @@
           <button id="achievementsCloseBtn" class="school ready">Continue</button>
         </div>
       </div>
-      <div class="shark-warning-overlay hidden" id="initialsOverlay">
-        <div class="shark-warning-panel initials-panel">
-          <h2 id="initialsHeading">New Score!</h2>
-          <p id="initialsSummary" class="initials-summary"></p>
-          <input id="initialsInput" class="initials-input" maxlength="3" autocomplete="off" spellcheck="false" aria-label="Your initials">
-          <button id="initialsSubmitBtn" class="school ready">Save Score</button>
+      <div class="leaderboard-overlay hidden" id="runSummaryOverlay">
+        <div class="leaderboard-panel run-summary-panel">
+          <h2 id="runSummaryTitle">Run Over</h2>
+          <p id="runSummaryName" class="run-summary-name"></p>
+          <div id="runSummaryStats" class="run-summary-stats"></div>
+          <div id="runSummaryAchievements" class="run-summary-achievements"></div>
+          <button id="runSummarySaveBtn" class="school ready">Save to Leaderboard</button>
+          <button id="runSummarySkipBtn" class="secondary">Skip</button>
         </div>
       </div>
       <div class="dpad-row">

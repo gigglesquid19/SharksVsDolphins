@@ -22,7 +22,10 @@ Contents
 - `src/entities.ts` - the Dolphin, Shark, MagicShrimp, and Jellyfish classes
   and their movement logic (no Pixi/DOM dependencies).
 - `src/scoring.ts` - local top-10 leaderboard persistence (`localStorage`),
-  separate boards for Campaign and Endless.
+  separate boards for Campaign and Endless; entries are stamped with the
+  dolphin's name.
+- `src/profile.ts` - the player's dolphin name (`localStorage`, default `Echo`,
+  editable from the pause menu).
 - `src/achievements.ts` - the achievement definitions and unlock/seen
   persistence (`localStorage`).
 - `src/lifetimeStats.ts` - cumulative cross-run totals (dolphins saved, sharks
@@ -180,8 +183,9 @@ tester account - Play Games sign-in does not work on most emulators.
 
 How to Play
 --------------------
-1. Open the game and pick a mode on the title screen, then **Dive In** past
-   the story intro:
+1. Open the game and pick a mode on the title screen. On your first play the
+   story intro also asks you to **name your dolphin** (default `Echo`); the
+   name sticks and is editable from the pause menu. Then **Dive In**:
    - **Campaign Mode**: the classic 10-level run. Pick a starting level,
      progress is checkpointed at each level transition (`localStorage`), and
      the title screen offers **Continue Campaign** to resume a run you left
@@ -189,9 +193,11 @@ How to Play
      leaderboard.
    - **Endless Mode**: always starts at level 1 with no level picker, keeps
      going past level 10 with escalating difficulty, and has no free resume
-     - a death ends the run and prompts for the Endless leaderboard. This is
-     the intended hook for a future pay-to-continue offer (see "Ideas for
-     Further Development").
+     - a death ends the run. This is the intended hook for a future
+     pay-to-continue offer (see "Ideas for Further Development").
+   Both endings show a **run-summary card** - dolphin name, a stat breakdown,
+   and any achievements unlocked that run - then let you save the score (under
+   your dolphin's name) to the leaderboard, or Skip.
 2. Click **Start** to begin swimming.
 3. Controls:
    - Desktop: Arrow keys or WASD.

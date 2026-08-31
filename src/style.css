@@ -650,6 +650,13 @@ button.mega-shrimp.green {
   padding: 8px 12px;
   border: 1px solid rgba(56, 189, 248, 0.15);
 }
+/* Name column: keep long names from stretching the table. */
+.leaderboard-table td.name-cell {
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .leaderboard-table th {
   background: rgba(56, 189, 248, 0.15);
   color: #22d3ee;
@@ -721,25 +728,71 @@ button.mega-shrimp.green {
 }
 .achievement-row.unlocked .achievement-status { color: #facc15; }
 
-.initials-summary {
-  margin: -8px 0 0;
+/* Dolphin-name inputs (narrative first-run prompt + pause menu). */
+.dolphin-name-field,
+.pause-name {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  font-size: 0.85rem;
   color: var(--muted);
-  font-size: 0.9rem;
+  font-weight: 700;
 }
-.initials-input {
-  width: 140px;
-  padding: 10px 12px;
+.pause-name { align-items: stretch; text-align: left; }
+#dolphinNameInput,
+#pauseNameInput {
+  padding: 9px 12px;
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.08);
   color: var(--text);
-  font-size: 1.6rem;
-  font-weight: 800;
-  letter-spacing: 0.3em;
+  font-size: 1.1rem;
+  font-weight: 700;
   text-align: center;
-  text-transform: uppercase;
 }
-.initials-input:focus { outline: 2px solid var(--accent); }
+#dolphinNameInput { width: 180px; }
+#dolphinNameInput:focus,
+#pauseNameInput:focus { outline: 2px solid var(--accent); }
+
+/* Run-summary card. */
+.run-summary-panel { gap: 14px; }
+.run-summary-name {
+  margin: -6px 0 0;
+  font-weight: 800;
+  color: var(--accent);
+  font-size: 1.05rem;
+}
+.run-summary-stats {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 18px;
+  width: 100%;
+  max-width: 320px;
+  font-size: 0.92rem;
+}
+.run-summary-stats .label { color: var(--muted); text-align: left; }
+.run-summary-stats .value { font-weight: 800; text-align: right; }
+.run-summary-achievements {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  max-width: 320px;
+}
+.run-summary-achievements:empty { display: none; }
+.run-summary-achievements .row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  background: rgba(250, 204, 21, 0.1);
+  border: 1px solid rgba(250, 204, 21, 0.3);
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-align: left;
+}
 
 .level-badge {
   position: absolute;

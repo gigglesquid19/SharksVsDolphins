@@ -1,9 +1,11 @@
+import { DEFAULT_DOLPHIN_NAME } from './profile';
+
 const MAX_SAVED_SCORES = 10;
 const CAMPAIGN_KEY = 'svsd-scores-campaign';
 const ENDLESS_KEY = 'svsd-scores-endless';
 
 export interface CampaignScore {
-  initials: string;
+  name: string;
   timeToSaveOcean: number;
   retries: number;
   recruited: number;
@@ -13,6 +15,12 @@ export interface CampaignScore {
 }
 
 export type NewCampaignScore = Omit<CampaignScore, 'date'>;
+
+/** Older records stored a 3-char `initials`; map it onto `name` so they still render. */
+function withName<T extends { name?: string }>(rec: T): T {
+  const legacy = (rec as { initials?: string }).initials;
+  return { ...rec, name: rec.name ?? legacy ?? DEFAULT_DOLPHIN_NAME };
+}
 
 /** Saves a cleared-campaign run into the local top-10 campaign leaderboard, fastest-first. */
 export function saveCampaignScore(score: NewCampaignScore): void {
@@ -29,7 +37,7 @@ export function saveCampaignScore(score: NewCampaignScore): void {
 export function loadCampaignScores(): CampaignScore[] {
   try {
     const raw = localStorage.getItem(CAMPAIGN_KEY);
-    return raw ? JSON.parse(raw) : [];
+    return raw ? (JSON.parse(raw) as CampaignScore[]).map(withName) : [];
   } catch (e) {
     console.warn('Failed to load campaign scores', e);
     return [];
@@ -37,7 +45,7 @@ export function loadCampaignScores(): CampaignScore[] {
 }
 
 export interface EndlessScore {
-  initials: string;
+  name: string;
   levelReached: number;
   timeSurvived: number;
   recruited: number;
@@ -62,7 +70,7 @@ export function saveEndlessScore(score: NewEndlessScore): void {
 export function loadEndlessScores(): EndlessScore[] {
   try {
     const raw = localStorage.getItem(ENDLESS_KEY);
-    return raw ? JSON.parse(raw) : [];
+    return raw ? (JSON.parse(raw) as EndlessScore[]).map(withName) : [];
   } catch (e) {
     console.warn('Failed to load endless scores', e);
     return [];

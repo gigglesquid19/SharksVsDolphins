@@ -41,8 +41,8 @@ FEATURES
   boss fight against the Matriarch and her escort.
 • Endless — the campaign never stops; difficulty keeps climbing and the
   Matriarch returns every ten levels. Chase your deepest run.
-• Two leaderboards — fastest Campaign clear and deepest Endless run, with
-  three-letter initials, all stored on your device.
+• Name your dolphin, then chase two leaderboards — fastest Campaign clear and
+  deepest Endless run — all stored on your device.
 • The Mega Pod finale — every dolphin you save across a Campaign run is banked,
   then called back all at once for the final push against the Matriarch.
 • Magic Shrimp power-ups, procedural storms that cut your visibility, a sprint
@@ -109,8 +109,8 @@ Answer the IARC questionnaire truthfully; expected answers for this app:
 - **Controlled substances:** none.
 - **Gambling:** none (the leaderboards are score-based, no wagering, no
   simulated gambling).
-- **User interaction / user-generated content:** none — no chat, no sharing,
-  the "initials" are three local characters not shared anywhere.
+- **User interaction / user-generated content:** none — no chat, no sharing;
+  the dolphin name is stored only on the device and not shared anywhere.
 - **Data collection / location:** none.
 
 Likely outcome: **PEGI 7 / ESRB Everyone 10+ / USK 6** or similar. Google will

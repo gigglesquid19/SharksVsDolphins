@@ -2,11 +2,11 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { loadCampaignScores, loadEndlessScores, saveCampaignScore, saveEndlessScore } from './scoring';
 
 function campaignScore(timeToSaveOcean: number) {
-  return { initials: 'AAA', timeToSaveOcean, retries: 0, recruited: 1, lost: 0, sharksKilled: 2 };
+  return { name: 'Echo', timeToSaveOcean, retries: 0, recruited: 1, lost: 0, sharksKilled: 2 };
 }
 
 function endlessScore(levelReached: number, timeSurvived = 100) {
-  return { initials: 'BBB', levelReached, timeSurvived, recruited: 1, sharksKilled: 2 };
+  return { name: 'Splash', levelReached, timeSurvived, recruited: 1, sharksKilled: 2 };
 }
 
 beforeEach(() => {
@@ -23,12 +23,20 @@ describe('campaign scores', () => {
     expect(loadCampaignScores()).toEqual([]);
   });
 
-  it('persists initials and stamps a date', () => {
+  it('persists the name and stamps a date', () => {
     saveCampaignScore(campaignScore(42));
     const scores = loadCampaignScores();
     expect(scores).toHaveLength(1);
-    expect(scores[0].initials).toBe('AAA');
+    expect(scores[0].name).toBe('Echo');
     expect(typeof scores[0].date).toBe('string');
+  });
+
+  it('reads a legacy `initials` record back as `name`', () => {
+    localStorage.setItem(
+      'svsd-scores-campaign',
+      JSON.stringify([{ initials: 'XYZ', timeToSaveOcean: 5, retries: 0, recruited: 0, lost: 0, sharksKilled: 0, date: 'x' }])
+    );
+    expect(loadCampaignScores()[0].name).toBe('XYZ');
   });
 
   it('keeps the leaderboard sorted fastest-first', () => {

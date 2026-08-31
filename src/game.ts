@@ -36,6 +36,7 @@ import { hasSeenHint, markHintSeen, HintId } from './tutorialHints';
 import { AMBIENT_TRACKS, BOSS_TRACKS, pickRandomTrack } from './music';
 import { ACHIEVEMENTS, AchievementId, getUnlockedMap, unlock } from './achievements';
 import { bumpLifetime, recordPlayDay } from './lifetimeStats';
+import { getDolphinName } from './profile';
 import { playGames } from './playGames';
 
 export type GameMode = 'campaign' | 'endless';
@@ -44,7 +45,10 @@ type LeaderboardBoard = 'campaign' | 'endless';
 // '/' for the app and dev, '/SharksVsDolphins/' for the GitHub Pages build - so
 // public/ assets loaded at runtime resolve under whatever sub-path is in use.
 const ASSET_BASE = import.meta.env.BASE_URL;
-const INITIALS_KEY = 'svsd-initials';
+
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+}
 
 const DOLPHIN_SPAWN_INTERVAL = 15;
 const EVENT_CHECK_INTERVAL = 60;
@@ -148,7 +152,10 @@ export class Game {
   private awaitingNewWaters = false;
   private awaitingLevelUpChoice = false;
   private awaitingSharkWarning = false;
+  private awaitingRunSummary = false;
   private awaitingTutorialHint = false;
+  /** Achievement ids unlocked during the current run, for the run-summary card. */
+  private achievementsThisRun: string[] = [];
   private hintQueue: { heading: string; text: string }[] = [];
   private seenSharkKinds = new Set<SharkKind>();
   private seenLargeSharkKinds = new Set<SharkKind>();
@@ -185,8 +192,8 @@ export class Game {
   private mode: GameMode = 'campaign';
   private currentLeaderboardBoard: LeaderboardBoard = 'campaign';
   private pendingScore:
-    | { board: 'campaign'; score: Omit<NewCampaignScore, 'initials'> }
-    | { board: 'endless'; score: Omit<NewEndlessScore, 'initials'> }
+    | { board: 'campaign'; score: Omit<NewCampaignScore, 'name'> }
+    | { board: 'endless'; score: Omit<NewEndlessScore, 'name'> }
     | null = null;
 
   private pointerActive = false;
@@ -228,10 +235,11 @@ export class Game {
   private leaderboardGlobalRankEl: HTMLElement | null = null;
   private leaderboardGlobalBtn: HTMLButtonElement | null = null;
   private leaderboardSignInBtn: HTMLButtonElement | null = null;
-  private initialsOverlayEl: HTMLDivElement | null = null;
-  private initialsHeadingEl: HTMLElement | null = null;
-  private initialsSummaryEl: HTMLElement | null = null;
-  private initialsInputEl: HTMLInputElement | null = null;
+  private runSummaryOverlayEl: HTMLDivElement | null = null;
+  private runSummaryTitleEl: HTMLElement | null = null;
+  private runSummaryNameEl: HTMLElement | null = null;
+  private runSummaryStatsEl: HTMLElement | null = null;
+  private runSummaryAchievementsEl: HTMLElement | null = null;
   private tutorialHintOverlayEl: HTMLDivElement | null = null;
   private tutorialHintHeadingEl: HTMLElement | null = null;
   private tutorialHintTextEl: HTMLElement | null = null;
@@ -325,10 +333,11 @@ export class Game {
       await playGames.signIn();
       this.showLeaderboard(this.currentLeaderboardBoard);
     });
-    this.initialsOverlayEl = document.getElementById('initialsOverlay') as HTMLDivElement | null;
-    this.initialsHeadingEl = document.getElementById('initialsHeading') as HTMLElement | null;
-    this.initialsSummaryEl = document.getElementById('initialsSummary') as HTMLElement | null;
-    this.initialsInputEl = document.getElementById('initialsInput') as HTMLInputElement | null;
+    this.runSummaryOverlayEl = document.getElementById('runSummaryOverlay') as HTMLDivElement | null;
+    this.runSummaryTitleEl = document.getElementById('runSummaryTitle');
+    this.runSummaryNameEl = document.getElementById('runSummaryName');
+    this.runSummaryStatsEl = document.getElementById('runSummaryStats');
+    this.runSummaryAchievementsEl = document.getElementById('runSummaryAchievements');
     this.tutorialHintOverlayEl = document.getElementById('tutorialHintOverlay') as HTMLDivElement | null;
     this.tutorialHintHeadingEl = document.getElementById('tutorialHintHeading') as HTMLElement | null;
     this.tutorialHintTextEl = document.getElementById('tutorialHintText') as HTMLElement | null;
@@ -615,7 +624,7 @@ export class Game {
   }
 
   private pauseGame(): void {
-    if (!this.running || this.paused || this.awaitingLevelUpChoice || this.awaitingSharkWarning || this.awaitingTutorialHint) return;
+    if (!this.running || this.paused || this.awaitingLevelUpChoice || this.awaitingSharkWarning || this.awaitingRunSummary || this.awaitingTutorialHint) return;
     this.paused = true;
     if (this.timer) clearTimeout(this.timer);
     this.flushLifetimeStats();
@@ -771,6 +780,7 @@ export class Game {
       this.lastMusicLevel = 0;
       this.syncedSharkKills = 0;
       this.lastBoostNudgeTime = 0;
+      this.achievementsThisRun = [];
       this.unsyncedPlaySeconds = 0;
       this.lifetimeFlushAt = 20;
       this.playDayRecorded = false;
@@ -833,6 +843,8 @@ export class Game {
     this.levelUpOverlayEl.classList.add('hidden');
     this.awaitingSharkWarning = false;
     this.sharkWarningOverlayEl.classList.add('hidden');
+    this.awaitingRunSummary = false;
+    this.runSummaryOverlayEl?.classList.add('hidden');
     this.paused = false;
     this.pauseOverlayEl.classList.add('hidden');
     this.loadBackground(getLevelBackground(config.level)).catch((err) => console.warn('Background load failed:', err));
@@ -1162,7 +1174,7 @@ export class Game {
           sharksKilled: this.sharksKilled,
         },
       };
-      this.showInitialsPrompt('Game Over', `Reached level ${this.currentLevel} - survived ${timeSurvived.toFixed(1)}s`);
+      this.showRunSummary('endless');
     }
   }
 
@@ -1240,47 +1252,75 @@ export class Game {
     this.setStatus('You cleared the campaign! The ocean is safe.');
     this.startBtn.textContent = 'Retry';
     this.showBanner('Ocean Saved!', 'victory');
-    this.showInitialsPrompt('Ocean Saved!', `Cleared in ${timeToSaveOcean.toFixed(1)}s`);
+    this.showRunSummary('campaign');
   }
 
-  private showInitialsPrompt(heading: string, summary: string): void {
-    if (!this.initialsOverlayEl || !this.initialsInputEl) return;
-    if (this.initialsHeadingEl) this.initialsHeadingEl.textContent = heading;
-    if (this.initialsSummaryEl) this.initialsSummaryEl.textContent = summary;
-    let remembered = '';
-    try {
-      remembered = localStorage.getItem(INITIALS_KEY) ?? '';
-    } catch (e) {
-      console.warn('Failed to read remembered initials', e);
+  /** End-of-run card: the dolphin's name, a stat grid, and any achievements from this run. */
+  private showRunSummary(board: LeaderboardBoard): void {
+    if (!this.runSummaryOverlayEl || !this.pendingScore) return;
+    this.awaitingRunSummary = true;
+
+    if (this.runSummaryTitleEl) this.runSummaryTitleEl.textContent = board === 'campaign' ? 'Ocean Saved!' : 'Run Over';
+    if (this.runSummaryNameEl) this.runSummaryNameEl.textContent = getDolphinName();
+
+    const rows: [string, string][] =
+      this.pendingScore.board === 'campaign'
+        ? [
+            ['Time', `${this.pendingScore.score.timeToSaveOcean.toFixed(1)}s`],
+            ['Retries', String(this.pendingScore.score.retries)],
+            ['Dolphins recruited', String(this.pendingScore.score.recruited)],
+            ['Dolphins lost', String(this.pendingScore.score.lost)],
+            ['Dolphins saved', String(this.totalDolphinsSaved)],
+            ['Sharks destroyed', String(this.pendingScore.score.sharksKilled)],
+          ]
+        : [
+            ['Depth', `Level ${this.pendingScore.score.levelReached}`],
+            ['Survived', `${this.pendingScore.score.timeSurvived.toFixed(1)}s`],
+            ['Dolphins recruited', String(this.pendingScore.score.recruited)],
+            ['Sharks destroyed', String(this.pendingScore.score.sharksKilled)],
+          ];
+    if (this.runSummaryStatsEl) {
+      this.runSummaryStatsEl.innerHTML = rows
+        .map(([label, value]) => `<span class="label">${label}</span><span class="value">${value}</span>`)
+        .join('');
     }
-    this.initialsInputEl.value = remembered;
-    this.initialsOverlayEl.classList.remove('hidden');
-    this.initialsInputEl.focus();
-    this.initialsInputEl.select();
+
+    if (this.runSummaryAchievementsEl) {
+      const unlocked = [...new Set(this.achievementsThisRun)]
+        .map((id) => ACHIEVEMENTS.find((a) => a.id === id))
+        .filter((a): a is (typeof ACHIEVEMENTS)[number] => !!a);
+      this.runSummaryAchievementsEl.innerHTML = unlocked
+        .map((a) => `<div class="row"><span>${a.icon}</span><span>${a.name}</span></div>`)
+        .join('');
+    }
+
+    this.runSummaryOverlayEl.classList.remove('hidden');
   }
 
-  /** Saves the pending score (from a campaign clear or an endless game over) with the player's initials. */
-  submitPendingScore(rawInitials: string): void {
+  /** Saves the pending score to the local + Play Games leaderboards under the dolphin's name. */
+  submitPendingScore(): void {
     if (!this.pendingScore) return;
-    const clean = rawInitials.trim().slice(0, 3).toUpperCase() || 'AAA';
-    try {
-      localStorage.setItem(INITIALS_KEY, clean);
-    } catch (e) {
-      console.warn('Failed to save initials', e);
-    }
-
+    const name = getDolphinName();
     if (this.pendingScore.board === 'campaign') {
-      saveCampaignScore({ ...this.pendingScore.score, initials: clean });
+      saveCampaignScore({ ...this.pendingScore.score, name });
       // Time board is milliseconds, smaller-is-better (see src/playGames.ts).
       void playGames.submit('campaign', this.pendingScore.score.timeToSaveOcean * 1000);
     } else {
-      saveEndlessScore({ ...this.pendingScore.score, initials: clean });
+      saveEndlessScore({ ...this.pendingScore.score, name });
       void playGames.submit('endless', this.pendingScore.score.levelReached);
     }
     const board = this.pendingScore.board;
     this.pendingScore = null;
-    this.initialsOverlayEl?.classList.add('hidden');
+    this.awaitingRunSummary = false;
+    this.runSummaryOverlayEl?.classList.add('hidden');
     this.showLeaderboard(board);
+  }
+
+  /** Dismisses the run-summary card without saving the score. */
+  dismissRunSummary(): void {
+    this.pendingScore = null;
+    this.awaitingRunSummary = false;
+    this.runSummaryOverlayEl?.classList.add('hidden');
   }
 
   showLeaderboard(board: LeaderboardBoard = this.currentLeaderboardBoard): void {
@@ -1293,27 +1333,27 @@ export class Game {
     if (board === 'campaign') {
       if (this.leaderboardHeadingEl) this.leaderboardHeadingEl.textContent = 'Campaign Leaderboard';
       this.leaderboardHeadEl.innerHTML =
-        '<tr><th>#</th><th>Initials</th><th>Time</th><th>Retries</th><th>Recruited</th><th>Lost</th><th>Sharks</th></tr>';
+        '<tr><th>#</th><th>Name</th><th>Time</th><th>Retries</th><th>Recruited</th><th>Lost</th><th>Sharks</th></tr>';
       const scores = loadCampaignScores();
       if (scores.length === 0) {
         this.renderEmptyLeaderboardRow(7, 'No completed campaign runs yet.');
       } else {
         for (const [i, s] of scores.entries()) {
           const row = document.createElement('tr');
-          row.innerHTML = `<td>${i + 1}</td><td>${s.initials}</td><td>${s.timeToSaveOcean.toFixed(1)}s</td><td>${s.retries}</td><td>${s.recruited}</td><td>${s.lost}</td><td>${s.sharksKilled}</td>`;
+          row.innerHTML = `<td>${i + 1}</td><td class="name-cell" title="${escapeHtml(s.name)}">${escapeHtml(s.name)}</td><td>${s.timeToSaveOcean.toFixed(1)}s</td><td>${s.retries}</td><td>${s.recruited}</td><td>${s.lost}</td><td>${s.sharksKilled}</td>`;
           this.leaderboardListEl.appendChild(row);
         }
       }
     } else {
       if (this.leaderboardHeadingEl) this.leaderboardHeadingEl.textContent = 'Endless Leaderboard';
-      this.leaderboardHeadEl.innerHTML = '<tr><th>#</th><th>Initials</th><th>Level</th><th>Survived</th><th>Recruited</th><th>Sharks</th></tr>';
+      this.leaderboardHeadEl.innerHTML = '<tr><th>#</th><th>Name</th><th>Level</th><th>Survived</th><th>Recruited</th><th>Sharks</th></tr>';
       const scores = loadEndlessScores();
       if (scores.length === 0) {
         this.renderEmptyLeaderboardRow(6, 'No endless runs yet.');
       } else {
         for (const [i, s] of scores.entries()) {
           const row = document.createElement('tr');
-          row.innerHTML = `<td>${i + 1}</td><td>${s.initials}</td><td>${s.levelReached}</td><td>${s.timeSurvived.toFixed(1)}s</td><td>${s.recruited}</td><td>${s.sharksKilled}</td>`;
+          row.innerHTML = `<td>${i + 1}</td><td class="name-cell" title="${escapeHtml(s.name)}">${escapeHtml(s.name)}</td><td>${s.levelReached}</td><td>${s.timeSurvived.toFixed(1)}s</td><td>${s.recruited}</td><td>${s.sharksKilled}</td>`;
           this.leaderboardListEl.appendChild(row);
         }
       }
@@ -1565,6 +1605,7 @@ export class Game {
     const def = unlock(id);
     if (!def) return;
     this.achievementQueue.push({ icon: def.icon, name: def.name });
+    this.achievementsThisRun.push(def.id);
     this.processAchievementQueue();
   }
 
@@ -2057,7 +2098,7 @@ export class Game {
   }
 
   private step(): void {
-    if (!this.running || this.awaitingLevelUpChoice || this.awaitingSharkWarning || this.awaitingTutorialHint) return;
+    if (!this.running || this.awaitingLevelUpChoice || this.awaitingSharkWarning || this.awaitingRunSummary || this.awaitingTutorialHint) return;
 
     const sharkSpeed = parseInt(this.sharkSpeedInput.value, 10) || 1;
 
