@@ -248,12 +248,12 @@ Game Features
   sharks are cleared, a Summon Mega Pod button appears that calls every
   saved dolphin back in at once for the final push. Not tracked in Endless
   mode, which has no defined ending for the total to pay off at.
-- **The Matriarch in Endless mode**: reappears every 10 levels past the
-  campaign. Landing the finishing hit doesn't destroy her here - she
-  flashes damaged and flees off-screen instead, so the same encounter
-  repeats at the next 10-level mark rather than ending the run. She only
-  counts toward the Matriarch Slayer achievement and the sharks-killed
-  stat on an actual kill, which now only happens in Campaign mode.
+- **The Matriarch**: the campaign's level-10 boss (and an Endless boss every
+  10 levels). She hits hard - a bite from her costs you **two** pod members,
+  not one. In Endless the finishing hit doesn't destroy her; she flashes
+  damaged and flees off-screen, so the encounter repeats at the next 10-level
+  mark rather than ending the run, and she only counts toward the Matriarch
+  Slayer achievement and the sharks-killed stat on an actual Campaign kill.
 - **Sound**: dynamic background music (see Music below) with a mute toggle
   and volume slider, plus procedurally synthesized sound effects (bite,
   recruit chime, shrimp pickup, storm rumble) via the Web Audio API.

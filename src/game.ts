@@ -2251,23 +2251,27 @@ export class Game {
         for (const shark of this.sharks) {
           if (shark.distanceBetween(this.player) < this.sharkHitRadius(shark)) {
             sfx.playBite();
-            let victim: Dolphin | undefined;
-            for (let i = this.dolphins.length - 1; i >= 0; i--) {
+            // The Matriarch takes two pod members per bite; every other shark takes one.
+            const bite = shark.matriarch ? 2 : 1;
+            const victims: Dolphin[] = [];
+            for (let i = this.dolphins.length - 1; i >= 0 && victims.length < bite; i--) {
               const candidate = this.dolphins[i];
               if (!candidate.isPlayer && candidate.recruited && now >= candidate.invulnerableUntil) {
-                victim = candidate;
-                break;
+                victims.push(candidate);
               }
             }
-            if (victim) {
+            if (victims.length > 0) {
               this.playerHitCooldownUntil = now + 1000;
-              this.particles.emit('hit', victim._x * scale + scale / 2, victim._y * scale + scale / 2, 12, { speed: 2, life: 0.6 });
-              this.removeDolphinSprite(victim);
-              this.dolphins = this.dolphins.filter((d) => d !== victim);
-              this.totalLost++;
-              this.lostThisLevel++;
-              this.setStatus('A dolphin was lost');
-              this.showBanner('Dolphin Lost!', 'lost', 2000);
+              for (const v of victims) {
+                this.particles.emit('hit', v._x * scale + scale / 2, v._y * scale + scale / 2, 12, { speed: 2, life: 0.6 });
+                this.removeDolphinSprite(v);
+                this.totalLost++;
+                this.lostThisLevel++;
+              }
+              this.dolphins = this.dolphins.filter((d) => !victims.includes(d));
+              const many = victims.length > 1;
+              this.setStatus(many ? `${victims.length} dolphins lost!` : 'A dolphin was lost');
+              this.showBanner(many ? `${victims.length} Dolphins Lost!` : 'Dolphin Lost!', 'lost', 2000);
             } else if (this.vitalityLives > 0) {
               this.vitalityLives -= 1;
               this.playerHitCooldownUntil = now + 1000;
