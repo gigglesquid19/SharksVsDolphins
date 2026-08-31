@@ -221,6 +221,9 @@ How to Play
      social post can't be detected, so the reward fires whenever the OS share
      sheet completes without being cancelled (or a clipboard-copy fallback
      succeeds).
+   - **About Me** (title screen): the developer's bio, a contact email, and a
+     Buy Me a Coffee button (its URL is a `COFFEE_URL` placeholder in
+     `src/main.ts` for now).
 2. Click **Start** to begin swimming.
 3. Controls:
    - Desktop: Arrow keys or WASD.

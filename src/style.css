@@ -1050,6 +1050,81 @@ button.mega-shrimp.green {
 .store-item.locked { border-style: dashed; opacity: 0.9; }
 .store-item.locked .store-skin-preview { opacity: 0.75; }
 
+/* --- About Me --- */
+.about-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 105;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 24px;
+  overflow-y: auto;
+  background:
+    linear-gradient(180deg, rgba(2, 6, 23, 0.72), rgba(2, 6, 23, 0.9)),
+    url('/OpenOceanBGImage.webp') center / cover no-repeat;
+}
+.about-screen.hidden { display: none; }
+
+.about-panel {
+  width: 100%;
+  max-width: 560px;
+  margin: auto;
+  background: var(--panel);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+}
+.about-panel h2 { margin: 0; }
+
+.about-photo {
+  width: 100%;
+  max-width: 340px;
+  height: auto;
+  border-radius: 14px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+}
+
+.about-body {
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.about-body p {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+.about-body a {
+  color: #38bdf8;
+  word-break: break-all;
+}
+
+.coffee-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border-radius: 999px;
+  background: #ffdd00;
+  color: #0f172a;
+  font-weight: 800;
+  font-size: 1rem;
+  text-decoration: none;
+  box-shadow: 0 4px 16px rgba(255, 221, 0, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.coffee-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 22px rgba(255, 221, 0, 0.5); }
+
 /* --- Share (run-summary + Level 50 milestone) --- */
 .share-btn {
   background: linear-gradient(135deg, #22d3ee, #0ea5e9);

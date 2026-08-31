@@ -83,6 +83,12 @@ Leonardo account (and its plan at time of generation) able to evidence this.
 > to stop others from copying them. This does not affect your right to release
 > the game.
 
+### About Me photo
+
+`public/about-me.webp` (from `Images/AboutMe/AboutMe.jpeg`, resized by
+`tools/generate_about_image.py`) is the project author's own photograph. No
+third-party rights involved.
+
 ### Pearl currency icon — Mischeal
 
 `public/pearl.png` is a single 16×16 tile cropped (by `tools/extract_pearl.py`)

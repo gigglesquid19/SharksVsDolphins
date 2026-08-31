@@ -148,6 +148,19 @@ refreshTitlePearls();
 const store = setupStore({ onPearlsChange: refreshTitlePearls });
 document.getElementById('titleStoreBtn')!.addEventListener('click', () => store.open());
 
+// --- About Me ---
+// TODO: replace with the real Buy Me a Coffee URL.
+const COFFEE_URL = 'https://www.buymeacoffee.com/';
+const aboutScreen = document.getElementById('aboutScreen') as HTMLDivElement;
+(document.getElementById('aboutPhoto') as HTMLImageElement).src = `${import.meta.env.BASE_URL}about-me.webp`;
+document.getElementById('titleAboutBtn')!.addEventListener('click', () => aboutScreen.classList.remove('hidden'));
+document.getElementById('aboutBackBtn')!.addEventListener('click', () => aboutScreen.classList.add('hidden'));
+document.getElementById('coffeeBtn')!.addEventListener('click', (e) => {
+  // window.open with _blank is what Capacitor hands off to the system browser on Android.
+  e.preventDefault();
+  window.open(COFFEE_URL, '_blank', 'noopener');
+});
+
 // The "start with N dolphins" testing shortcuts only make sense on level 10 (the Matriarch
 // fight, otherwise a long grind to reach in a fresh run) - shown only while that's selected,
 // and mutually exclusive with each other (game.ts prefers the 8-dolphin one if both are checked,
