@@ -75,6 +75,11 @@ const LARGE_SHARK_SIZE_MULTIPLIER = 1.8;
 const SPRINT_DURATION = 300;
 const SPRINT_COOLDOWN = 10000;
 const SPRINT_SPEED = 2;
+// Game-feel: a brief freeze-frame and a light screen shake on large-shark kills.
+const HIT_STOP_MS = 70;
+const SHAKE_MAGNITUDE = 3.5;
+const SHAKE_DURATION_MS = 200;
+const COMBO_RESET_SECONDS = 2.5;
 const SHARK_BASE_SCALE = 0.6;
 const SHARK_ATTACK_TRIGGER_RADIUS = 6;
 const SHARK_KIND_SCALE: Record<SharkKind, number> = {
@@ -203,6 +208,14 @@ export class Game {
   private sprintCooldownReduction = 0;
   /** Extra sprint duration in ms from the Store's Boost Duration upgrade (Endless only). */
   private sprintDurationBonus = 0;
+  // Game feel: hit-stop freezes the sim until this time; the shake jitters the Pixi stage.
+  private hitStopUntil = 0;
+  private shakeTime = 0;
+  private shakeMagnitude = 0;
+  /** Consecutive shark kills; drives the rising combo pitch. Resets after a gap / dolphin loss / level. */
+  private killCombo = 0;
+  private lastKillTime = 0;
+  private reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
   private vitalityLives = 0;
   private speedBonusPct = 0;
   private charismaBonusDolphins = 0;
@@ -426,6 +439,21 @@ export class Game {
     this.stormOverlay = new Graphics();
     this.stage.addChild(this.stormOverlay);
 
+    // Screen shake runs on Pixi's render ticker (smooth 60fps), decoupled from the ~80ms sim loop.
+    this.app.ticker.add(() => {
+      if (this.shakeTime > 0) {
+        // Clamp so a resume from a backgrounded tab can't blow the whole shake in one frame.
+        this.shakeTime -= Math.min(this.app.ticker.deltaMS, 50) / 1000;
+        const m = Math.max(0, this.shakeTime / (SHAKE_DURATION_MS / 1000)) * this.shakeMagnitude;
+        this.stage.position.set((Math.random() - 0.5) * 2 * m, (Math.random() - 0.5) * 2 * m);
+      } else if (this.stage.x !== 0 || this.stage.y !== 0) {
+        this.stage.position.set(0, 0);
+      }
+    });
+    window.matchMedia?.('(prefers-reduced-motion: reduce)').addEventListener('change', (e) => {
+      this.reducedMotion = e.matches;
+    });
+
     this.particles = new ParticleSystem(this.fxContainer);
 
     await this.createBackground();
@@ -486,6 +514,27 @@ export class Game {
   /** Sprint duration in ms: the base plus the Store's Boost Duration upgrade. */
   private sprintDurationMs(): number {
     return SPRINT_DURATION + this.sprintDurationBonus;
+  }
+
+  /** Freeze-frame + light screen shake for a big kill. No-op under prefers-reduced-motion. */
+  private triggerBigKillFeedback(): void {
+    if (this.reducedMotion) return;
+    this.hitStopUntil = Date.now() + HIT_STOP_MS;
+    this.shakeMagnitude = SHAKE_MAGNITUDE;
+    this.shakeTime = SHAKE_DURATION_MS / 1000;
+  }
+
+  /** Plays the kill blip, bumping the combo (and its pitch) unless too long since the last kill. */
+  private registerKillSound(): void {
+    if (this.gameTime - this.lastKillTime > COMBO_RESET_SECONDS) this.killCombo = 0;
+    this.killCombo++;
+    this.lastKillTime = this.gameTime;
+    sfx.playSharkKill(this.killCombo - 1);
+  }
+
+  private resetKillCombo(): void {
+    this.killCombo = 0;
+    this.lastKillTime = 0;
   }
 
   getSprintCooldownFraction(): number {
@@ -890,6 +939,10 @@ export class Game {
     this.sprinting = false;
     this.sprintEndTime = 0;
     this.sprintCooldownEnd = 0;
+    this.resetKillCombo();
+    this.hitStopUntil = 0;
+    this.shakeTime = 0;
+    this.stage?.position.set(0, 0);
     this.awaitingNewWaters = false;
     this.newWatersPromptEl.classList.remove('visible');
     this.awaitingLevelUpChoice = false;
@@ -1250,6 +1303,7 @@ export class Game {
 
   private levelComplete(): void {
     this.levelCompleted = true;
+    this.resetKillCombo();
     if (this.lostThisLevel === 0) this.tryUnlock('flawlessLevel');
     if (this.mode === 'campaign' && this.currentLevel === 5) this.tryUnlock('halfwayThere');
     if (this.wasOnLastLifeThisLevel) this.tryUnlock('comeback');
@@ -2257,6 +2311,13 @@ export class Game {
   private step(): void {
     if (!this.running || this.awaitingLevelUpChoice || this.awaitingSharkWarning || this.awaitingRunSummary || this.awaitingTutorialHint || this.awaitingMilestone) return;
 
+    // Hit-stop: keep the loop alive but freeze the simulation for a beat after a big kill.
+    if (Date.now() < this.hitStopUntil) {
+      this.lastFrameTime = 0;
+      this.timer = setTimeout(() => this.step(), 16);
+      return;
+    }
+
     const sharkSpeed = parseInt(this.sharkSpeedInput.value, 10) || 1;
 
     const now = Date.now();
@@ -2371,12 +2432,18 @@ export class Game {
           survivingSharks.push(shark);
         } else if (shark === this.matriarch && this.mode === 'endless') {
           this.particles.emit('hit', shark._x * scale + scale / 2, shark._y * scale + scale / 2, 16, { speed: 3, life: 0.6 });
+          this.triggerBigKillFeedback();
           this.fleeMatriarch(shark);
         } else {
           this.particles.emit('hit', shark._x * scale + scale / 2, shark._y * scale + scale / 2, 16, { speed: 3, life: 0.6 });
           this.sharksKilled++;
-          if (shark.large) this.playSharkDeathAnimation(shark);
-          else this.removeSharkSprite(shark);
+          this.registerKillSound();
+          if (shark.large) {
+            this.playSharkDeathAnimation(shark);
+            this.triggerBigKillFeedback();
+          } else {
+            this.removeSharkSprite(shark);
+          }
           this.tryUnlock('firstHuntingKill');
         }
       }
@@ -2387,6 +2454,7 @@ export class Game {
         this.levelComplete();
       } else if (this.matriarch && !this.sharks.includes(this.matriarch) && !this.levelCompleted) {
         this.sharksKilled += this.sharks.length;
+        if (this.sharks.length > 0) this.triggerBigKillFeedback();
         for (const s of this.sharks) {
           if (s.large) this.playSharkDeathAnimation(s);
           else this.removeSharkSprite(s);
@@ -2413,6 +2481,7 @@ export class Game {
             }
             if (victims.length > 0) {
               this.playerHitCooldownUntil = now + 1000;
+              this.resetKillCombo();
               for (const v of victims) {
                 this.particles.emit('hit', v._x * scale + scale / 2, v._y * scale + scale / 2, 12, { speed: 2, life: 0.6 });
                 this.removeDolphinSprite(v);

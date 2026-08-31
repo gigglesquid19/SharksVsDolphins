@@ -98,6 +98,32 @@ class SfxEngine {
     noise.stop(now + 0.15);
   }
 
+  /** Short percussive kill blip whose pitch climbs with the combo step (0-based), then caps. */
+  playSharkKill(step: number): void {
+    const ctx = this.ensureContext();
+    const now = ctx.currentTime;
+
+    const semis = Math.min(Math.max(step, 0), 14) * 1.4;
+    const base = 300 * Math.pow(2, semis / 12);
+
+    this.tone(ctx, base, now, 0.1, { type: 'square', gain: 0.16, glideTo: base * 1.5 });
+    this.tone(ctx, base * 2, now + 0.015, 0.08, { type: 'triangle', gain: 0.09 });
+
+    const noise = ctx.createBufferSource();
+    noise.buffer = this.noiseBuffer(ctx, 0.05);
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 2200;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.14, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+    noise.connect(hp);
+    hp.connect(gain);
+    gain.connect(this.masterGain!);
+    noise.start(now);
+    noise.stop(now + 0.06);
+  }
+
   playRecruit(): void {
     const ctx = this.ensureContext();
     const now = ctx.currentTime;

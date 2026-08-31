@@ -295,6 +295,10 @@ Game Features
 - **Sound**: dynamic background music (see Music below) with a mute toggle
   and volume slider, plus procedurally synthesized sound effects (bite,
   recruit chime, shrimp pickup, storm rumble) via the Web Audio API.
+- **Kill juice**: a brief freeze-frame (hit-stop) and a light screen shake when a
+  large shark is destroyed, and a kill sound whose pitch climbs as you chain
+  kills (resetting after a gap or a lost dolphin). The freeze and shake are
+  skipped under the OS "reduce motion" setting.
 
 Music
 --------------------
