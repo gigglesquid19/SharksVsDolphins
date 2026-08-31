@@ -2541,10 +2541,16 @@ export class Game {
       const podSize = this.getPodSize();
       for (const shark of this.sharks) {
         const unlimitedRange = shark.kind === 'greatWhite' || shark.kind === 'hammerhead';
-        // A pod big enough to ram this shark makes it wary (Matriarch excepted - she's a boss).
+        // A pod big enough to ram this shark makes it wary (Matriarch excepted - she's a boss),
+        // but NOT while the player is boosting: a wary shark holds a buffer of 8 units, which is
+        // wider than a large shark's ram radius (6.3 for a tiger), so it parked itself exactly
+        // outside kill range from the instant the pod qualified - and a large shark can only be
+        // destroyed by a 300ms boost on a 10s cooldown. Boost-ramming one was near impossible.
+        // Now the boost makes them commit: they stop backing off the moment you dash.
         const podThreat =
           !shark.matriarch &&
           this.huntingMode &&
+          !this.sprinting &&
           podSize >= this.sharkPodRequirement(shark.kind, shark.large);
         shark.move(sharkSpeed, this.player, this.sharks, unlimitedRange, now, podThreat);
       }

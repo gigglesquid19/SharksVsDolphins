@@ -148,6 +148,30 @@ describe('Shark.move pod-threat', () => {
     expect(wary.distanceBetween(p)).toBeGreaterThan(3);
   });
 
+  it('holds a buffer wider than a large shark can be rammed from, so the retreat must be cancellable', () => {
+    // Large sharks are only destroyed by a boost-ram, and Game.sharkRamRadius gives a large
+    // tiger 4 * sqrt(2.5) = 6.32. The wary buffer is 8, so a retreating large shark sits
+    // outside kill range: game.ts must clear podThreat while the player sprints, or the shark
+    // is unkillable. This pins the numbers that make that necessary.
+    const LARGE_BUFFER = 8;
+    const largeTigerRamRadius = 4 * Math.sqrt(1 * 2.5); // 6.32
+    const largeHammerheadRamRadius = 4 * Math.sqrt(2 * 1.8); // 7.59
+    expect(largeTigerRamRadius).toBeLessThan(LARGE_BUFFER);
+    expect(largeHammerheadRamRadius).toBeLessThan(LARGE_BUFFER);
+
+    // Behaviourally: a wary large shark reaches beyond ram range, i.e. it can sit where a boost
+    // cannot reach it. Uses a hammerhead - a large tiger would enter its ambush stalk and freeze
+    // (it stays frozen here because `now` is fixed), and a great white would start a charge.
+    const p = playerAt(50, 50);
+    const s = testShark(56, 50, { kind: 'hammerhead', large: true, sizeMultiplier: 1.8 });
+    let furthest = 0;
+    for (let i = 0; i < 15; i++) {
+      s.move(1, p, [s], true, NOW, true);
+      furthest = Math.max(furthest, s.distanceBetween(p));
+    }
+    expect(furthest).toBeGreaterThan(largeHammerheadRamRadius);
+  });
+
   it('still presses toward the player from outside the buffer', () => {
     const p = playerAt(50, 50);
     const s = testShark(20, 50);
