@@ -1050,6 +1050,18 @@ button.mega-shrimp.green {
 .store-item.locked { border-style: dashed; opacity: 0.9; }
 .store-item.locked .store-skin-preview { opacity: 0.75; }
 
+/* --- Continue offer (Android Game Over) --- */
+.continue-panel { text-align: center; }
+.continue-panel p {
+  color: var(--text);
+  line-height: 1.5;
+  margin: 4px 0 12px;
+}
+#continuePayBtn {
+  background: linear-gradient(135deg, #34d399, #0d9488);
+  box-shadow: 0 4px 16px rgba(52, 211, 153, 0.4);
+}
+
 /* --- About Me --- */
 .about-screen {
   position: fixed;

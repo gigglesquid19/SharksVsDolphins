@@ -41,6 +41,10 @@ Contents
 - `src/storeView.ts` - renders and wires the Store screen.
 - `src/share.ts` - Web Share API wrapper (clipboard fallback) for the campaign /
   Level 50 milestone Share buttons and the Voyager-skin reward.
+- `src/platform.ts` - the `isAndroid` flag that gates all monetisation.
+- `src/ads.ts` / `src/iap.ts` - AdMob and Play Billing wrappers (Android only;
+  every method is a no-op on web). Back the paid/rewarded Continue - see
+  Monetisation below.
 - `src/tutorialHints.ts` - first-run tooltip seen/unseen persistence
   (`localStorage`).
 - `src/music.ts` - the ambient/boss track lists and random-pick helper (see
@@ -190,6 +194,47 @@ One-time setup in Play Console / Google Cloud:
 
 Sign-in and score submission only work in a signed build on a real device with a
 tester account - Play Games sign-in does not work on most emulators.
+
+
+Monetisation (Android only)
+--------------------
+The **PWA build has no ads and no purchases** - it is left as-is for testing.
+Everything below is gated on `isAndroid` (`src/platform.ts`); on web
+`ads.available` / `iap.available` are `false` and every code path is skipped.
+
+- **Continue offer** - after an **Endless** Game Over the player is offered one
+  Continue per run: *watch a rewarded ad* (free) or *buy it* (a real
+  `continue_run` consumable). Taking either revives the player mid-run with a
+  fresh 3-dolphin pod and 4s of invulnerability; the sharks, level, and score all
+  carry over. Declining shows the normal run-summary card.
+- **Interstitial** - a full-screen ad every 3rd Endless death, shown at the
+  natural break as the run-summary is dismissed.
+- **No Retry button on Android** - after Game Over the run is genuinely over
+  unless you Continue. The run-summary card and a small Game Over panel gain a
+  **Main Menu** button; Campaign keeps its checkpoint (**Continue Campaign** from
+  the title resumes it).
+
+Local plugins mirror `PlayGamesPlugin`:
+`android/app/src/main/java/.../AdsPlugin.java` (AdMob rewarded + interstitial +
+UMP consent, wrapped by `src/ads.ts`) and `.../BillingPlugin.java` (Play Billing
+consumable, wrapped by `src/iap.ts`).
+
+**Ships with Google's official TEST ad IDs** so a debug build shows test ads and
+can never trip an AdMob policy strike. One-time setup before a production release:
+
+1. **AdMob** -> create an app, plus a **Rewarded** and an **Interstitial** ad
+   unit. Put the real app id in
+   `android/app/src/main/res/values/ads-ids.xml` and the real unit ids in
+   `UNITS` in `src/ads.ts`. Add your test device in the AdMob console.
+2. **AdMob -> Privacy & messaging** -> create a **GDPR** consent message
+   (the UMP flow is already wired in `AdsPlugin.initialize`).
+3. **Play Console -> Monetize -> Products -> In-app products** -> create a
+   **consumable** managed product with ID `continue_run` and a price.
+4. **Play Console -> App content**: *Ads* -> **contains ads**; declare the IAP;
+   update the **Data safety** form (AdMob collects an advertising ID) - Google
+   publishes an AdMob data-safety guidance page to follow.
+5. Test on a **real device** with a licensed test account - ads and billing do
+   not work on most emulators.
 
 How to Play
 --------------------

@@ -50,8 +50,11 @@ FEATURES
 • Procedurally synthesized sound effects and a dynamic ambient / boss
   soundtrack.
 
-No ads. No in-app purchases. No account. No internet connection needed after
-install — everything runs on your device.
+No account needed. The only ads are an optional "watch to continue" after an
+Endless Game Over, plus an occasional full-screen ad between runs — there are no
+banners and nothing interrupts you mid-game. A one-tap purchase to continue a run
+is offered as an alternative to the ad. Everything else runs offline on your
+device.
 ```
 
 **Category:** Game › Arcade  (Action is also fine)
@@ -76,15 +79,29 @@ above is the separate store-listing icon.
 Data safety form
 ----------------
 
-**If you ship WITHOUT Play Games Services** (leaderboard IDs still placeholders):
+> The current Android build **has AdMob + Play Billing wired in** (test IDs by
+> default). Once you ship with real ad IDs, the "without ads" option below no
+> longer applies — AdMob collects a device/advertising ID, so the answer to
+> "collect or share user data" becomes **Yes**. See the AdMob section.
+
+**AdMob (once real ad IDs are set):**
+- **Collect or share user data?** → **Yes**.
+- **Data type:** *Device or other IDs* (the advertising ID), and *App activity*.
+  Collected **and shared** with Google. Purpose: *Advertising or marketing* +
+  *App functionality*. May be used for personalised ads unless the user declines
+  via the UMP consent form.
+- **Encrypted in transit:** Yes. **Deletion:** users reset their advertising ID
+  in Android settings.
+- Follow Google's *AdMob data safety* guidance page for the exact checkboxes.
+- **In-app purchases:** the `continue_run` consumable — no user data beyond
+  what Google Play Billing handles.
+
+**If you ship WITHOUT ads** (test IDs left in, or ad units removed):
 - **Does your app collect or share any of the required user data types?** → **No**
-- Data types collected / shared: none.
+- Rationale: no analytics or accounts; the only persisted data is local
+  `localStorage`, which never leaves the device.
 
-Rationale: no analytics, ads, accounts, or network calls; the only persisted data
-is local `localStorage` (scores, settings, achievements) which never leaves the
-device — under Play's definitions this is not "collection".
-
-**If you ship WITH Play Games Services leaderboards enabled:**
+**If you ship WITH Play Games Services leaderboards enabled** (in addition to the above):
 - **Does your app collect or share any user data?** → **Yes** (via Google Play
   Games Services)
 - **Data type:** *App activity → Other actions / game progress*, and a Play Games
@@ -111,7 +128,8 @@ Answer the IARC questionnaire truthfully; expected answers for this app:
   simulated gambling).
 - **User interaction / user-generated content:** none — no chat, no sharing;
   the dolphin name is stored only on the device and not shared anywhere.
-- **Data collection / location:** none.
+- **Data collection / location:** none (unless real AdMob IDs are set — then an
+  advertising ID is collected; declare it).
 
 Likely outcome: **PEGI 7 / ESRB Everyone 10+ / USK 6** or similar. Google will
 assign the exact ratings from your answers.
@@ -119,8 +137,10 @@ assign the exact ratings from your answers.
 
 App content declarations (Play Console → App content)
 ----------------------------------------------------
-- **Ads:** contains no ads.
-- **In-app purchases:** none.
+- **Ads:** **contains ads** (rewarded + interstitial via AdMob) once real ad IDs
+  are set. With the default test IDs, answer per your test build.
+- **In-app purchases:** **yes** — one consumable, `continue_run` (continue an
+  Endless run). Price range is whatever you set in Play Console.
 - **Target audience:** 13+ recommended (simplest path — avoids the extra
   "designed for families" requirements). The content itself is suitable for
   younger players if you choose to include them.

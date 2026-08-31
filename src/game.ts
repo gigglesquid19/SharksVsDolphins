@@ -49,6 +49,9 @@ import { endlessStartBonuses, equippedSkinId, grantSkin, ownsSkin } from './stor
 import { skinById } from './skins';
 import { shareMilestone, SHARE_REWARD_SKIN } from './share';
 import { playGames } from './playGames';
+import { isAndroid } from './platform';
+import { ads } from './ads';
+import { iap } from './iap';
 
 export type GameMode = 'campaign' | 'endless';
 type LeaderboardBoard = 'campaign' | 'endless';
@@ -179,6 +182,12 @@ export class Game {
   private awaitingMilestone = false;
   /** Set when level 50 is cleared in Endless, so the levelComplete timer shows the milestone overlay. */
   private pendingMilestone = false;
+  /** The Android "Continue your run?" offer is open (gates the loop). */
+  private awaitingContinue = false;
+  /** One paid/ad Continue per Endless run. */
+  private continueUsedThisRun = false;
+  /** Endless deaths this session, for the every-3rd interstitial (Android). */
+  private endlessDeaths = 0;
   /** Achievement ids unlocked during the current run, for the run-summary card. */
   private achievementsThisRun: string[] = [];
   private hintQueue: { heading: string; text: string }[] = [];
@@ -279,9 +288,15 @@ export class Game {
   private runSummaryStatsEl: HTMLElement | null = null;
   private runSummaryAchievementsEl: HTMLElement | null = null;
   private runSummaryShareBtnEl: HTMLButtonElement | null = null;
+  private runSummaryHomeBtnEl: HTMLButtonElement | null = null;
   private milestoneOverlayEl: HTMLDivElement | null = null;
   private milestoneTextEl: HTMLElement | null = null;
   private milestoneRewardEl: HTMLElement | null = null;
+  private continueOverlayEl: HTMLDivElement | null = null;
+  private continueDepthEl: HTMLElement | null = null;
+  private continueAdBtnEl: HTMLButtonElement | null = null;
+  private continuePayBtnEl: HTMLButtonElement | null = null;
+  private gameOverOverlayEl: HTMLDivElement | null = null;
   private tutorialHintOverlayEl: HTMLDivElement | null = null;
   private tutorialHintHeadingEl: HTMLElement | null = null;
   private tutorialHintTextEl: HTMLElement | null = null;
@@ -381,9 +396,15 @@ export class Game {
     this.runSummaryStatsEl = document.getElementById('runSummaryStats');
     this.runSummaryAchievementsEl = document.getElementById('runSummaryAchievements');
     this.runSummaryShareBtnEl = document.getElementById('runSummaryShareBtn') as HTMLButtonElement | null;
+    this.runSummaryHomeBtnEl = document.getElementById('runSummaryHomeBtn') as HTMLButtonElement | null;
     this.milestoneOverlayEl = document.getElementById('milestoneOverlay') as HTMLDivElement | null;
     this.milestoneTextEl = document.getElementById('milestoneText');
     this.milestoneRewardEl = document.getElementById('milestoneReward');
+    this.continueOverlayEl = document.getElementById('continueOverlay') as HTMLDivElement | null;
+    this.continueDepthEl = document.getElementById('continueDepth');
+    this.continueAdBtnEl = document.getElementById('continueAdBtn') as HTMLButtonElement | null;
+    this.continuePayBtnEl = document.getElementById('continuePayBtn') as HTMLButtonElement | null;
+    this.gameOverOverlayEl = document.getElementById('gameOverOverlay') as HTMLDivElement | null;
     this.tutorialHintOverlayEl = document.getElementById('tutorialHintOverlay') as HTMLDivElement | null;
     this.tutorialHintHeadingEl = document.getElementById('tutorialHintHeading') as HTMLElement | null;
     this.tutorialHintTextEl = document.getElementById('tutorialHintText') as HTMLElement | null;
@@ -713,7 +734,7 @@ export class Game {
   }
 
   private pauseGame(): void {
-    if (!this.running || this.paused || this.awaitingLevelUpChoice || this.awaitingSharkWarning || this.awaitingRunSummary || this.awaitingTutorialHint || this.awaitingMilestone) return;
+    if (!this.running || this.paused || this.awaitingLevelUpChoice || this.awaitingSharkWarning || this.awaitingRunSummary || this.awaitingTutorialHint || this.awaitingMilestone || this.awaitingContinue) return;
     this.paused = true;
     if (this.timer) clearTimeout(this.timer);
     this.flushLifetimeStats();
@@ -954,6 +975,11 @@ export class Game {
     this.awaitingMilestone = false;
     this.pendingMilestone = false;
     this.milestoneOverlayEl?.classList.add('hidden');
+    this.awaitingContinue = false;
+    this.continueUsedThisRun = false;
+    this.continueOverlayEl?.classList.add('hidden');
+    this.gameOverOverlayEl?.classList.add('hidden');
+    this.startBtn.classList.remove('hidden');
     this.paused = false;
     this.pauseOverlayEl.classList.add('hidden');
     this.loadBackground(getLevelBackground(config.level)).catch((err) => console.warn('Background load failed:', err));
@@ -1281,12 +1307,27 @@ export class Game {
     if (this.timer) clearTimeout(this.timer);
     this.flushLifetimeStats();
     this.setStatus('Eaten by a shark');
-    this.startBtn.textContent = 'Retry';
     this.showBanner('Game Over', 'gameover');
 
-    // Endless runs end permanently on death (no free checkpoint resume) and record a
-    // depth/survival-time score; this is also the intended hook for a future pay-to-continue offer.
+    // Android only: one Continue per Endless run - watch a rewarded ad or buy it (src/ads.ts, src/iap.ts).
+    if (this.mode === 'endless' && isAndroid && !this.continueUsedThisRun && (ads.available || iap.available)) {
+      this.showContinueOffer();
+      return;
+    }
+    this.finishGameOver();
+  }
+
+  /** The end of a run once Continue is declined / unavailable / already used. */
+  private finishGameOver(): void {
+    if (isAndroid) {
+      // No free retry on Android - the run is over (or you took the Continue offer).
+      this.startBtn.classList.add('hidden');
+    } else {
+      this.startBtn.textContent = 'Retry';
+    }
+
     if (this.mode === 'endless') {
+      this.endlessDeaths++;
       const timeSurvived = this.runElapsed;
       this.pendingScore = {
         board: 'endless',
@@ -1298,7 +1339,88 @@ export class Game {
         },
       };
       this.showRunSummary('endless');
+    } else if (isAndroid) {
+      // Campaign keeps its checkpoint (Continue Campaign from the title); with no Retry
+      // button the player still needs an explicit way back to the menu.
+      this.gameOverOverlayEl?.classList.remove('hidden');
     }
+  }
+
+  /** Android Endless Game Over: offer a one-time Continue (rewarded ad or IAP). */
+  private showContinueOffer(): void {
+    if (!this.continueOverlayEl) {
+      this.finishGameOver();
+      return;
+    }
+    this.awaitingContinue = true;
+    if (this.continueDepthEl) this.continueDepthEl.textContent = `Level ${this.currentLevel}`;
+
+    if (this.continueAdBtnEl) {
+      this.continueAdBtnEl.classList.toggle('hidden', !ads.available);
+      this.continueAdBtnEl.disabled = !ads.rewardedReady;
+      if (ads.available && !ads.rewardedReady) {
+        void ads.preloadRewarded().then((ready) => {
+          if (this.continueAdBtnEl && this.awaitingContinue) this.continueAdBtnEl.disabled = !ready;
+        });
+      }
+    }
+    if (this.continuePayBtnEl) {
+      this.continuePayBtnEl.classList.add('hidden');
+      void iap.continuePrice().then((price) => {
+        if (this.continuePayBtnEl && this.awaitingContinue && price) {
+          this.continuePayBtnEl.textContent = `Continue – ${price}`;
+          this.continuePayBtnEl.classList.remove('hidden');
+        }
+      });
+    }
+
+    this.continueOverlayEl.classList.remove('hidden');
+  }
+
+  async continueViaAd(): Promise<void> {
+    if (this.continueAdBtnEl) this.continueAdBtnEl.disabled = true;
+    const rewarded = await ads.showRewarded();
+    if (rewarded) this.revive();
+    else if (this.continueAdBtnEl) this.continueAdBtnEl.disabled = !ads.rewardedReady;
+  }
+
+  async continueViaPurchase(): Promise<void> {
+    if (this.continuePayBtnEl) this.continuePayBtnEl.disabled = true;
+    const purchased = await iap.buyContinue();
+    if (purchased) this.revive();
+    else if (this.continuePayBtnEl) this.continuePayBtnEl.disabled = false;
+  }
+
+  /** "No Thanks" on the Continue offer - proceed to the normal run-summary. */
+  declineContinue(): void {
+    if (!this.awaitingContinue) return;
+    this.awaitingContinue = false;
+    this.continueOverlayEl?.classList.add('hidden');
+    this.finishGameOver();
+  }
+
+  /** Puts the player back in the water mid-run with a fresh pod. Score / sharks / level all carry over. */
+  private revive(): void {
+    if (!this.player) {
+      this.declineContinue();
+      return;
+    }
+    this.continueUsedThisRun = true;
+    this.awaitingContinue = false;
+    this.continueOverlayEl?.classList.add('hidden');
+
+    this.player.invulnerableUntil = Date.now() + 4000;
+    this.player._x = Math.floor(SIZE / 2);
+    this.player._y = Math.floor(SIZE / 2);
+    for (let i = 0; i < 3; i++) this.spawnRecruitedDolphin(this.player._x, this.player._y);
+
+    this.playerHitCooldownUntil = Date.now() + 4000;
+    this.resetKillCombo();
+    this.running = true;
+    this.setStatus('Back in the water!');
+    this.showBanner('Continue!', 'victory', 1500);
+    this.lastFrameTime = 0;
+    this.step();
   }
 
   private levelComplete(): void {
@@ -1436,6 +1558,8 @@ export class Game {
       this.runSummaryShareBtnEl.textContent = 'Share';
       this.runSummaryShareBtnEl.disabled = false;
     }
+    // On Android there is no Retry button after Game Over - offer an explicit way back to the menu.
+    this.runSummaryHomeBtnEl?.classList.toggle('hidden', !isAndroid);
 
     this.runSummaryOverlayEl.classList.remove('hidden');
   }
@@ -1508,6 +1632,13 @@ export class Game {
     this.milestoneRewardEl.appendChild(caption);
   }
 
+  /** Every 3rd Endless death on Android, show a preloaded interstitial at this natural break. */
+  private maybeInterstitial(board: LeaderboardBoard): void {
+    if (isAndroid && board === 'endless' && this.endlessDeaths > 0 && this.endlessDeaths % 3 === 0) {
+      void ads.maybeShowInterstitial();
+    }
+  }
+
   /** Saves the pending score to the local + Play Games leaderboards under the dolphin's name. */
   submitPendingScore(): void {
     if (!this.pendingScore) return;
@@ -1524,14 +1655,17 @@ export class Game {
     this.pendingScore = null;
     this.awaitingRunSummary = false;
     this.runSummaryOverlayEl?.classList.add('hidden');
+    this.maybeInterstitial(board);
     this.showLeaderboard(board);
   }
 
   /** Dismisses the run-summary card without saving the score. */
   dismissRunSummary(): void {
+    const board = this.pendingScore?.board ?? this.currentLeaderboardBoard;
     this.pendingScore = null;
     this.awaitingRunSummary = false;
     this.runSummaryOverlayEl?.classList.add('hidden');
+    this.maybeInterstitial(board);
   }
 
   showLeaderboard(board: LeaderboardBoard = this.currentLeaderboardBoard): void {
@@ -2309,7 +2443,7 @@ export class Game {
   }
 
   private step(): void {
-    if (!this.running || this.awaitingLevelUpChoice || this.awaitingSharkWarning || this.awaitingRunSummary || this.awaitingTutorialHint || this.awaitingMilestone) return;
+    if (!this.running || this.awaitingLevelUpChoice || this.awaitingSharkWarning || this.awaitingRunSummary || this.awaitingTutorialHint || this.awaitingMilestone || this.awaitingContinue) return;
 
     // Hit-stop: keep the loop alive but freeze the simulation for a beat after a big kill.
     if (Date.now() < this.hitStopUntil) {

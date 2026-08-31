@@ -5,6 +5,8 @@ import { clearRunCheckpoint, loadRunCheckpoint } from './runState';
 import { getDolphinName, hasNamedDolphin, setDolphinName } from './profile';
 import { getPearls } from './pearls';
 import { setupStore } from './storeView';
+import { ads } from './ads';
+import { iap } from './iap';
 import { registerSW } from 'virtual:pwa-register';
 import { Capacitor } from '@capacitor/core';
 
@@ -148,6 +150,10 @@ refreshTitlePearls();
 const store = setupStore({ onPearlsChange: refreshTitlePearls });
 document.getElementById('titleStoreBtn')!.addEventListener('click', () => store.open());
 
+// --- Monetisation (Android only; both no-op on web) ---
+void ads.init();
+void iap.init();
+
 // --- About Me ---
 // TODO: replace with the real Buy Me a Coffee URL.
 const COFFEE_URL = 'https://www.buymeacoffee.com/';
@@ -248,7 +254,9 @@ const inputs = {
     enterAppFromTitle();
   });
   titleContinueBtn.addEventListener('click', () => {
-    if (!savedCheckpoint) return;
+    // Re-read: a checkpoint may have been written this session (e.g. after an Android Game Over).
+    const checkpoint = loadRunCheckpoint();
+    if (!checkpoint) return;
     game.setMode('campaign');
     levelSelectWrap.classList.remove('hidden');
     titleScreen.classList.add('hidden');
@@ -256,7 +264,7 @@ const inputs = {
     appContent.classList.remove('hidden');
     bgMusic.play().catch((err) => console.warn('Music playback failed:', err));
     sfx.resume();
-    game.resumeRun(savedCheckpoint);
+    game.resumeRun(checkpoint);
   });
 
   document.getElementById('leaderboardBtn')!.addEventListener('click', () => game.showLeaderboard());
@@ -268,6 +276,24 @@ const inputs = {
   document.getElementById('runSummarySkipBtn')!.addEventListener('click', () => game.dismissRunSummary());
   document.getElementById('milestoneShareBtn')!.addEventListener('click', () => void game.shareEndless50());
   document.getElementById('milestoneContinueBtn')!.addEventListener('click', () => game.dismissMilestone());
+
+  // Android Game Over: Continue offer + a way back to the menu (no Retry button on Android).
+  function returnToTitle(): void {
+    game.reset();
+    appContent.classList.add('hidden');
+    narrativeScreen.classList.add('hidden');
+    titleScreen.classList.remove('hidden');
+    if (loadRunCheckpoint()) titleContinueBtn.classList.remove('hidden');
+    refreshTitlePearls();
+  }
+  document.getElementById('continueAdBtn')!.addEventListener('click', () => void game.continueViaAd());
+  document.getElementById('continuePayBtn')!.addEventListener('click', () => void game.continueViaPurchase());
+  document.getElementById('continueDeclineBtn')!.addEventListener('click', () => game.declineContinue());
+  document.getElementById('runSummaryHomeBtn')!.addEventListener('click', () => {
+    game.dismissRunSummary();
+    returnToTitle();
+  });
+  document.getElementById('gameOverHomeBtn')!.addEventListener('click', returnToTitle);
   document.getElementById('schoolBtn')!.addEventListener('click', () => game.formSchool());
   document.getElementById('megaPodBtn')!.addEventListener('click', () => game.summonMegaPod());
   document.getElementById('megaShrimpYellow')!.addEventListener('click', () => game.chooseUpgrade('vitality'));

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Required by play-services-ads on Android 13+ (API 33/34) so the Google Mobile
+  Ads SDK can use the Privacy Sandbox Attribution / Topics APIs. Standard boilerplate
+  from Google's docs - safe as-is.
+-->
+<ad-services-config>
+    <attribution allowAllToAccess="true" />
+    <topics allowAllToAccess="true" />
+    <custom-audiences allowAllToAccess="true" />
+</ad-services-config>

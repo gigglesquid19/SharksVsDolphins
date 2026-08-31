@@ -129,6 +129,9 @@ Code / libraries
 |---|---|---|
 | PixiJS (`pixi.js`) | MIT | WebGL renderer — bundled |
 | Capacitor (`@capacitor/core`, `@capacitor/android`) | MIT | native Android wrapper — bundled |
+| Google Mobile Ads SDK (`play-services-ads`) + UMP | [Android Software Development Kit License](https://developer.android.com/studio/terms) | rewarded / interstitial ads — Android build only |
+| Google Play Billing Library (`billing`) | Android SDK License | the paid Continue — Android build only |
+| Google Play Games Services v2 (`play-services-games-v2`) | Android SDK License | leaderboards — Android build only |
 | Vite, Vitest, TypeScript, `vite-plugin-pwa` | MIT | build and test tooling — not shipped |
 
 The game's own source is under the ISC license (see `README.md`).

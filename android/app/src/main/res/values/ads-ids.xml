@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  AdMob identifiers. These are NOT secrets - they ship in every APK.
+
+  `admob_app_id` below is Google's OFFICIAL TEST app id. Replace it with your
+  real AdMob application id (Play Console -> AdMob -> App settings) before a
+  production release. The rewarded / interstitial ad UNIT ids live in
+  src/ads.ts (UNITS), also currently test ids.
+
+  Serving live ads to yourself while developing can get an AdMob account
+  suspended - keep the test ids until you ship, and add your device as an
+  AdMob test device.
+-->
+<resources>
+    <string name="admob_app_id" translatable="false">ca-app-pub-3940256099942544~3347511713</string>
+</resources>

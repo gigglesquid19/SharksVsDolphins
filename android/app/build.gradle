@@ -75,6 +75,12 @@ dependencies {
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     // Play Games Services v2 - backs the local PlayGamesPlugin (leaderboards, sign-in).
     implementation "com.google.android.gms:play-services-games-v2:21.0.0"
+    // AdMob (rewarded Continue + interstitial) - backs AdsPlugin.
+    implementation "com.google.android.gms:play-services-ads:23.6.0"
+    // UMP consent SDK (GDPR message before ads). Bundled with play-services-ads, pinned for clarity.
+    implementation "com.google.android.ump:user-messaging-platform:3.1.0"
+    // Google Play Billing - backs BillingPlugin (the paid Continue consumable).
+    implementation "com.android.billingclient:billing:7.1.1"
     implementation project(':capacitor-android')
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"

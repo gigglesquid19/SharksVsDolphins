@@ -1,4 +1,5 @@
-import { Capacitor, registerPlugin } from '@capacitor/core';
+import { registerPlugin } from '@capacitor/core';
+import { isAndroid } from './platform';
 
 /**
  * Google Play Games Services leaderboards - Android only.
@@ -39,8 +40,7 @@ const LEADERBOARD_IDS = {
 export type OnlineBoard = keyof typeof LEADERBOARD_IDS;
 export type { PlayerScoreResult };
 
-const plugin =
-  Capacitor.getPlatform() === 'android' ? registerPlugin<PlayGamesNative>('PlayGames') : null;
+const plugin = isAndroid ? registerPlugin<PlayGamesNative>('PlayGames') : null;
 
 export const playGames = {
   /** True only in the Android app with the native plugin present. */
