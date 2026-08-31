@@ -645,6 +645,32 @@ export class Game {
     return this.paused;
   }
 
+  /** Snapshot of loop/gate state for the ?diag on-screen readout (see main.ts). */
+  debugSnapshot(): Record<string, unknown> {
+    return {
+      running: this.running,
+      paused: this.paused,
+      loopTimer: !!this.timer,
+      mode: this.mode,
+      level: this.currentLevel,
+      sharks: this.sharks.length,
+      dolphins: this.dolphins.length,
+      pod: this.getPodSize(),
+      gameTime: Math.round(this.gameTime * 10) / 10,
+      activeEvent: this.activeEvent?.type ?? null,
+      awaiting: [
+        this.awaitingSharkWarning && 'sharkWarning',
+        this.awaitingTutorialHint && 'tutorialHint',
+        this.awaitingLevelUpChoice && 'levelUp',
+        this.awaitingRunSummary && 'runSummary',
+        this.awaitingMilestone && 'milestone',
+        this.awaitingContinue && 'continue',
+        this.awaitingNewWaters && 'newWaters',
+      ].filter(Boolean),
+      hitStopMs: Math.max(0, this.hitStopUntil - Date.now()),
+    };
+  }
+
   formSchool(): void {
     if (!this.readyToSchool || this.huntingMode || this.activeEvent?.type === 'jellyfish') return;
     this.huntingMode = true;

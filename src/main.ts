@@ -256,6 +256,23 @@ const inputs = {
 
   inputs.startBtn.addEventListener('click', () => game.retry());
 
+  // ?diag - an on-screen readout of the game loop state, for debugging a freeze on a
+  // device with no console. Load <url>/?diag to enable it.
+  if (new URLSearchParams(location.search).has('diag')) {
+    const panel = document.createElement('pre');
+    panel.style.cssText =
+      'position:fixed;top:0;left:0;z-index:9998;margin:0;padding:6px 8px;background:rgba(2,6,23,.85);' +
+      'color:#7dd3fc;font:11px/1.35 monospace;white-space:pre;pointer-events:none;max-width:60vw';
+    document.body.appendChild(panel);
+    setInterval(() => {
+      try {
+        panel.textContent = JSON.stringify(game.debugSnapshot(), null, 1);
+      } catch (e) {
+        panel.textContent = 'debugSnapshot threw:\n' + String((e as Error)?.stack || e);
+      }
+    }, 250);
+  }
+
   document.getElementById('titleCampaignBtn')!.addEventListener('click', () => {
     clearRunCheckpoint();
     game.setMode('campaign');
