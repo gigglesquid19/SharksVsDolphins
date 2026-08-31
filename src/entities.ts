@@ -89,6 +89,11 @@ export class Shark {
   ambushCooldownEnd = 0;
   ambushDx = 0;
   ambushDy = 0;
+  // Persistent unit heading for smooth steering (0,0 until the first pursuit frame).
+  headingX = 0;
+  headingY = 0;
+  // Large-hammerhead flank side, committed lazily: -1, 0 (unset), or 1.
+  flankSign = 0;
 
   constructor(i: number) {
     this.id = i;
@@ -103,7 +108,38 @@ export class Shark {
     return Math.sqrt((this._x - other._x) ** 2 + (this._y - other._y) ** 2);
   }
 
-  move(speed: number, player: Dolphin | null, sharks: Shark[], unlimitedRange = false, now: number = Date.now()): void {
+  /**
+   * Eases the persistent heading toward a desired direction (turn 0..1). The heading is only
+   * clamped to length <= 1, never inflated, so a shark reversing course dips through near-zero
+   * speed and turns smoothly instead of snapping 180 degrees.
+   */
+  private steer(desiredX: number, desiredY: number, turn: number): void {
+    const dl = Math.hypot(desiredX, desiredY);
+    if (dl < 1e-4) return;
+    const tx = desiredX / dl;
+    const ty = desiredY / dl;
+    if (this.headingX === 0 && this.headingY === 0) {
+      this.headingX = tx;
+      this.headingY = ty;
+      return;
+    }
+    this.headingX += (tx - this.headingX) * turn;
+    this.headingY += (ty - this.headingY) * turn;
+    const hl = Math.hypot(this.headingX, this.headingY);
+    if (hl > 1) {
+      this.headingX /= hl;
+      this.headingY /= hl;
+    }
+  }
+
+  move(
+    speed: number,
+    player: Dolphin | null,
+    sharks: Shark[],
+    unlimitedRange = false,
+    now: number = Date.now(),
+    podThreat = false,
+  ): void {
     if (!player) return;
     const huntRadius = 25;
     const distToPlayer = this.distanceBetween(player);
@@ -127,8 +163,13 @@ export class Shark {
           this.chargeCooldownEnd = now + CHARGE_COOLDOWN;
         }
       } else if (now >= this.chargeCooldownEnd && distToPlayer >= CHARGE_MIN_DIST && distToPlayer <= CHARGE_MAX_DIST) {
-        const odx = directionDelta(player._x, this._x);
-        const ody = player._y - this._y;
+        // Lead the target: aim at where the player will be, not where they are. The dash runs
+        // ~12 ticks; a partial lead means a hard turn during the wind-up still dodges it.
+        const LEAD_TICKS = 7;
+        const predX = wrapX(player._x + (player._x - player.lastX) * LEAD_TICKS);
+        const predY = clampEntityY(player._y + (player._y - player.lastY) * LEAD_TICKS, margin);
+        const odx = directionDelta(predX, this._x);
+        const ody = predY - this._y;
         const d = Math.sqrt(odx * odx + ody * ody);
         if (d > 0) {
           this.chargeDx = odx / d;
@@ -176,10 +217,36 @@ export class Shark {
     }
 
     if (unlimitedRange || distToPlayer <= huntRadius) {
-      const effectiveSpeed = speed * this.speedMultiplier * 0.7;
-      const dx = Math.sign(directionDelta(player._x, this._x));
-      const dy = Math.sign(player._y - this._y);
+      // Continuous heading toward the player - the base of every pursuit behaviour below.
+      const toPlayerX = directionDelta(player._x, this._x);
+      const toPlayerY = player._y - this._y;
+      const dist = Math.hypot(toPlayerX, toPlayerY) || 1;
+      let desX = toPlayerX;
+      let desY = toPlayerY;
 
+      // Large hammerheads swing wide and come in from the side; the offset shrinks to 0 as
+      // they close so they still connect. Two hammerheads on opposite sides form a pincer.
+      const flanking = this.large && this.kind === 'hammerhead';
+      if (flanking) {
+        if (this.flankSign === 0) this.flankSign = toPlayerY >= 0 ? 1 : -1;
+        const perpX = -toPlayerY / dist;
+        const perpY = toPlayerX / dist;
+        // Arc in from the side while far; within ~8 units drop the arc and drive straight so it connects.
+        const offset = dist > 8 ? Math.min(3 + (dist - 8) * 0.5, 12) : 0;
+        desX = toPlayerX + perpX * offset * this.flankSign;
+        desY = toPlayerY + perpY * offset * this.flankSign;
+      }
+
+      // Hunting Mode + a pod big enough to destroy this shark: hang back but keep pressing.
+      if (podThreat) {
+        const buffer = this.large ? 8 : 5;
+        if (dist < buffer) {
+          desX = toPlayerX - (toPlayerX / dist) * buffer * 1.6;
+          desY = toPlayerY - (toPlayerY / dist) * buffer * 1.6;
+        }
+      }
+
+      // Boids-style separation from nearby sharks.
       let sepDx = 0;
       let sepDy = 0;
       for (const other of sharks) {
@@ -192,11 +259,13 @@ export class Shark {
           sepDy += ody / d;
         }
       }
+      desX += sepDx * 3;
+      desY += sepDy * 3;
 
-      const moveX = dx + Math.sign(sepDx) * 0.5;
-      const moveY = dy + Math.sign(sepDy) * 0.5;
-      this._x = keepX(this._x + moveX * effectiveSpeed);
-      this._y = clampEntityY(this._y + moveY * effectiveSpeed, margin);
+      this.steer(desX, desY, flanking ? 0.28 : 0.18);
+      const effectiveSpeed = speed * this.speedMultiplier * 0.7 * (podThreat ? 0.7 : 1);
+      this._x = keepX(this._x + this.headingX * effectiveSpeed);
+      this._y = clampEntityY(this._y + this.headingY * effectiveSpeed, margin);
     } else {
       const wanderSpeed = 1 + Math.random() * 2.5;
       if (Math.random() < 0.5) {

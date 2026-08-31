@@ -83,3 +83,75 @@ describe('Jellyfish', () => {
     expect(jelly.speed).toBeLessThan(0.5);
   });
 });
+
+// --- Advanced pursuit AI (steering, flanking, pod-awareness) ---
+
+const NOW = 1_000_000;
+
+/** A stationary player at (x, y) with matching lastX/lastY (no velocity). */
+function playerAt(x: number, y: number): Dolphin {
+  const d = new Dolphin(0, y, x);
+  d.isPlayer = true;
+  d.lastX = x;
+  d.lastY = y;
+  return d;
+}
+
+function testShark(x: number, y: number, opts: Partial<Shark> = {}): Shark {
+  const s = new Shark(1);
+  s._x = x;
+  s._y = y;
+  s.lastX = x;
+  s.lastY = y;
+  Object.assign(s, opts);
+  return s;
+}
+
+describe('Shark.move smooth pursuit', () => {
+  it('steers a unit heading toward the player and closes distance', () => {
+    const p = playerAt(60, 50);
+    const s = testShark(40, 50);
+    for (let i = 0; i < 15; i++) s.move(1, p, [s], true, NOW);
+    expect(Math.hypot(s.headingX, s.headingY)).toBeCloseTo(1, 2);
+    expect(s.distanceBetween(p)).toBeLessThan(20);
+  });
+});
+
+describe('Shark.move large-hammerhead flank', () => {
+  it('approaches at an angle, not straight at a distant player', () => {
+    const p = playerAt(30, 90);
+    const s = testShark(30, 50, { kind: 'hammerhead', large: true });
+    s.move(1, p, [s], true, NOW);
+    // A head-on chase would leave headingX ~ 0 (the player is directly "below").
+    expect(Math.abs(s.headingX)).toBeGreaterThan(0.2);
+  });
+
+  it('converges on the player once close', () => {
+    const p = playerAt(50, 50);
+    const s = testShark(50, 46, { kind: 'hammerhead', large: true });
+    for (let i = 0; i < 20; i++) s.move(1, p, [s], true, NOW);
+    expect(s.distanceBetween(p)).toBeLessThan(4);
+  });
+});
+
+describe('Shark.move pod-threat', () => {
+  it('backs away when inside the buffer and the pod can kill it', () => {
+    const p = playerAt(50, 50);
+    const wary = testShark(53, 50);
+    const bold = testShark(53, 50);
+    for (let i = 0; i < 12; i++) {
+      wary.move(1, p, [wary], true, NOW, true);
+      bold.move(1, p, [bold], true, NOW, false);
+    }
+    expect(wary.distanceBetween(p)).toBeGreaterThan(bold.distanceBetween(p));
+    expect(wary.distanceBetween(p)).toBeGreaterThan(3);
+  });
+
+  it('still presses toward the player from outside the buffer', () => {
+    const p = playerAt(50, 50);
+    const s = testShark(20, 50);
+    const start = s.distanceBetween(p);
+    for (let i = 0; i < 10; i++) s.move(1, p, [s], true, NOW, true);
+    expect(s.distanceBetween(p)).toBeLessThan(start);
+  });
+});

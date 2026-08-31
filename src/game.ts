@@ -2437,9 +2437,15 @@ export class Game {
     this.moveFollowers();
 
     if (this.activeEvent?.type !== 'jellyfish') {
+      const podSize = this.getPodSize();
       for (const shark of this.sharks) {
         const unlimitedRange = shark.kind === 'greatWhite' || shark.kind === 'hammerhead';
-        shark.move(sharkSpeed, this.player, this.sharks, unlimitedRange, now);
+        // A pod big enough to ram this shark makes it wary (Matriarch excepted - she's a boss).
+        const podThreat =
+          !shark.matriarch &&
+          this.huntingMode &&
+          podSize >= this.sharkPodRequirement(shark.kind, shark.large);
+        shark.move(sharkSpeed, this.player, this.sharks, unlimitedRange, now, podThreat);
       }
     }
 
