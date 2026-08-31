@@ -1302,7 +1302,11 @@ export class Game {
     // so the pod slowly strung out behind instead of holding formation.
     const SLOW_RADIUS = 3;
     const CATCH_UP = 1.5;
-    const wanted = Math.min(speed * CATCH_UP, (dist / SLOW_RADIUS) * speed);
+    // Inside PARK_RADIUS ask for nothing, so a follower stops micro-correcting on the spot.
+    // Safe now that the formation only turns with the player: a moving slot outruns this in a
+    // single tick, so it can never park mid-chase (which is what the old 0.4 radius did).
+    const PARK_RADIUS = 0.15;
+    const wanted = dist < PARK_RADIUS ? 0 : Math.min(speed * CATCH_UP, (dist / SLOW_RADIUS) * speed);
     const desiredVX = dist > 0.001 ? (dx / dist) * wanted : 0;
     const desiredVY = dist > 0.001 ? (dy / dist) * wanted : 0;
 
@@ -2887,9 +2891,14 @@ export class Game {
       tail.rotation = Math.sin(beat) * (fast ? 0.6 : 0.45);
       const stretch = fast ? 1.14 : 1;
 
-      // Keep facing the last horizontal heading; only flip when actually moving sideways.
+      // Keep facing the last horizontal heading; only flip when genuinely swimming sideways.
+      // The threshold is deliberately well above zero: a pod member easing into its formation
+      // slot drifts by hundredths of a unit, and at 0.01 every one of those micro-corrections
+      // mirrored the sprite. The dolphin flip-flopped on the spot, which read as shaking even
+      // though its position was barely changing.
+      const FLIP_THRESHOLD = 0.2;
       let dir = Math.sign(fish.scale.x) || 1;
-      if (Math.abs(dx) > 0.01) dir = dx > 0 ? 1 : -1;
+      if (Math.abs(dx) > FLIP_THRESHOLD) dir = dx > 0 ? 1 : -1;
       fish.scale.set(dir * stretch, 1 / stretch);
       fish.rotation = Math.sin(beat - 0.8) * 0.05 + dir * Math.max(-1.4, Math.min(1.4, dy)) * 0.12;
       fish.y = Math.sin(t * 4.5 + dolphin.id) * 0.7;
