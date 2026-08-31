@@ -947,7 +947,7 @@ button.mega-shrimp.green {
   padding: 24px;
   overflow-y: auto;
   background:
-    linear-gradient(180deg, rgba(2, 6, 23, 0.5), rgba(2, 6, 23, 0.72)),
+    linear-gradient(180deg, rgba(2, 6, 23, 0.35), rgba(2, 6, 23, 0.55)),
     url('/shop-bg.webp') center / cover no-repeat;
 }
 .store-screen.hidden { display: none; }
@@ -956,17 +956,20 @@ button.mega-shrimp.green {
   width: 100%;
   max-width: 720px;
   margin: auto;
-  /* Slightly translucent so the blurred shop scene reads through the panel too. */
-  background: rgba(9, 15, 30, 0.72);
-  backdrop-filter: blur(14px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  /* Mostly see-through: the shop scene shows through the panel, blur keeps text legible. */
+  background: rgba(6, 11, 24, 0.38);
+  backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: var(--radius);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
   padding: 24px;
   display: flex;
   flex-direction: column;
   gap: 20px;
 }
+.store-panel h2,
+.store-panel h3,
+.store-note { text-shadow: 0 1px 4px rgba(2, 6, 23, 0.8); }
 
 .store-header {
   display: flex;
@@ -1008,8 +1011,9 @@ button.mega-shrimp.green {
   gap: 6px;
   padding: 12px;
   text-align: center;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  /* Kept fairly opaque so the tile text stays readable over the visible shop art. */
+  background: rgba(9, 14, 28, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 14px;
 }
 .store-item.equipped {
