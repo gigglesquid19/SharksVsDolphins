@@ -68,7 +68,7 @@ export const DEFAULT_DOLPHIN_PALETTE: DolphinPalette = {
   back: '#1d3149',
   mid: '#4076b6',
   flank: '#93bfe7',
-  belly: '#eef5fc',
+  belly: '#ffffff',
   fin: '#2c5388',
   finEdge: 'rgba(16,28,46,0.4)',
   rim: 'rgba(214,234,255,0.9)',
@@ -144,10 +144,10 @@ function makeDolphinBodyTexture(p: DolphinPalette): Texture {
   // countershaded body, then a rim light clipped to it so the highlight hugs the spine
   const grad = ctx.createLinearGradient(0, -11, 0, 13);
   grad.addColorStop(0, p.back);
-  grad.addColorStop(0.28, p.mid);
-  grad.addColorStop(0.52, '#6ba0d6');
-  grad.addColorStop(0.7, p.flank);
-  grad.addColorStop(0.88, p.belly);
+  grad.addColorStop(0.24, p.mid);
+  grad.addColorStop(0.44, '#6ba0d6');
+  grad.addColorStop(0.58, p.flank);
+  grad.addColorStop(0.72, p.belly);
   grad.addColorStop(1, p.belly);
   silhouette();
   ctx.save();
