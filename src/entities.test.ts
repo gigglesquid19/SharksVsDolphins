@@ -118,6 +118,60 @@ describe('Shark.move smooth pursuit', () => {
   });
 });
 
+describe('Shark.move idle search', () => {
+  // A tiger only wanders when the player is outside its 25-unit hunt radius and it has no
+  // unlimited range (great whites / hammerheads always pursue, so they never idle).
+  function wanderPath(ticks: number) {
+    const p = playerAt(95, 95);
+    const s = testShark(20, 50);
+    const vecs: [number, number][] = [];
+    for (let i = 0; i < ticks; i++) {
+      const bx = s._x;
+      const by = s._y;
+      s.move(1, p, [s], false, NOW);
+      let vx = s._x - bx;
+      if (vx > 50) vx -= 100;
+      if (vx < -50) vx += 100;
+      const vy = s._y - by;
+      if (Math.hypot(vx, vy) > 0.01) vecs.push([vx, vy]);
+    }
+    return { s, vecs };
+  }
+
+  it('cruises instead of twitching on the spot', () => {
+    const { vecs } = wanderPath(200);
+    // The old wander rolled a fresh random axis/sign/distance each tick: ~87 degrees of
+    // direction change per tick and 13% outright reversals. A cruising shark turns gently.
+    let sum = 0;
+    let reversals = 0;
+    for (let i = 1; i < vecs.length; i++) {
+      const a = Math.atan2(vecs[i - 1][1], vecs[i - 1][0]);
+      const b = Math.atan2(vecs[i][1], vecs[i][0]);
+      let diff = Math.abs(b - a) * (180 / Math.PI);
+      if (diff > 180) diff = 360 - diff;
+      sum += diff;
+      if (diff > 150) reversals++;
+    }
+    expect(sum / (vecs.length - 1)).toBeLessThan(20);
+    expect(reversals).toBeLessThan(vecs.length * 0.05);
+  });
+
+  it('actually gets somewhere rather than milling in place', () => {
+    const { s } = wanderPath(200);
+    expect(s.distanceBetween({ _x: 20, _y: 50 })).toBeGreaterThan(10);
+  });
+
+  it('stays within the vertical bounds while searching', () => {
+    const p = playerAt(95, 95);
+    const s = testShark(20, 50);
+    for (let i = 0; i < 400; i++) {
+      s.move(1, p, [s], false, NOW);
+      expect(s._y).toBeGreaterThanOrEqual(0);
+      expect(s._y).toBeLessThanOrEqual(100);
+    }
+  });
+});
+
 describe('Shark.move large-hammerhead flank', () => {
   it('approaches at an angle, not straight at a distant player', () => {
     const p = playerAt(30, 90);

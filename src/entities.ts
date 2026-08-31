@@ -13,6 +13,11 @@ const AMBUSH_COOLDOWN = 3000;
 const AMBUSH_RANGE = 25;
 const AMBUSH_MIN_DIST = 2;
 const AMBUSH_SPEED = 3;
+// Idle "searching" cruise: how far the wander angle can drift per tick (radians), how quickly
+// the shark turns onto it, and its cruise speed as a fraction of the pursuit speed.
+const WANDER_TURN = 0.5;
+const WANDER_STEER = 0.12;
+const WANDER_SPEED = 0.6;
 
 export class Dolphin {
   id: number;
@@ -98,6 +103,8 @@ export class Shark {
   headingY = 0;
   // Large-hammerhead flank side, committed lazily: -1, 0 (unset), or 1.
   flankSign = 0;
+  /** Direction the shark is idly cruising in, random-walked while searching. */
+  wanderAngle = 0;
 
   constructor(i: number) {
     this.id = i;
@@ -273,13 +280,36 @@ export class Shark {
       this._x = keepX(this._x + this.headingX * effectiveSpeed);
       this._y = clampEntityY(this._y + this.headingY * effectiveSpeed, margin);
     } else {
-      const wanderSpeed = 1 + Math.random() * 2.5;
-      if (Math.random() < 0.5) {
-        this._x = keepX(this._x + (Math.random() < 0.5 ? 1 : -1) * wanderSpeed);
+      // Idle search. The old version rolled a fresh random axis, sign and distance every tick,
+      // so a searching shark twitched on the spot instead of going anywhere. Now it holds a
+      // wander angle and random-walks the ANGLE, not the position: the shark cruises in long
+      // lazy arcs, and because it steers the same persistent heading the pursuit branch uses,
+      // spotting the player turns into a smooth acceleration rather than a snap.
+      if (this.headingX === 0 && this.headingY === 0) {
+        this.wanderAngle = Math.random() * Math.PI * 2;
       }
-      if (Math.random() < 0.5) {
-        this._y = clampEntityY(this._y + (Math.random() < 0.5 ? 1 : -1) * wanderSpeed, margin);
-      }
+      this.wanderAngle += (Math.random() - 0.5) * WANDER_TURN;
+      let desX = Math.cos(this.wanderAngle);
+      let desY = Math.sin(this.wanderAngle);
+
+      // Bank away from the surface and the sea floor instead of sliding along the clamp. The
+      // weight has to exceed 1 to actually turn the shark around: at weight 1 it only cancels a
+      // heading pointed straight out of bounds, so the shark ran along the edge instead.
+      const edge = 12;
+      const EDGE_PUSH = 2.5;
+      const floor = SIZE - 1 - margin;
+      if (this._y < margin + edge) desY += (EDGE_PUSH * (margin + edge - this._y)) / edge;
+      else if (this._y > floor - edge) desY -= (EDGE_PUSH * (this._y - (floor - edge))) / edge;
+
+      this.steer(desX, desY, WANDER_STEER);
+      // Cruising, not hunting: noticeably slower than the 0.95 pursuit speed, so a shark that
+      // notices you visibly picks up pace.
+      const cruise = speed * this.speedMultiplier * WANDER_SPEED;
+      this._x = keepX(this._x + this.headingX * cruise);
+      this._y = clampEntityY(this._y + this.headingY * cruise, margin);
+      // The wander angle is deliberately NOT re-synced to the heading here: letting it run
+      // ahead is what gives the shark a heading to lean into. Snapping it back each tick
+      // averaged the randomness away and the shark cruised in near-perfect straight lines.
     }
   }
 }
