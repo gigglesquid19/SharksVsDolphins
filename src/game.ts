@@ -448,15 +448,6 @@ export class Game {
     return Math.max(0, Math.min(1, (now - startedAt) / total));
   }
 
-  start(): void {
-    if (!this.initModel(this.getSelectedLevelConfig())) return;
-    this.sessionStartTime = Date.now();
-    this.running = true;
-    this.startBtn.textContent = 'Restart';
-    this.setStatus('Swimming');
-    this.step();
-  }
-
   reset(): void {
     this.running = false;
     if (this.timer) clearTimeout(this.timer);
@@ -467,16 +458,19 @@ export class Game {
     this.startBtn.textContent = 'Start';
   }
 
+  /**
+   * The Start / Restart / Retry button. On the first press of a session (also true right
+   * after Reset) this begins a fresh run at the picked level; every later press is a genuine
+   * retry of the current level with upgrades and run stats kept.
+   */
   retry(): void {
-    const config = getLevelConfig(this.currentLevel);
-    if (this.sessionStartTime === 0) {
-      this.sessionStartTime = Date.now();
-    } else {
-      this.retries++;
-    }
-    if (!this.initModel(config, true)) return;
+    const firstRun = this.sessionStartTime === 0;
+    const config = firstRun ? this.getSelectedLevelConfig() : getLevelConfig(this.currentLevel);
+    if (!this.initModel(config, !firstRun)) return;
+    if (firstRun) this.sessionStartTime = Date.now();
+    else this.retries++;
     this.running = true;
-    this.startBtn.textContent = 'Retry';
+    this.startBtn.textContent = firstRun ? 'Restart' : 'Retry';
     this.setStatus('Swimming');
     this.step();
   }
