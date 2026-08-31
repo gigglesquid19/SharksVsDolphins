@@ -421,18 +421,24 @@ const inputs = {
       const reservedTop = controlsEl ? controlsEl.getBoundingClientRect().bottom + gap : 0;
       canvasWrap.style.paddingTop = `${reservedTop}px`;
 
-      // The world grid is a fixed 1:1 square, but a phone screen isn't - a true square bounded
-      // by width alone only ever covers ~45-55% of a tall screen. Instead of preserving the
-      // square, fill most of both dimensions independently (mild stretch, not a hard crop) so
-      // the play area actually covers most of the screen. WIDTH_FILL/HEIGHT_FILL leave a small
-      // breathing-room margin rather than going fully edge-to-edge.
+      // The world grid is a fixed 1:1 square, so the canvas is sized as a square: the largest
+      // one that fits both budgets. Filling width and height independently did cover more of a
+      // tall phone screen, but it stretched the world - on a wide window it came out over 3:1,
+      // with circular things drawn as ellipses and vertical distances reading differently from
+      // horizontal ones. WIDTH_FILL/HEIGHT_FILL leave breathing room rather than going fully
+      // edge-to-edge; the height budget also keeps the fixed d-pad row clear of the play area.
       const WIDTH_FILL = 0.98;
-      const HEIGHT_FILL = 0.7;
+      const HEIGHT_FILL = 0.86;
       const availableHeight = window.innerHeight - reservedTop;
-      gameCanvas.style.width = `${window.innerWidth * WIDTH_FILL}px`;
-      gameCanvas.style.height = `${availableHeight * HEIGHT_FILL}px`;
+      const side = Math.max(1, Math.min(window.innerWidth * WIDTH_FILL, availableHeight * HEIGHT_FILL));
+      gameCanvas.style.width = `${side}px`;
+      gameCanvas.style.height = `${side}px`;
     } else {
       canvasWrap.style.paddingTop = '';
+      // Clear the sizes Pixi writes inline (autoDensity) as well as anything the compact layout
+      // left behind, so the stylesheet's `canvas { width: 100%; height: auto }` takes over and
+      // the stage fills the panel. Pixi pins the canvas to its 600px backing-store size, which
+      // beats the stylesheet and left a strip of dead panel down the right-hand side.
       gameCanvas.style.width = '';
       gameCanvas.style.height = '';
     }
@@ -494,9 +500,10 @@ const inputs = {
     syncStageTop();
   });
 
-  window.addEventListener('resize', () => {
-    if (isCompactLayout()) applyFullscreenCanvasSize();
-  });
+  // Unconditional: the normal-layout branch is what clears Pixi's inline sizing, so it has to
+  // run on load and on every resize, not only while a compact layout is active.
+  window.addEventListener('resize', applyFullscreenCanvasSize);
+  applyFullscreenCanvasSize();
 
   if (Capacitor.isNativePlatform()) {
     enableNativeCompactLayout();
