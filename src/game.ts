@@ -35,6 +35,7 @@ import { RunCheckpoint, clearRunCheckpoint, saveRunCheckpoint } from './runState
 import { hasSeenHint, markHintSeen, HintId } from './tutorialHints';
 import { AMBIENT_TRACKS, BOSS_TRACKS, pickRandomTrack } from './music';
 import { ACHIEVEMENTS, AchievementId, getUnlockedMap, unlock } from './achievements';
+import { bumpLifetime, recordPlayDay } from './lifetimeStats';
 import { playGames } from './playGames';
 
 export type GameMode = 'campaign' | 'endless';
@@ -160,6 +161,14 @@ export class Game {
   private sharksKilled = 0;
   private lostThisLevel = 0;
   private sessionStartTime = 0;
+  // Lifetime-achievement bookkeeping (see flushLifetimeStats / src/lifetimeStats.ts).
+  private syncedSharkKills = 0;
+  private unsyncedPlaySeconds = 0;
+  private lifetimeFlushAt = 0;
+  private playDayRecorded = false;
+  private wasOnLastLifeThisLevel = false;
+  private lostAtSwarmStart = 0;
+  private achievementQueue: { icon: string; name: string }[] = [];
   private sprinting = false;
   private sprintEndTime = 0;
   private sprintCooldownEnd = 0;
@@ -482,6 +491,8 @@ export class Game {
     this.totalRecruited = checkpoint.totalRecruited;
     this.totalLost = checkpoint.totalLost;
     this.sharksKilled = checkpoint.sharksKilled;
+    // Kills up to the checkpoint were already added to the lifetime total last session.
+    this.syncedSharkKills = checkpoint.sharksKilled;
     this.totalDolphinsSaved = checkpoint.totalDolphinsSaved;
     this.seenSharkKinds = new Set(checkpoint.seenSharkKinds);
     this.seenLargeSharkKinds = new Set(checkpoint.seenLargeSharkKinds);
@@ -549,6 +560,7 @@ export class Game {
     if (!this.megaPodAvailable || !this.player) return;
     this.megaPodAvailable = false;
     this.megaPodBtnWrap?.classList.add('hidden');
+    this.tryUnlock('megaPod');
 
     const count = this.totalDolphinsSaved;
     for (let i = 0; i < count; i++) {
@@ -611,6 +623,7 @@ export class Game {
     if (!this.running || this.paused || this.awaitingLevelUpChoice || this.awaitingSharkWarning || this.awaitingTutorialHint) return;
     this.paused = true;
     if (this.timer) clearTimeout(this.timer);
+    this.flushLifetimeStats();
     this.setStatus('Paused');
     this.pauseOverlayEl.classList.remove('hidden');
   }
@@ -761,8 +774,13 @@ export class Game {
       this.sessionStartTime = 0;
       this.totalDolphinsSaved = 0;
       this.lastMusicLevel = 0;
+      this.syncedSharkKills = 0;
+      this.unsyncedPlaySeconds = 0;
+      this.lifetimeFlushAt = 20;
+      this.playDayRecorded = false;
       this.leaderboardOverlayEl?.classList.add('hidden');
     }
+    this.wasOnLastLifeThisLevel = false;
 
     for (let i = 0; i < this.charismaBonusDolphins; i++) {
       this.spawnRecruitedDolphin(px, py);
@@ -981,6 +999,9 @@ export class Game {
 
   /** Endless mode: instead of being destroyed, the Matriarch flashes damaged and swims off - she'll be back. */
   private fleeMatriarch(shark: Shark): void {
+    // The Matriarch first appears at level 10, then every 10 levels; seeing her off at 20+
+    // means the player has now survived a second encounter.
+    if (this.currentLevel >= 20) this.tryUnlock('matriarchRematch');
     const sprite = this.sharkSprites.get(shark);
     if (sprite) {
       this.sharkSprites.delete(shark);
@@ -1127,6 +1148,7 @@ export class Game {
     this.running = false;
     this.totalLost++;
     if (this.timer) clearTimeout(this.timer);
+    this.flushLifetimeStats();
     this.setStatus('Eaten by a shark');
     this.startBtn.textContent = 'Retry';
     this.showBanner('Game Over', 'gameover');
@@ -1151,6 +1173,9 @@ export class Game {
   private levelComplete(): void {
     this.levelCompleted = true;
     if (this.lostThisLevel === 0) this.tryUnlock('flawlessLevel');
+    if (this.mode === 'campaign' && this.currentLevel === 5) this.tryUnlock('halfwayThere');
+    if (this.wasOnLastLifeThisLevel) this.tryUnlock('comeback');
+    this.flushLifetimeStats();
     this.saveDolphinsAndDepart();
     this.setStatus('All sharks destroyed!');
 
@@ -1178,8 +1203,12 @@ export class Game {
   private saveDolphinsAndDepart(): void {
     if (!this.player) return;
     if (this.mode === 'campaign') {
-      this.totalDolphinsSaved += this.getPodSize();
+      const pod = this.getPodSize();
+      this.totalDolphinsSaved += pod;
       this.updateDolphinsSavedBadge();
+      const lifetime = bumpLifetime('dolphinsSaved', pod);
+      if (lifetime >= 1000) this.tryUnlock('guardianOfThePod');
+      else if (lifetime >= 100) this.tryUnlock('homebound');
     }
     for (const dolphin of this.dolphins) {
       if (!dolphin.isPlayer) {
@@ -1206,6 +1235,12 @@ export class Game {
         sharksKilled: this.sharksKilled,
       },
     };
+
+    this.flushLifetimeStats();
+    if (timeToSaveOcean <= 720) this.tryUnlock('speedrunner');
+    if (this.retries === 0) this.tryUnlock('noDoOvers');
+    if (this.totalLost === 0) this.tryUnlock('flawlessCampaign');
+
     this.setStatus('You cleared the campaign! The ocean is safe.');
     this.startBtn.textContent = 'Retry';
     this.showBanner('Ocean Saved!', 'victory');
@@ -1401,6 +1436,12 @@ export class Game {
     this.awaitingNewWaters = false;
     this.newWatersPromptEl.classList.remove('visible');
     this.currentLevel += 1;
+    this.wasOnLastLifeThisLevel = false;
+    if (this.mode === 'endless') {
+      if (this.currentLevel >= 15) this.tryUnlock('deepDiver');
+      if (this.currentLevel >= 25) this.tryUnlock('abyssal');
+      if (this.currentLevel >= 40) this.tryUnlock('intoTheTrench');
+    }
     const config = getLevelConfig(this.currentLevel);
 
     this.setStatus(`Level ${this.currentLevel}: hunt the sharks!`);
@@ -1522,25 +1563,53 @@ export class Game {
     }
   }
 
-  /** Unlocks an achievement if it isn't already, and pops the toast if this is a new unlock. Non-blocking. */
+  /** Unlocks an achievement if it isn't already, queueing its toast if this is a new unlock. Non-blocking. */
   private tryUnlock(id: AchievementId): void {
     const def = unlock(id);
-    if (def) this.announceAchievement(def.icon, def.name);
+    if (!def) return;
+    this.achievementQueue.push({ icon: def.icon, name: def.name });
+    this.processAchievementQueue();
   }
 
-  private announceAchievement(icon: string, name: string): void {
-    sfx.playAchievement();
-    if (!this.achievementToastEl || !this.achievementToastNameEl) return;
-    if (this.achievementToastTimeout) {
-      clearTimeout(this.achievementToastTimeout);
-      this.achievementToastTimeout = null;
+  /** Shows queued achievement toasts one at a time - a single event (a campaign clear especially)
+   * can unlock several at once, and the old single-toast code just overwrote them. */
+  private processAchievementQueue(): void {
+    if (this.achievementToastTimeout || this.achievementQueue.length === 0) return;
+    if (!this.achievementToastEl || !this.achievementToastNameEl) {
+      this.achievementQueue = [];
+      return;
     }
-    if (this.achievementToastIconEl) this.achievementToastIconEl.textContent = icon;
-    this.achievementToastNameEl.textContent = name;
+    const next = this.achievementQueue.shift()!;
+    sfx.playAchievement();
+    if (this.achievementToastIconEl) this.achievementToastIconEl.textContent = next.icon;
+    this.achievementToastNameEl.textContent = next.name;
     this.achievementToastEl.classList.add('visible');
     this.achievementToastTimeout = setTimeout(() => {
       this.achievementToastEl?.classList.remove('visible');
-    }, 3200);
+      this.achievementToastTimeout = setTimeout(() => {
+        this.achievementToastTimeout = null;
+        this.processAchievementQueue();
+      }, 350);
+    }, 2600);
+  }
+
+  /** Pushes this run's new shark kills and elapsed play time into the persistent lifetime
+   * totals and unlocks the cumulative achievements. Called at run-end points and periodically
+   * from step(); safe to call repeatedly (it only ever adds the un-synced delta). */
+  private flushLifetimeStats(): void {
+    const newKills = this.sharksKilled - this.syncedSharkKills;
+    if (newKills > 0) {
+      this.syncedSharkKills = this.sharksKilled;
+      const total = bumpLifetime('sharksKilled', newKills);
+      if (total >= 1000) this.tryUnlock('sharkaggeddon');
+      else if (total >= 100) this.tryUnlock('sharkCentury');
+    }
+    const wholeSeconds = Math.floor(this.unsyncedPlaySeconds);
+    if (wholeSeconds > 0) {
+      this.unsyncedPlaySeconds -= wholeSeconds;
+      const total = bumpLifetime('playSeconds', wholeSeconds);
+      if (total >= 36000) this.tryUnlock('theLongGame');
+    }
   }
 
   showAchievements(): void {
@@ -1718,6 +1787,7 @@ export class Game {
 
   private startJellyfishSwarm(): void {
     this.activeEvent = { type: 'jellyfish', endsAt: this.gameTime + JELLYFISH_SWARM_DURATION };
+    this.lostAtSwarmStart = this.totalLost;
     this.clearJellyfish();
     for (let i = 0; i < JELLYFISH_COUNT; i++) {
       const y = 2 + Math.random() * (SIZE - 4);
@@ -1744,6 +1814,7 @@ export class Game {
     this.clearJellyfish();
     this.activeEvent = null;
     this.setStatus('The swarm has passed');
+    if (this.totalLost === this.lostAtSwarmStart) this.tryUnlock('throughTheSwarm');
   }
 
   private updateJellyfish(): void {
@@ -2155,6 +2226,11 @@ export class Game {
               this.gameOver();
               return;
             }
+            // On the last life: pod down to just the player, no extra lives left. Clearing
+            // the level from here unlocks Comeback (checked in levelComplete()).
+            if (this.getPodSize() === 1 && this.vitalityLives === 0) {
+              this.wasOnLastLifeThisLevel = true;
+            }
             break;
           }
         }
@@ -2203,6 +2279,18 @@ export class Game {
 
     if (this.startTime === 0) this.startTime = now;
     this.gameTime = (now - this.startTime) / 1000;
+
+    // Lifetime stats: count this frame's play time, record the play-day once per run,
+    // and flush accumulated totals to storage every ~20s so a force-quit loses little.
+    this.unsyncedPlaySeconds += dt;
+    if (!this.playDayRecorded) {
+      this.playDayRecorded = true;
+      if (recordPlayDay() >= 7) this.tryUnlock('devoted');
+    }
+    if (this.gameTime >= this.lifetimeFlushAt) {
+      this.lifetimeFlushAt = this.gameTime + 20;
+      this.flushLifetimeStats();
+    }
 
     this.updateEvents();
     this.updateMatriarch();

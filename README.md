@@ -25,6 +25,9 @@ Contents
   separate boards for Campaign and Endless.
 - `src/achievements.ts` - the achievement definitions and unlock/seen
   persistence (`localStorage`).
+- `src/lifetimeStats.ts` - cumulative cross-run totals (dolphins saved, sharks
+  killed, play time, distinct play days) backing the lifetime achievements;
+  `localStorage`.
 - `src/tutorialHints.ts` - first-run tooltip seen/unseen persistence
   (`localStorage`).
 - `src/music.ts` - the ambient/boss track lists and random-pick helper (see
@@ -266,10 +269,14 @@ sources and licenses. To re-derive the served copies from source, run them
 through `ffmpeg -i <src> -c:a libmp3lame -q:a 3 -ar 44100 -ac 2 -map_metadata -1`.
 - **Pause menu**: freezes the simulation and timers; resume, restart, or
   reset from the overlay, or toggle with `Esc`/`P`.
-- **Achievements**: five one-time unlocks (first recruit, first Hunting Mode
-  kill, a flawless level, surviving a storm, defeating the Matriarch), each
-  with a toast + chime on unlock and a checklist viewable from the
-  Achievements button, persisted locally so they carry across runs.
+- **Achievements**: 22 one-time unlocks, each with a toast + chime and a
+  checklist behind the Achievements button, persisted locally. Most track a
+  single run (first recruit, a flawless level, clearing level 5, a sub-12-minute
+  campaign, a no-retry campaign, reaching Endless level 15/25/40, summoning the
+  Mega Pod, ...); a handful are cumulative across every run (save 100 / 1,000
+  dolphins, destroy 100 / 1,000 sharks, play on 7 days, 10 hours total) and are
+  backed by `src/lifetimeStats.ts`. When multiple unlock at once (a campaign
+  clear can trigger several) the toasts queue and show in turn.
 - **First-run tutorial hints**: short one-time tooltips explain Form Pod,
   Hunting Mode, and the Mega Shrimp choices the first time each triggers.
 - **Mobile-first controls**: on-screen D-pad or a draggable joystick (your

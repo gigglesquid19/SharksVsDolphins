@@ -6,14 +6,36 @@ beforeEach(() => {
 });
 
 describe('ACHIEVEMENTS', () => {
-  it('defines the expected five achievements', () => {
+  it('defines the full achievement set in order', () => {
     expect(ACHIEVEMENTS.map((a) => a.id)).toEqual([
       'firstRecruit',
       'firstHuntingKill',
       'flawlessLevel',
       'stormSurvivor',
       'matriarchSlayer',
+      'halfwayThere',
+      'speedrunner',
+      'noDoOvers',
+      'flawlessCampaign',
+      'matriarchRematch',
+      'deepDiver',
+      'abyssal',
+      'intoTheTrench',
+      'megaPod',
+      'homebound',
+      'guardianOfThePod',
+      'sharkCentury',
+      'sharkaggeddon',
+      'throughTheSwarm',
+      'comeback',
+      'devoted',
+      'theLongGame',
     ]);
+  });
+
+  it('has no duplicate ids', () => {
+    const ids = ACHIEVEMENTS.map((a) => a.id);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 
   it('gives every achievement a name, description, and icon', () => {
