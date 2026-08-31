@@ -36,7 +36,16 @@ import { hasSeenHint, markHintSeen, HintId } from './tutorialHints';
 import { AMBIENT_TRACKS, BOSS_TRACKS, pickRandomTrack } from './music';
 import { ACHIEVEMENTS, AchievementId, getUnlockedMap, unlock } from './achievements';
 import { bumpLifetime, recordPlayDay } from './lifetimeStats';
+import {
+  awardPearls,
+  getPearls,
+  pearlsForLevel,
+  PEARLS_CAMPAIGN_CLEAR,
+  PEARLS_FLAWLESS_CAMPAIGN_BONUS,
+} from './pearls';
 import { getDolphinName } from './profile';
+import { endlessStartBonuses, equippedSkinId } from './store';
+import { skinById } from './skins';
 import { playGames } from './playGames';
 
 export type GameMode = 'campaign' | 'endless';
@@ -186,6 +195,8 @@ export class Game {
   private sprintEndTime = 0;
   private sprintCooldownEnd = 0;
   private sprintCooldownReduction = 0;
+  /** Extra sprint duration in ms from the Store's Boost Duration upgrade (Endless only). */
+  private sprintDurationBonus = 0;
   private vitalityLives = 0;
   private speedBonusPct = 0;
   private charismaBonusDolphins = 0;
@@ -219,6 +230,9 @@ export class Game {
   private levelBadgeNumberEl: HTMLElement | null = null;
   private dolphinsSavedBadgeEl: HTMLElement | null = null;
   private dolphinsSavedNumberEl: HTMLElement | null = null;
+  private pearlsNumberEl: HTMLElement | null = null;
+  /** Pearls earned in the current run, shown on the run-summary card. */
+  private pearlsThisRun = 0;
   private startWithPodCheckbox: HTMLInputElement | null = null;
   private startWith8PodCheckbox: HTMLInputElement | null = null;
   private bannerEl: HTMLDivElement;
@@ -361,6 +375,7 @@ export class Game {
     this.levelBadgeNumberEl = document.getElementById('levelBadgeNumber');
     this.dolphinsSavedBadgeEl = document.getElementById('dolphinsSavedBadge');
     this.dolphinsSavedNumberEl = document.getElementById('dolphinsSavedNumber');
+    this.pearlsNumberEl = document.getElementById('pearlsNumber');
     this.startWithPodCheckbox = document.getElementById('startWithPodCheckbox') as HTMLInputElement | null;
     this.startWith8PodCheckbox = document.getElementById('startWith8PodCheckbox') as HTMLInputElement | null;
 
@@ -454,10 +469,15 @@ export class Game {
 
   /** 0 right after sprinting, ramping up to 1 once the cooldown has fully recharged - lets the UI
    * show a recharge indicator on the Sprint button instead of it just silently becoming usable. */
+  /** Sprint duration in ms: the base plus the Store's Boost Duration upgrade. */
+  private sprintDurationMs(): number {
+    return SPRINT_DURATION + this.sprintDurationBonus;
+  }
+
   getSprintCooldownFraction(): number {
     const now = Date.now();
     if (now >= this.sprintCooldownEnd) return 1;
-    const total = SPRINT_DURATION + Math.max(3000, SPRINT_COOLDOWN - this.sprintCooldownReduction);
+    const total = this.sprintDurationMs() + Math.max(3000, SPRINT_COOLDOWN - this.sprintCooldownReduction);
     const startedAt = this.sprintCooldownEnd - total;
     return Math.max(0, Math.min(1, (now - startedAt) / total));
   }
@@ -774,6 +794,7 @@ export class Game {
       this.speedBonusPct = 0;
       this.charismaBonusDolphins = 0;
       this.sprintCooldownReduction = 0;
+      this.sprintDurationBonus = 0;
       this.seenSharkKinds = new Set<SharkKind>();
       this.seenLargeSharkKinds = new Set<SharkKind>();
       this.seenLargeSharkVariety = false;
@@ -787,11 +808,23 @@ export class Game {
       this.lastMusicLevel = 0;
       this.syncedSharkKills = 0;
       this.lastBoostNudgeTime = 0;
+      this.pearlsThisRun = 0;
       this.achievementsThisRun = [];
       this.unsyncedPlaySeconds = 0;
       this.lifetimeFlushAt = 20;
       this.playDayRecorded = false;
       this.leaderboardOverlayEl?.classList.add('hidden');
+
+      // Endless only: the Store's permanent upgrades seed this run's starting stats;
+      // in-run Mega Shrimp picks then add on top (chooseUpgrade). Campaign is untouched.
+      if (this.mode === 'endless') {
+        const b = endlessStartBonuses();
+        this.vitalityLives = b.vitalityLives;
+        this.speedBonusPct = b.speedBonusPct;
+        this.charismaBonusDolphins = b.charismaBonusDolphins;
+        this.sprintCooldownReduction = b.sprintCooldownReduction;
+        this.sprintDurationBonus = b.sprintDurationBonus;
+      }
     }
     this.wasOnLastLifeThisLevel = false;
 
@@ -860,6 +893,7 @@ export class Game {
     this.announceLevel();
     this.applyLevelMusic();
     this.updateDolphinsSavedBadge();
+    this.updatePearlsBadge();
     return true;
   }
 
@@ -876,6 +910,19 @@ export class Game {
   private updateDolphinsSavedBadge(): void {
     this.dolphinsSavedBadgeEl?.classList.toggle('hidden', this.mode !== 'campaign');
     if (this.dolphinsSavedNumberEl) this.dolphinsSavedNumberEl.textContent = String(this.totalDolphinsSaved);
+  }
+
+  /** The persisted Pearl balance, shown in both modes (see src/pearls.ts). */
+  private updatePearlsBadge(): void {
+    if (this.pearlsNumberEl) this.pearlsNumberEl.textContent = String(getPearls());
+  }
+
+  /** Banks `n` Pearls: adds to the persisted balance and the run total, and refreshes the HUD. */
+  private awardRunPearls(n: number): void {
+    if (n <= 0) return;
+    this.pearlsThisRun += n;
+    awardPearls(n);
+    this.updatePearlsBadge();
   }
 
   /**
@@ -921,7 +968,7 @@ export class Game {
     invulRing.name = 'invulRing';
     container.addChild(invulRing);
 
-    const fish = createDolphinSprite();
+    const fish = createDolphinSprite(skinById(equippedSkinId()).palette);
     fish.name = 'fish';
     container.addChild(fish);
 
@@ -1190,6 +1237,8 @@ export class Game {
     if (this.mode === 'campaign' && this.currentLevel === 5) this.tryUnlock('halfwayThere');
     if (this.wasOnLastLifeThisLevel) this.tryUnlock('comeback');
     this.flushLifetimeStats();
+    const pearls = pearlsForLevel(this.currentLevel, this.lostThisLevel === 0);
+    this.awardRunPearls(pearls);
     this.saveDolphinsAndDepart();
     this.setStatus('All sharks destroyed!');
 
@@ -1197,7 +1246,7 @@ export class Game {
     // after the Matriarch's own "Matriarch Defeated!" banner, which this would otherwise stomp.
     const isCampaignFinale = this.mode === 'campaign' && this.currentLevel === LEVELS.length;
     if (!isCampaignFinale) {
-      this.showBanner('Level Complete!', 'victory', 1800);
+      this.showBanner(`Level Complete!  +${pearls} Pearls`, 'victory', 1800);
     }
 
     if (this.levelCompleteTimer) clearTimeout(this.levelCompleteTimer);
@@ -1255,6 +1304,8 @@ export class Game {
     if (this.retries === 0) this.tryUnlock('noDoOvers');
     if (this.totalLost === 0) this.tryUnlock('flawlessCampaign');
 
+    this.awardRunPearls(PEARLS_CAMPAIGN_CLEAR + (this.totalLost === 0 ? PEARLS_FLAWLESS_CAMPAIGN_BONUS : 0));
+
     this.setStatus('You cleared the campaign! The ocean is safe.');
     this.startBtn.textContent = 'Retry';
     this.showBanner('Ocean Saved!', 'victory');
@@ -1278,12 +1329,16 @@ export class Game {
             ['Dolphins lost', String(this.pendingScore.score.lost)],
             ['Dolphins saved', String(this.totalDolphinsSaved)],
             ['Sharks destroyed', String(this.pendingScore.score.sharksKilled)],
+            ['Pearls earned', String(this.pearlsThisRun)],
+            ['Pearl balance', String(getPearls())],
           ]
         : [
             ['Depth', `Level ${this.pendingScore.score.levelReached}`],
             ['Survived', `${this.pendingScore.score.timeSurvived.toFixed(1)}s`],
             ['Dolphins recruited', String(this.pendingScore.score.recruited)],
             ['Sharks destroyed', String(this.pendingScore.score.sharksKilled)],
+            ['Pearls earned', String(this.pearlsThisRun)],
+            ['Pearl balance', String(getPearls())],
           ];
     if (this.runSummaryStatsEl) {
       this.runSummaryStatsEl.innerHTML = rows
@@ -2112,8 +2167,8 @@ export class Game {
     if (now >= this.sprintEndTime) this.sprinting = false;
     if (this.keys[' '] && now >= this.sprintCooldownEnd) {
       this.sprinting = true;
-      this.sprintEndTime = now + SPRINT_DURATION;
-      this.sprintCooldownEnd = now + SPRINT_DURATION + Math.max(3000, SPRINT_COOLDOWN - this.sprintCooldownReduction);
+      this.sprintEndTime = now + this.sprintDurationMs();
+      this.sprintCooldownEnd = now + this.sprintDurationMs() + Math.max(3000, SPRINT_COOLDOWN - this.sprintCooldownReduction);
       this.setStatus('Sprint!');
       this.showBanner('Sprint!', 'victory', 800);
     }

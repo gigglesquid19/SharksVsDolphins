@@ -3,6 +3,8 @@ import { Game } from './game';
 import { sfx } from './sfx';
 import { clearRunCheckpoint, loadRunCheckpoint } from './runState';
 import { getDolphinName, hasNamedDolphin, setDolphinName } from './profile';
+import { getPearls } from './pearls';
+import { setupStore } from './storeView';
 import { registerSW } from 'virtual:pwa-register';
 import { Capacitor } from '@capacitor/core';
 
@@ -99,6 +101,52 @@ pauseNameInput.addEventListener('change', () => {
 });
 
 if (savedCheckpoint) titleContinueBtn.classList.remove('hidden');
+
+// --- Splash screen ---
+// Shown first on load: the logo big with a "press anything" prompt. Any key or tap reveals
+// the title screen. A capture-phase key listener so the very first press only dismisses the
+// splash (and never leaks through to the game's pause/movement handlers).
+const splashScreen = document.getElementById('splashScreen') as HTMLDivElement;
+const splashLogo = document.getElementById('splashLogo') as HTMLImageElement;
+splashLogo.src = `${import.meta.env.BASE_URL}game-logo.webp`;
+let splashDismissed = false;
+
+function dismissSplash(): void {
+  if (splashDismissed) return;
+  splashDismissed = true;
+  splashScreen.classList.add('hidden');
+  titleScreen.classList.remove('hidden');
+}
+
+window.addEventListener(
+  'keydown',
+  (e) => {
+    if (splashDismissed) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    dismissSplash();
+  },
+  true,
+);
+// `click`, not `pointerdown`, so hiding the splash mid-tap can't let the release land on a
+// title-screen button underneath.
+splashScreen.addEventListener('click', dismissSplash);
+
+// --- Pearls ---
+// The <img class="pearl-icon"> tags ship with a placeholder "/pearl.png"; rewrite them to the
+// deploy base so they resolve under the GitHub Pages sub-path (mirrors ASSET_BASE in game.ts).
+document.querySelectorAll<HTMLImageElement>('img.pearl-icon').forEach((img) => {
+  img.src = `${import.meta.env.BASE_URL}pearl.png`;
+});
+const titlePearlsNumberEl = document.getElementById('titlePearlsNumber');
+function refreshTitlePearls(): void {
+  if (titlePearlsNumberEl) titlePearlsNumberEl.textContent = String(getPearls());
+}
+refreshTitlePearls();
+
+// --- Store ---
+const store = setupStore({ onPearlsChange: refreshTitlePearls });
+document.getElementById('titleStoreBtn')!.addEventListener('click', () => store.open());
 
 // The "start with N dolphins" testing shortcuts only make sense on level 10 (the Matriarch
 // fight, otherwise a long grind to reach in a fresh run) - shown only while that's selected,

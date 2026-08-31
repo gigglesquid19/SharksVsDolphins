@@ -89,6 +89,27 @@ const FLUKE_JOINT_X = -38 * BODY_SPRITE_SCALE;
 const bodyTextureCache = new Map<string, Texture>();
 
 function makeDolphinBodyTexture(p: DolphinPalette): Texture {
+  const tex = Texture.from(makeDolphinBodyCanvas(p));
+  tex.source.scaleMode = 'linear';
+  return tex;
+}
+
+/** Linear blend of two `#rrggbb` colours, `t` from 0 (a) to 1 (b). */
+function mixHex(a: string, b: string, t: number): string {
+  const pa = parseInt(a.slice(1), 16);
+  const pb = parseInt(b.slice(1), 16);
+  const r = Math.round(((pa >> 16) & 255) + (((pb >> 16) & 255) - ((pa >> 16) & 255)) * t);
+  const g = Math.round(((pa >> 8) & 255) + (((pb >> 8) & 255) - ((pa >> 8) & 255)) * t);
+  const bl = Math.round((pa & 255) + ((pb & 255) - (pa & 255)) * t);
+  return `#${((1 << 24) | (r << 16) | (g << 8) | bl).toString(16).slice(1)}`;
+}
+
+/**
+ * Draws the static dolphin body (countershaded flanks, dorsal fin, pectoral, eye)
+ * to a fresh canvas. Used both for the shared sprite texture and, at a larger
+ * scale, for the Store's skin previews (src/storeView.ts).
+ */
+export function makeDolphinBodyCanvas(p: DolphinPalette): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
   canvas.width = BODY_CANVAS_W;
   canvas.height = BODY_CANVAS_H;
@@ -145,7 +166,7 @@ function makeDolphinBodyTexture(p: DolphinPalette): Texture {
   const grad = ctx.createLinearGradient(0, -11, 0, 13);
   grad.addColorStop(0, p.back);
   grad.addColorStop(0.24, p.mid);
-  grad.addColorStop(0.44, '#6ba0d6');
+  grad.addColorStop(0.44, mixHex(p.mid, p.flank, 0.5));
   grad.addColorStop(0.58, p.flank);
   grad.addColorStop(0.72, p.belly);
   grad.addColorStop(1, p.belly);
@@ -186,9 +207,7 @@ function makeDolphinBodyTexture(p: DolphinPalette): Texture {
   ctx.fillStyle = '#ffffff';
   ctx.fill();
 
-  const tex = Texture.from(canvas);
-  tex.source.scaleMode = 'linear';
-  return tex;
+  return canvas;
 }
 
 export function createDolphinSprite(palette: DolphinPalette = DEFAULT_DOLPHIN_PALETTE): Container {

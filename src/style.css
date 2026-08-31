@@ -107,6 +107,55 @@ h1 {
 
 .title-screen.hidden { display: none; }
 
+/* First thing shown on load: the logo big, dismissed by any tap or key press. */
+.splash-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  padding: 24px;
+  text-align: center;
+  cursor: pointer;
+  background:
+    linear-gradient(180deg, rgba(2, 6, 23, 0.55), rgba(2, 6, 23, 0.85)),
+    url('/OpenOceanBGImage.webp') center / cover no-repeat;
+}
+.splash-screen.hidden { display: none; }
+
+.splash-logo {
+  width: min(72vw, 60vh, 460px);
+  height: auto;
+  border-radius: 28px;
+  box-shadow: 0 20px 70px rgba(2, 6, 23, 0.7), 0 0 60px rgba(56, 189, 248, 0.3);
+  animation: splashLogoIn 0.6s ease both;
+}
+
+.splash-prompt {
+  font-size: clamp(1rem, 3.5vw, 1.3rem);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text);
+  text-shadow: 0 2px 12px rgba(2, 6, 23, 0.8);
+  animation: splashPromptPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes splashLogoIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes splashPromptPulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .splash-logo, .splash-prompt { animation: none; }
+  .splash-prompt { opacity: 0.9; }
+}
+
 .title-heading {
   font-size: clamp(2.2rem, 8vw, 4rem);
   font-weight: 800;
@@ -846,6 +895,153 @@ button.mega-shrimp.green {
   color: #facc15;
   text-shadow: 0 0 10px rgba(250, 204, 21, 0.6);
 }
+
+/* Persisted Pearl balance - shown in both modes, tucked under the level badge. */
+.pearls-badge {
+  position: absolute;
+  top: 76px;
+  right: 10px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: rgba(2, 6, 23, 0.75);
+  border: 1px solid rgba(226, 232, 240, 0.35);
+  border-radius: 999px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+  backdrop-filter: blur(3px);
+}
+.pearls-badge #pearlsNumber {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #e2e8f0;
+  text-shadow: 0 0 10px rgba(226, 232, 240, 0.55);
+}
+.pearl-icon {
+  width: 18px;
+  height: 18px;
+  image-rendering: pixelated;
+  vertical-align: middle;
+}
+.title-pearls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 4px 0 0;
+  font-weight: 700;
+  color: var(--muted);
+}
+.title-pearls #titlePearlsNumber { color: #e2e8f0; }
+
+/* --- Store --- */
+.store-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 105;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 24px;
+  overflow-y: auto;
+  background:
+    linear-gradient(180deg, rgba(2, 6, 23, 0.86), rgba(2, 6, 23, 0.92)),
+    url('/shop-bg.webp') center / cover no-repeat;
+}
+.store-screen.hidden { display: none; }
+
+.store-panel {
+  width: 100%;
+  max-width: 720px;
+  margin: auto;
+  background: var(--panel);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.store-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.store-header h2 { margin: 0; }
+.store-pearls {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 800;
+  font-size: 1.2rem;
+  color: #e2e8f0;
+}
+
+.store-section h3 {
+  margin: 0 0 4px;
+  color: var(--text);
+}
+.store-note {
+  margin: 0 0 12px;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.store-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.store-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+}
+.store-item.equipped {
+  border-color: rgba(250, 204, 21, 0.7);
+  box-shadow: 0 0 0 1px rgba(250, 204, 21, 0.4) inset;
+}
+.store-item-name { font-weight: 700; color: var(--text); }
+.store-item-desc,
+.store-item-level {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.store-skin-preview {
+  width: 100%;
+  max-width: 132px;
+  height: auto;
+  image-rendering: auto;
+}
+
+.store-buy {
+  margin-top: 6px;
+  padding: 8px 14px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, #38bdf8, #0ea5e9);
+  box-shadow: none;
+}
+.store-buy:hover:not(:disabled) { box-shadow: 0 4px 16px rgba(14, 165, 233, 0.5); }
+.store-buy:disabled { opacity: 0.45; cursor: default; }
+.store-buy .pearl-icon { width: 14px; height: 14px; }
 
 .new-waters-prompt {
   position: absolute;

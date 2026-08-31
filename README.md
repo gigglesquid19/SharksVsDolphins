@@ -12,8 +12,8 @@ runs entirely client-side.
 
 Contents
 -------------------
-- `index.html` - page markup: title screen, narrative screen, settings panel,
-  game canvas, on-screen controls, and audio elements.
+- `index.html` - page markup: splash screen, title screen, narrative screen,
+  settings panel, game canvas, on-screen controls, and audio elements.
 - `src/main.ts` - entry point: wires up all UI (buttons, D-pad, joystick,
   volume, pause menu, fullscreen) to the `Game` class.
 - `src/game.ts` - core game/simulation orchestration: level flow, spawning,
@@ -31,6 +31,13 @@ Contents
 - `src/lifetimeStats.ts` - cumulative cross-run totals (dolphins saved, sharks
   killed, play time, distinct play days) backing the lifetime achievements;
   `localStorage`.
+- `src/pearls.ts` - the persisted Pearl currency balance (`localStorage`), the
+  per-level payout formula, and the spend path.
+- `src/store.ts` - the Store: persisted purchases (`localStorage`) of permanent
+  Endless-mode stat upgrades and dolphin skins, plus the derived Endless starting
+  bonuses.
+- `src/skins.ts` - the dolphin skin catalogue (palette swaps, prices).
+- `src/storeView.ts` - renders and wires the Store screen.
 - `src/tutorialHints.ts` - first-run tooltip seen/unseen persistence
   (`localStorage`).
 - `src/music.ts` - the ambient/boss track lists and random-pick helper (see
@@ -183,9 +190,10 @@ tester account - Play Games sign-in does not work on most emulators.
 
 How to Play
 --------------------
-1. Open the game and pick a mode on the title screen. On your first play the
-   story intro also asks you to **name your dolphin** (default `Echo`); the
-   name sticks and is editable from the pause menu. Then **Dive In**:
+1. On load a splash screen shows the logo big - tap or press any key to reach
+   the title screen - then pick a mode. On your first play the story intro also
+   asks you to **name your dolphin** (default `Echo`); the name sticks and is
+   editable from the pause menu. Then **Dive In**:
    - **Campaign Mode**: the classic 10-level run. Pick a starting level,
      progress is checkpointed at each level transition (`localStorage`), and
      the title screen offers **Continue Campaign** to resume a run you left
@@ -195,6 +203,11 @@ How to Play
      going past level 10 with escalating difficulty, and has no free resume
      - a death ends the run. This is the intended hook for a future
      pay-to-continue offer (see "Ideas for Further Development").
+   - **Store** (title screen): spend Pearls on permanent **Endless upgrades**
+     (Vitality, Speed, Charisma, Boost Cooldown, and Boost Duration - they seed
+     an Endless run's starting stats and stack with the Mega Shrimp picks you
+     make during the run; Campaign is unaffected) and **dolphin skins** (palette
+     recolours of the whole pod, one equipped at a time).
    Both endings show a **run-summary card** - dolphin name, a stat breakdown,
    and any achievements unlocked that run - then let you save the score (under
    your dolphin's name) to the leaderboard, or Skip.
@@ -254,6 +267,17 @@ Game Features
   damaged and flees off-screen, so the encounter repeats at the next 10-level
   mark rather than ending the run, and she only counts toward the Matriarch
   Slayer achievement and the sharks-killed stat on an actual Campaign kill.
+- **Pearls**: a soft currency that persists on the device across playthroughs
+  (`src/pearls.ts`). Clearing a level pays out `10 + level` Pearls (`+5` for
+  losing no dolphins that level) in either mode; clearing the Campaign adds a
+  `100` bonus (`+50` if no dolphin was lost all run). The balance shows on the
+  title screen, a HUD badge, and the run-summary card, and is spent in the
+  **Store**.
+- **Store** (`src/store.ts` / `src/storeView.ts`): a title-screen shop that
+  spends Pearls on permanent Endless-mode stat upgrades (Vitality, Speed,
+  Charisma, Boost Cooldown, Boost Duration - all tiered) and dolphin skins
+  (`src/skins.ts` - palette recolours applied to the whole pod). Purchases
+  persist in `localStorage`.
 - **Sound**: dynamic background music (see Music below) with a mute toggle
   and volume slider, plus procedurally synthesized sound effects (bite,
   recruit chime, shrimp pickup, storm rumble) via the Web Audio API.
@@ -332,8 +356,8 @@ Ideas for Further Development
 - Android packaging via Capacitor or a Trusted Web Activity, plus PNG app
   icons (192x192/512x512/maskable) for proper install prompts.
 - Analytics/crash reporting.
-- Cosmetic unlocks, achievements, and daily challenges for longer-term
-  retention.
+- Daily challenges and a daily Pearl bonus for longer-term retention (cosmetic
+  unlocks and achievements are now in - see the Store and Achievements).
 - Split the storm/matriarch/spawning logic still in `src/game.ts` out into
   dedicated system modules, the way `src/entities.ts` and `src/scoring.ts`
   already were. That code is threaded through `step()`/`init()` with a lot

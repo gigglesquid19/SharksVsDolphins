@@ -19,14 +19,41 @@
 
   <audio id="bgMusic" loop preload="auto"></audio>
 
-  <div class="title-screen" id="titleScreen">
+  <div class="splash-screen" id="splashScreen">
+    <img class="splash-logo" id="splashLogo" alt="Sharks Vs Dolphins" src="/game-logo.webp">
+    <p class="splash-prompt">Tap or press any button to start</p>
+  </div>
+
+  <div class="title-screen hidden" id="titleScreen">
     <h1 class="title-heading">Sharks Vs Dolphins</h1>
     <p class="title-tagline">Swim, dodge, and recruit your pod to survive the open ocean.</p>
+    <p class="title-pearls" id="titlePearls"><img class="pearl-icon" alt="" src="/pearl.png"> <span id="titlePearlsNumber">0</span> Pearls</p>
     <div class="title-mode-choices">
       <button id="titleCampaignBtn" class="school ready">Campaign Mode<span class="title-mode-sub">Levels 1-10 Classic</span></button>
       <button id="titleEndlessBtn" class="school ready">Endless Mode<span class="title-mode-sub">Survive as long as you can</span></button>
     </div>
+    <button id="titleStoreBtn" class="secondary">Store</button>
     <button id="titleContinueBtn" class="secondary hidden">Continue Campaign</button>
+  </div>
+
+  <div class="store-screen hidden" id="storeScreen">
+    <div class="store-panel">
+      <div class="store-header">
+        <h2>Store</h2>
+        <span class="store-pearls" id="storePearls"><img class="pearl-icon" alt=""> <span id="storePearlsNumber">0</span></span>
+      </div>
+      <div class="store-section">
+        <h3>Endless Upgrades</h3>
+        <p class="store-note">Permanent head starts for Endless Mode. They stack with the Mega Shrimp upgrades you pick during a run.</p>
+        <div class="store-grid" id="storeUpgrades"></div>
+      </div>
+      <div class="store-section">
+        <h3>Dolphin Skins</h3>
+        <p class="store-note">Recolours your whole pod. One equipped at a time.</p>
+        <div class="store-grid" id="storeSkins"></div>
+      </div>
+      <button id="storeCloseBtn" class="school ready">Back</button>
+    </div>
   </div>
 
   <div class="narrative-screen hidden" id="narrativeScreen">
@@ -109,6 +136,10 @@
       <div class="dolphins-saved-badge hidden" id="dolphinsSavedBadge" aria-label="Dolphins saved">
         <span class="dolphins-saved-icon">🐬</span>
         <span id="dolphinsSavedNumber">0</span>
+      </div>
+      <div class="pearls-badge" id="pearlsBadge" aria-label="Pearls">
+        <img class="pearl-icon" alt="" src="/pearl.png">
+        <span id="pearlsNumber">0</span>
       </div>
       <div class="last-life hidden" id="lastLifeHeart" style="position: absolute; bottom: 10px; left: 10px; font-size: 2.2rem; pointer-events: none;">❤️</div>
       <div class="game-banner" id="gameBanner"></div>

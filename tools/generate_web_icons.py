@@ -5,6 +5,8 @@
   * icon-maskable-512.png        - purpose "maskable": the scene sits in the centre ~80%
                                    with a blurred edge extension, so a launcher mask
                                    (circle / squircle) never clips the animals
+  * game-logo.webp              - the frame-stripped art at display resolution, shown on
+                                   the in-app splash screen (see #splashScreen in index.html)
 
 Run from the repo root:  python tools/generate_web_icons.py
 Then rebuild (npm run build / build:android) and redeploy.
@@ -33,7 +35,10 @@ def main() -> None:
     blurred.paste(art.resize((inner, inner), Image.LANCZOS), ((px - inner) // 2, (px - inner) // 2))
     blurred.convert("RGBA").save(OUT / "icon-maskable-512.png")
 
-    print(f"Wrote icon-192.png, icon-512.png, icon-maskable-512.png to {OUT}")
+    # Splash art: the frame-stripped scene at ~2x its on-screen size, as webp.
+    art.resize((640, 640), Image.LANCZOS).save(OUT / "game-logo.webp", quality=82, method=6)
+
+    print(f"Wrote icon-192.png, icon-512.png, icon-maskable-512.png, game-logo.webp to {OUT}")
 
 
 if __name__ == "__main__":
