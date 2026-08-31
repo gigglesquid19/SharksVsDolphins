@@ -12,13 +12,25 @@ import { Capacitor } from '@capacitor/core';
 
 // Android WebView's console bridge only relays file/line/message for uncaught errors and
 // promise rejections (no stack) - re-log through console.error, which it relays in full,
-// so crashes are diagnosable from `adb logcat` alone.
-window.addEventListener('error', (event) => {
-  console.error('[onerror]', event.error?.stack || event.message);
-});
-window.addEventListener('unhandledrejection', (event) => {
-  console.error('[unhandledrejection]', event.reason?.stack || event.reason);
-});
+// so crashes are diagnosable from `adb logcat` alone. Also surface the first error on-screen:
+// mobile browsers have no console, and a silent throw looks exactly like "the game froze".
+function showFatal(label: string, detail: unknown): void {
+  console.error(label, detail);
+  let el = document.getElementById('fatalError');
+  if (!el) {
+    el = document.createElement('pre');
+    el.id = 'fatalError';
+    el.style.cssText =
+      'position:fixed;left:0;right:0;bottom:0;z-index:9999;margin:0;padding:10px 12px;max-height:45vh;overflow:auto;' +
+      'background:#7f1d1d;color:#fff;font:12px/1.4 monospace;white-space:pre-wrap;word-break:break-word;border-top:2px solid #fca5a5';
+    document.body.appendChild(el);
+  }
+  el.textContent = `${label}\n${String(
+    (detail as { stack?: string })?.stack || (detail as { message?: string })?.message || detail,
+  )}`;
+}
+window.addEventListener('error', (event) => showFatal('[onerror]', event.error ?? event.message));
+window.addEventListener('unhandledrejection', (event) => showFatal('[unhandledrejection]', event.reason));
 
 // Registers the Workbox-generated service worker (see vite.config.ts) so the built assets
 // are cached for offline play. registerType is 'prompt', and we deliberately pass no
@@ -598,7 +610,7 @@ const inputs = {
     if (e.buttons) updatePointerDirection(e.clientX, e.clientY);
   });
   window.addEventListener('mouseup', () => game.setPointer(false));
-})();
+})().catch((e) => showFatal('[main init]', e));
 
 (function spawnBubbles() {
   const container = document.getElementById('bubbles') as HTMLDivElement;
