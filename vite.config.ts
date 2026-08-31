@@ -18,7 +18,12 @@ export default defineConfig({
       // let the plugin only generate/register the service worker, not a competing manifest.
       manifest: false,
       injectRegister: false,
-      registerType: 'autoUpdate',
+      // 'prompt', not 'autoUpdate': a new deploy must NOT swap JS chunks under a running
+      // game (old hashed chunks are deleted from Pages on every deploy, so a mid-session
+      // swap leaves the page requesting files that now 404 and the loop dies). The new
+      // service worker installs and waits; it takes over on the next cold launch, when the
+      // asset set is guaranteed consistent.
+      registerType: 'prompt',
       workbox: {
         // Audio is cached at runtime (first play), not precached at install - it's large
         // relative to everything else here and shouldn't block/bloat the initial install.

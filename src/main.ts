@@ -21,7 +21,9 @@ window.addEventListener('unhandledrejection', (event) => {
 });
 
 // Registers the Workbox-generated service worker (see vite.config.ts) so the built assets
-// are cached for offline play; auto-updates in the background when a new build is deployed.
+// are cached for offline play. registerType is 'prompt', and we deliberately pass no
+// onNeedRefresh handler: a new deploy installs a waiting worker that only takes over on the
+// next cold launch, so a running game is never served a half-swapped set of JS chunks.
 registerSW({ immediate: true });
 
 const canvas = document.getElementById('simCanvas') as HTMLCanvasElement;
