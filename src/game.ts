@@ -35,6 +35,7 @@ import { RunCheckpoint, clearRunCheckpoint, saveRunCheckpoint } from './runState
 import { hasSeenHint, markHintSeen, HintId } from './tutorialHints';
 import { AMBIENT_TRACKS, BOSS_TRACKS, pickRandomTrack } from './music';
 import { ACHIEVEMENTS, AchievementId, getUnlockedMap, unlock } from './achievements';
+import { playGames } from './playGames';
 
 export type GameMode = 'campaign' | 'endless';
 type LeaderboardBoard = 'campaign' | 'endless';
@@ -213,6 +214,10 @@ export class Game {
   private leaderboardHeadingEl: HTMLElement | null = null;
   private leaderboardTabCampaignBtn: HTMLButtonElement | null = null;
   private leaderboardTabEndlessBtn: HTMLButtonElement | null = null;
+  private leaderboardGlobalEl: HTMLElement | null = null;
+  private leaderboardGlobalRankEl: HTMLElement | null = null;
+  private leaderboardGlobalBtn: HTMLButtonElement | null = null;
+  private leaderboardSignInBtn: HTMLButtonElement | null = null;
   private initialsOverlayEl: HTMLDivElement | null = null;
   private initialsHeadingEl: HTMLElement | null = null;
   private initialsSummaryEl: HTMLElement | null = null;
@@ -301,6 +306,15 @@ export class Game {
     this.leaderboardTabEndlessBtn = document.getElementById('leaderboardTabEndless') as HTMLButtonElement | null;
     this.leaderboardTabCampaignBtn?.addEventListener('click', () => this.showLeaderboard('campaign'));
     this.leaderboardTabEndlessBtn?.addEventListener('click', () => this.showLeaderboard('endless'));
+    this.leaderboardGlobalEl = document.getElementById('leaderboardGlobal');
+    this.leaderboardGlobalRankEl = document.getElementById('leaderboardGlobalRank');
+    this.leaderboardGlobalBtn = document.getElementById('leaderboardGlobalBtn') as HTMLButtonElement | null;
+    this.leaderboardSignInBtn = document.getElementById('leaderboardSignInBtn') as HTMLButtonElement | null;
+    this.leaderboardGlobalBtn?.addEventListener('click', () => void playGames.open(this.currentLeaderboardBoard));
+    this.leaderboardSignInBtn?.addEventListener('click', async () => {
+      await playGames.signIn();
+      this.showLeaderboard(this.currentLeaderboardBoard);
+    });
     this.initialsOverlayEl = document.getElementById('initialsOverlay') as HTMLDivElement | null;
     this.initialsHeadingEl = document.getElementById('initialsHeading') as HTMLElement | null;
     this.initialsSummaryEl = document.getElementById('initialsSummary') as HTMLElement | null;
@@ -365,6 +379,10 @@ export class Game {
     await this.loadSharkTextures();
     this.createEnvironment();
     this.initModel(this.getSelectedLevelConfig());
+
+    // Warm the Play Games sign-in state (no-op off Android) so the leaderboard
+    // overlay can show a global rank without a round-trip delay.
+    void playGames.ensureSignedIn();
   }
 
   private getSelectedLevelConfig(): LevelConfig {
@@ -1222,8 +1240,11 @@ export class Game {
 
     if (this.pendingScore.board === 'campaign') {
       saveCampaignScore({ ...this.pendingScore.score, initials: clean });
+      // Time board is milliseconds, smaller-is-better (see src/playGames.ts).
+      void playGames.submit('campaign', this.pendingScore.score.timeToSaveOcean * 1000);
     } else {
       saveEndlessScore({ ...this.pendingScore.score, initials: clean });
+      void playGames.submit('endless', this.pendingScore.score.levelReached);
     }
     const board = this.pendingScore.board;
     this.pendingScore = null;
@@ -1267,7 +1288,47 @@ export class Game {
       }
     }
 
+    void this.updateGlobalLeaderboardSection(board);
     this.leaderboardOverlayEl?.classList.remove('hidden');
+  }
+
+  /**
+   * Play Games Services global rank for the current board (Android only). Off Android
+   * `playGames.available` is false and the whole section stays hidden, leaving the local
+   * table as the only leaderboard - which is also all the web/PWA build ever has.
+   */
+  private async updateGlobalLeaderboardSection(board: LeaderboardBoard): Promise<void> {
+    const section = this.leaderboardGlobalEl;
+    if (!section) return;
+    if (!playGames.available) {
+      section.hidden = true;
+      return;
+    }
+    section.hidden = false;
+    if (this.leaderboardGlobalBtn) this.leaderboardGlobalBtn.hidden = true;
+    if (this.leaderboardSignInBtn) this.leaderboardSignInBtn.hidden = true;
+    if (this.leaderboardGlobalRankEl) this.leaderboardGlobalRankEl.textContent = 'Checking Play Games…';
+
+    const signedIn = await playGames.ensureSignedIn();
+    if (this.currentLeaderboardBoard !== board) return; // a later showLeaderboard() switched boards
+
+    if (!signedIn) {
+      if (this.leaderboardGlobalRankEl) {
+        this.leaderboardGlobalRankEl.textContent = 'Sign in to Play Games for a global rank.';
+      }
+      if (this.leaderboardSignInBtn) this.leaderboardSignInBtn.hidden = false;
+      return;
+    }
+
+    const score = await playGames.playerScore(board);
+    if (this.currentLeaderboardBoard !== board) return;
+    if (this.leaderboardGlobalBtn) this.leaderboardGlobalBtn.hidden = false;
+    if (this.leaderboardGlobalRankEl) {
+      this.leaderboardGlobalRankEl.textContent =
+        score && score.hasScore
+          ? `Global rank ${score.displayRank ?? '#' + score.rank}  ·  ${score.displayScore ?? ''}`.trim()
+          : 'No global score yet — finish a run to get on the board.';
+    }
   }
 
   private renderEmptyLeaderboardRow(colSpan: number, text: string): void {

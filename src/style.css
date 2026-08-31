@@ -665,6 +665,24 @@ button.mega-shrimp.green {
   color: #22d3ee;
 }
 
+/* Play Games Services global rank (Android only; hidden on web). */
+.leaderboard-global {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(56, 189, 248, 0.15);
+}
+.leaderboard-global[hidden] { display: none; }
+.leaderboard-global p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #22d3ee;
+}
+.leaderboard-global button[hidden] { display: none; }
+
 .achievements-list {
   display: flex;
   flex-direction: column;

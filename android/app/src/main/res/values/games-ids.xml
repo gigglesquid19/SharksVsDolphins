@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Play Games Services identifiers. These are NOT secrets - they ship in every APK.
+
+  Replace game_services_project_id with the numeric Project ID from
+  Play Console -> Play Games Services -> Configuration.
+
+  The two leaderboard IDs (CgkI...) go in src/playGames.ts (LEADERBOARD_IDS),
+  not here - they are only used from JavaScript.
+
+  Until a real project id is set, Play Games sign-in simply fails and the app
+  falls back to the local leaderboards.
+-->
+<resources>
+    <string name="game_services_project_id" translatable="false">0000000000</string>
+</resources>

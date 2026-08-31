@@ -25,6 +25,11 @@
 
         </activity>
 
+        <!-- Play Games Services project id (from Play Console). See res/values/games-ids.xml. -->
+        <meta-data
+            android:name="com.google.android.gms.games.APP_ID"
+            android:value="@string/game_services_project_id" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

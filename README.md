@@ -133,6 +133,46 @@ The `cap sync` step is essential and easy to forget: Gradle builds from
 `dist/` when `cap copy`/`cap sync` has run. Skipping it silently ships stale
 web assets.
 
+Play Games Services (leaderboards)
+--------------------
+Online leaderboards are **Android only** - a small local Capacitor plugin
+(`android/app/src/main/java/.../PlayGamesPlugin.java`, wrapped by
+`src/playGames.ts`) submits the two run results to Play Games Services and shows
+the player's global rank in the existing Leaderboard overlay. On web / PWA
+`playGames.available` is `false` and the whole thing is skipped - the local
+`localStorage` leaderboards (`src/scoring.ts`) are unchanged and remain the only
+board there.
+
+The IDs below are **not secrets** (they ship in every APK), so they are
+committed with placeholders rather than gitignored. Sign-in simply fails and the
+app falls back to local boards until real values are set.
+
+One-time setup in Play Console / Google Cloud:
+
+1. Play Console -> your app -> **Play Games Services -> Setup** -> create or link
+   a Google Cloud project.
+2. Google Cloud Console -> **OAuth consent screen** (External; add your own
+   Google account as a test user).
+3. Play Games Services -> **Credentials -> Android**: package
+   `com.sharksvsdolphins.app`, plus SHA-1 fingerprints for
+   - the debug keystore (`~/.android/debug.keystore`, password `android`) for dev,
+   - the upload keystore:
+     `keytool -list -v -keystore android/keystore/release.keystore -alias svsd-release`
+     (password in `keystore.properties`),
+   - and, once Play App Signing is active, the app-signing SHA-1 from
+     Play Console -> Test and release -> Setup -> App signing.
+4. Create two leaderboards:
+   - **Fastest Ocean Rescue** - score formatting *Time*, ordering *Smaller is better*
+   - **Deepest Waters** - score formatting *Numeric*, ordering *Larger is better*
+5. Copy the numeric **Project ID** into
+   `android/app/src/main/res/values/games-ids.xml`, and the two **Leaderboard IDs**
+   (`CgkI...`) into `LEADERBOARD_IDS` in `src/playGames.ts`.
+6. Play Games Services -> **Testers** -> add your Google account, then **publish**
+   the Play Games Services configuration (separate from publishing the app).
+
+Sign-in and score submission only work in a signed build on a real device with a
+tester account - Play Games sign-in does not work on most emulators.
+
 How to Play
 --------------------
 1. Open the game and pick a mode on the title screen, then **Dive In** past

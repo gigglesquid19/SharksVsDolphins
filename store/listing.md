@@ -75,16 +75,25 @@ above is the separate store-listing icon.
 
 Data safety form
 ----------------
-- **Does your app collect or share any of the required user data types?** → **No**
-- **Is all of the user data encrypted in transit?** → N/A (no data collected or transmitted)
-- **Do you provide a way for users to request that their data be deleted?** →
-  N/A; you may note that uninstalling or clearing storage removes all local data.
-- **Data types collected:** none.
-- **Data types shared:** none.
 
-Rationale: the app has no analytics, ads, accounts, or network calls. The only
-persisted data is local `localStorage` (scores, settings, achievements) which
-never leaves the device — under Play's definitions this is not "collection".
+**If you ship WITHOUT Play Games Services** (leaderboard IDs still placeholders):
+- **Does your app collect or share any of the required user data types?** → **No**
+- Data types collected / shared: none.
+
+Rationale: no analytics, ads, accounts, or network calls; the only persisted data
+is local `localStorage` (scores, settings, achievements) which never leaves the
+device — under Play's definitions this is not "collection".
+
+**If you ship WITH Play Games Services leaderboards enabled:**
+- **Does your app collect or share any user data?** → **Yes** (via Google Play
+  Games Services)
+- **Data type:** *App activity → Other actions / game progress*, and a Play Games
+  player ID. Collected and shared with Google. Purpose: *App functionality*
+  (leaderboards). Not linked to a resettable advertising ID; not used for tracking.
+- **Encrypted in transit:** Yes (handled by Google Play Games Services).
+- **Deletion:** players manage their Play Games data in their Google account.
+- Google publishes a Play Games Services data-safety guidance page — follow it for
+  the exact checkboxes.
 
 
 Content rating questionnaire
