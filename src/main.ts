@@ -154,7 +154,7 @@ if (savedCheckpoint) titleContinueBtn.classList.remove('hidden');
 // splash (and never leaks through to the game's pause/movement handlers).
 const splashScreen = document.getElementById('splashScreen') as HTMLDivElement;
 const splashLogo = document.getElementById('splashLogo') as HTMLImageElement;
-splashLogo.src = `${import.meta.env.BASE_URL}game-logo.webp`;
+splashLogo.src = `${import.meta.env.BASE_URL}splash-art.webp`;
 let splashDismissed = false;
 
 function dismissSplash(): void {

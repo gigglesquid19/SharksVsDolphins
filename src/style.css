@@ -113,47 +113,56 @@ h1 {
   inset: 0;
   z-index: 110;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 28px;
-  padding: 24px;
-  text-align: center;
   cursor: pointer;
-  background:
-    linear-gradient(180deg, rgba(2, 6, 23, 0.55), rgba(2, 6, 23, 0.85)),
-    url('/OpenOceanBGImage.webp') center / cover no-repeat;
+  /* Deep-ocean fill behind the poster. The art is a fixed 2:3 portrait, so on any window that
+     is not that shape the difference shows to either side of it - these blues are sampled from
+     the artwork so the letterboxing reads as more ocean rather than as an empty frame. */
+  background: radial-gradient(ellipse at 50% 38%, #0d5288 0%, #06294a 55%, #010f1d 100%);
 }
 .splash-screen.hidden { display: none; }
 
-.splash-logo {
-  width: min(72vw, 60vh, 460px);
-  height: auto;
-  border-radius: 28px;
-  box-shadow: 0 20px 70px rgba(2, 6, 23, 0.7), 0 0 60px rgba(56, 189, 248, 0.3);
-  animation: splashLogoIn 0.6s ease both;
+/* The start screen is one painted poster: the title, both characters and the Tap to Start
+   call to action are all inside the image. So it is letterboxed rather than cropped - cover
+   would cut the title off the top and the button off the bottom on any landscape window - and
+   nothing is drawn on top of it. The whole screen is the tap target (see main.ts), which is
+   what the painted button promises. */
+.splash-art {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  animation:
+    splashArtIn 0.6s ease both,
+    splashArtBreathe 2.8s ease-in-out 0.6s infinite;
 }
 
-.splash-prompt {
-  font-size: clamp(1rem, 3.5vw, 1.3rem);
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: var(--text);
-  text-shadow: 0 2px 12px rgba(2, 6, 23, 0.8);
-  animation: splashPromptPulse 1.6s ease-in-out infinite;
-}
-
-@keyframes splashLogoIn {
-  from { opacity: 0; transform: scale(0.92); }
+@keyframes splashArtIn {
+  from { opacity: 0; transform: scale(0.96); }
   to { opacity: 1; transform: scale(1); }
 }
-@keyframes splashPromptPulse {
-  0%, 100% { opacity: 0.55; }
-  50% { opacity: 1; }
+/* A slow lift in brightness stands in for the old pulsing prompt: the call to action is part
+   of the artwork, so it cannot be animated on its own without drifting out of register with
+   the poster as it is letterboxed. */
+@keyframes splashArtBreathe {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.07); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .splash-logo, .splash-prompt { animation: none; }
-  .splash-prompt { opacity: 0.9; }
+  .splash-art { animation: none; }
+}
+
+/* Kept in the DOM for screen readers - the prompt itself is painted into the poster. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 .title-heading {
