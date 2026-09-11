@@ -262,44 +262,54 @@ describe('Shark.move large-hammerhead flank', () => {
   });
 });
 
-describe('Shark.move pod-threat', () => {
-  it('backs away when inside the buffer and the pod can kill it', () => {
+describe('Shark.move never retreats from the pod', () => {
+  it('keeps closing on a pod big enough to destroy it', () => {
+    // Sharks used to hold a buffer off a kill-capable pod. It read as the shark fleeing rather
+    // than stalking, and parked it outside the range you could ram it from, so it is gone: every
+    // shark now presses the attack regardless of how many dolphins you have.
     const p = playerAt(50, 50);
-    const wary = testShark(53, 50);
-    const bold = testShark(53, 50);
-    for (let i = 0; i < 12; i++) {
-      wary.move(1, p, [wary], true, NOW, true);
-      bold.move(1, p, [bold], true, NOW, false);
-    }
-    expect(wary.distanceBetween(p)).toBeGreaterThan(bold.distanceBetween(p));
-    expect(wary.distanceBetween(p)).toBeGreaterThan(3);
+    const s = testShark(53, 50);
+    for (let i = 0; i < 12; i++) s.move(1, p, [s], true, NOW);
+    expect(s.distanceBetween(p)).toBeLessThan(3);
   });
+});
 
-  it('holds a buffer wider than the shark can be rammed from, so the retreat must be cancellable', () => {
-    // Game.sharkRamRadius gives a small tiger 4 * sqrt(1.33) = 4.61, inside the 5-unit wary
-    // buffer - so a retreating shark sits exactly outside kill range: game.ts must clear
-    // podThreat while the player sprints, or a wary shark is unkillable. Pins those numbers.
-    const BUFFER = 5;
-    const smallTigerRamRadius = 4 * Math.sqrt(1 * 1.33); // 4.61
-    expect(smallTigerRamRadius).toBeLessThan(BUFFER);
-
-    // Behaviourally: a wary shark reaches beyond ram range, i.e. it can sit where a ram cannot
-    // reach it. Only small sharks are ever given podThreat - large ones always commit.
+describe('Shark.move search drift', () => {
+  // Beyond the hunt radius a shark is searching rather than chasing, but it should still be
+  // working its way toward the pod - sharks milling at random read as ignoring the player,
+  // which is the wrong feel for the opening of a level.
+  it('closes on a player it has not noticed yet', () => {
     const p = playerAt(50, 50);
-    const s = testShark(54, 50, { kind: 'tiger', sizeMultiplier: 1.33 });
-    let furthest = 0;
-    for (let i = 0; i < 15; i++) {
-      s.move(1, p, [s], true, NOW, true);
-      furthest = Math.max(furthest, s.distanceBetween(p));
-    }
-    expect(furthest).toBeGreaterThan(smallTigerRamRadius);
-  });
-
-  it('still presses toward the player from outside the buffer', () => {
-    const p = playerAt(50, 50);
-    const s = testShark(20, 50);
+    const s = testShark(90, 50);
     const start = s.distanceBetween(p);
-    for (let i = 0; i < 10; i++) s.move(1, p, [s], true, NOW, true);
+    for (let i = 0; i < 60; i++) s.move(1, p, [s], false, NOW);
     expect(s.distanceBetween(p)).toBeLessThan(start);
+  });
+
+  it('drifts in from any direction, not just one axis', () => {
+    const p = playerAt(50, 50);
+    for (const [x, y] of [[90, 50], [10, 50], [50, 90], [50, 12]] as [number, number][]) {
+      const s = testShark(x, y);
+      const start = s.distanceBetween(p);
+      for (let i = 0; i < 60; i++) s.move(1, p, [s], false, NOW);
+      expect(s.distanceBetween(p)).toBeLessThan(start);
+    }
+  });
+
+  it('still wanders rather than driving straight at the player', () => {
+    // If the drift dominated, the search would just be a slower chase. Compare the ground it
+    // covers against the distance it actually closed: a straight run would make these equal.
+    const p = playerAt(50, 50);
+    const s = testShark(90, 50);
+    const start = s.distanceBetween(p);
+    let travelled = 0;
+    for (let i = 0; i < 60; i++) {
+      const bx = s._x;
+      const by = s._y;
+      s.move(1, p, [s], false, NOW);
+      travelled += Math.hypot(s._x - bx, s._y - by);
+    }
+    const closed = start - s.distanceBetween(p);
+    expect(closed).toBeLessThan(travelled * 0.95);
   });
 });

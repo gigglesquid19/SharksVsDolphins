@@ -83,6 +83,8 @@ const SMALL_TIGER_SIZE_MULTIPLIER = 1.33;
 // sharks are gone, so it is an endgame threat rather than something you meet on level one.
 const CLOAK_DURATION_MS = 20000;
 const CLOAK_COOLDOWN_MS = 20000;
+// Up to and including this level, a large great white needs 10 pod members rather than 12.
+const GREAT_WHITE_EASED_UNTIL_LEVEL = 5;
 const SPRINT_DURATION = 300;
 const SPRINT_COOLDOWN = 10000;
 const SPRINT_SPEED = 2;
@@ -2193,7 +2195,12 @@ export class Game {
   private sharkPodRequirement(kind: SharkKind, large: boolean): number {
     if (large) {
       if (kind === 'tiger') return 8;
-      if (kind === 'greatWhite') return 12;
+      // Levels 4 and 5 cap the pod at 12 (see levels.ts) and are the first to field a large
+      // great white, so the standing requirement of 12 meant a flawless run - every dolphin you
+      // had ever recruited still alive - just to make one killable. Early levels ask for 10.
+      if (kind === 'greatWhite') {
+        return this.currentLevel <= GREAT_WHITE_EASED_UNTIL_LEVEL ? 10 : 12;
+      }
       if (kind === 'hammerhead') return 10;
     } else {
       if (kind === 'tiger') return 4;
@@ -2625,7 +2632,6 @@ export class Game {
 
     if (this.activeEvent?.type !== 'jellyfish') {
       this.updateCloaks(now);
-      const podSize = this.getPodSize();
       // Once every remaining shark is large, none of them lose track any more: the end of a
       // level becomes a chase rather than hide-and-seek. Great whites and hammerheads already
       // track the player from anywhere; this is what brings large tigers up to that, and is the
@@ -2633,20 +2639,7 @@ export class Game {
       const allSharksLarge = this.sharks.length > 0 && this.sharks.every((s) => s.large);
       for (const shark of this.sharks) {
         const unlimitedRange = allSharksLarge || shark.kind === 'greatWhite' || shark.kind === 'hammerhead';
-        // A pod big enough to ram this shark makes it wary, but only the small ones. Large
-        // sharks (and the Matriarch - she's a boss) always press the attack: watching something
-        // that never loses track of you and can vanish at will also back away from your pod read
-        // as the shark fleeing rather than stalking, and it kept them off screen where you could
-        // not boost-ram them anyway. Wariness is cancelled by a boost for the same reason: a
-        // wary shark holds a 5-unit buffer, wider than the 4.6 a small tiger can be rammed from,
-        // so it would otherwise park itself exactly outside kill range.
-        const podThreat =
-          !shark.matriarch &&
-          !shark.large &&
-          this.huntingMode &&
-          !this.sprinting &&
-          podSize >= this.sharkPodRequirement(shark.kind, shark.large);
-        shark.move(sharkSpeed, this.player, this.sharks, unlimitedRange, now, podThreat);
+        shark.move(sharkSpeed, this.player, this.sharks, unlimitedRange, now);
       }
     }
 
