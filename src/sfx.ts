@@ -24,6 +24,12 @@ const BITE_SAMPLE = 'shark-bite.mp3';
  * 12% above 2kHz, which is why it reads as a body blow instead of a slap.
  */
 const BIG_KILL_SAMPLE = 'big-kill.mp3';
+/**
+ * Landing a hit on the Matriarch. Longer and far lower than the large-shark impact - all of its
+ * energy sits below 2kHz and it rings for over a second - because she takes three hits to bring
+ * down and each one should feel like it moved something enormous.
+ */
+const MATRIARCH_HIT_SAMPLE = 'matriarch-hit.mp3';
 
 class SfxEngine {
   private ctx: AudioContext | null = null;
@@ -56,6 +62,7 @@ class SfxEngine {
     this.preloadSample(RECRUIT_SAMPLE);
     this.preloadSample(BITE_SAMPLE);
     this.preloadSample(BIG_KILL_SAMPLE);
+    this.preloadSample(MATRIARCH_HIT_SAMPLE);
   }
 
   /** Fetches and decodes a sample once, caching the result. Safe to call repeatedly. */
@@ -244,6 +251,18 @@ class SfxEngine {
     const now = ctx.currentTime;
     this.tone(ctx, 150, now, 0.34, { type: 'sine', gain: 0.5, glideTo: 46 });
     this.crunch(ctx, now, { dur: 0.16, grainMs: 5, from: 1600, to: 300, peak: 0.4, q: 0.8 });
+  }
+
+  /** Landing a hit on the Matriarch - heavier and longer than an ordinary large-shark kill. */
+  playMatriarchHit(): void {
+    if (this.playSample(MATRIARCH_HIT_SAMPLE, 0.95)) return;
+
+    // Synthesised stand-in, used only until the recording has loaded.
+    const ctx = this.ensureContext();
+    const now = ctx.currentTime;
+    this.tone(ctx, 110, now, 0.9, { type: 'sine', gain: 0.5, glideTo: 38 });
+    this.tone(ctx, 78, now + 0.04, 0.8, { type: 'triangle', gain: 0.3 });
+    this.crunch(ctx, now, { dur: 0.22, grainMs: 7, from: 1200, to: 200, peak: 0.4, q: 0.9 });
   }
 
   /** Short percussive kill blip whose pitch climbs with the combo step (0-based), then caps. */

@@ -574,9 +574,10 @@ export class Game {
   }
 
   /** Freeze-frame + light screen shake for a big kill. No-op under prefers-reduced-motion. */
-  private triggerBigKillFeedback(): void {
+  private triggerBigKillFeedback(impact: 'shark' | 'matriarch' = 'shark'): void {
     // Sound first: reduced motion should suppress the freeze-frame and the shake, not the hit.
-    sfx.playBigKill();
+    if (impact === 'matriarch') sfx.playMatriarchHit();
+    else sfx.playBigKill();
     if (this.reducedMotion) return;
     this.hitStopUntil = Date.now() + HIT_STOP_MS;
     this.shakeMagnitude = SHAKE_MAGNITUDE;
@@ -2803,6 +2804,7 @@ export class Game {
             this.matriarchHitCooldownUntil = Date.now() + MATRIARCH_HIT_COOLDOWN_MS;
             this.matriarchHitsTaken++;
             this.particles.emit('hit', shark._x * scale + scale / 2, shark._y * scale + scale / 2, 16, { speed: 3, life: 0.6 });
+            this.triggerBigKillFeedback('matriarch');
             if (this.matriarchHitsTaken >= MATRIARCH_HITS_REQUIRED) {
               matriarchJustDefeated = true;
             } else {
@@ -2830,7 +2832,7 @@ export class Game {
           survivingSharks.push(shark);
         } else if (shark === this.matriarch && this.mode === 'endless') {
           this.particles.emit('hit', shark._x * scale + scale / 2, shark._y * scale + scale / 2, 16, { speed: 3, life: 0.6 });
-          this.triggerBigKillFeedback();
+          this.triggerBigKillFeedback('matriarch');
           this.fleeMatriarch(shark);
         } else {
           this.particles.emit('hit', shark._x * scale + scale / 2, shark._y * scale + scale / 2, 16, { speed: 3, life: 0.6 });

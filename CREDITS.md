@@ -53,6 +53,13 @@ but not to be redistributed as standalone downloads. Source files in
 | `dolphin-recruit.mp3` | `sondangsirait419-lumba-lumba-220055.mp3` | sondangsirait419 | 220055 |
 | `shark-bite.mp3` | `makigai_maimai-crunchy-bite-450650.mp3` | makigai_maimai | 450650 |
 | `big-kill.mp3` | `universfield-punch-140236.mp3` | universfield | 140236 |
+| `matriarch-hit.mp3` | `MatriarchHit3.mp3` | **unconfirmed** | **unconfirmed** |
+
+> The Matriarch hit was supplied already renamed, so its original uploader and
+> sound ID are not recoverable from the filename. Confirm its source before any
+> store release: if it is not Pixabay (or another licence permitting commercial
+> use), it must be replaced. Every other entry here was identified from its
+> original download filename.
 
 `dolphin-recruit.mp3` plays when a dolphin joins the pod: trimmed to drop 18ms
 of leading silence, raised 6dB (peak -1.8dB), 45ms fade-out, mono at 96kbps —
@@ -74,8 +81,15 @@ clipping otherwise (peak -1.6dB), 60ms fade-out, mono at 96kbps — 6.2KB. It ha
 weight rather than brightness: 12% of its energy above 2kHz, which is why it
 reads as a body blow and not a slap.
 
-All three have synthesized fallbacks in `src/sfx.ts` covering the first play of
-a session, before the files have finished loading.
+`matriarch-hit.mp3` plays each time the Mega Pod lands a hit on the Matriarch,
+the finishing blow included, and in Endless when the pod drives her off. Taken
+from 45ms in (1.8s), lowered 4dB for headroom (peak -2.8dB), 300ms fade-out,
+mono at 96kbps — 22KB. It is deliberately far heavier than the large-shark
+impact: all of its energy sits below 2kHz and it rings for over a second, so a
+boss hit does not sound like an ordinary kill.
+
+All four have synthesized fallbacks in `src/sfx.ts` covering the first play of a
+session, before the files have finished loading.
 
 
 Graphics
