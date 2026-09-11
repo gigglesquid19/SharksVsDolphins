@@ -575,6 +575,8 @@ export class Game {
 
   /** Freeze-frame + light screen shake for a big kill. No-op under prefers-reduced-motion. */
   private triggerBigKillFeedback(): void {
+    // Sound first: reduced motion should suppress the freeze-frame and the shake, not the hit.
+    sfx.playBigKill();
     if (this.reducedMotion) return;
     this.hitStopUntil = Date.now() + HIT_STOP_MS;
     this.shakeMagnitude = SHAKE_MAGNITUDE;

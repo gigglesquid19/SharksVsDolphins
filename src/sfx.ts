@@ -18,6 +18,12 @@ const RECRUIT_SAMPLE = 'dolphin-recruit.mp3';
  * it sounds like someone eating crisps rather than something happening underwater.
  */
 const BITE_SAMPLE = 'shark-bite.mp3';
+/**
+ * The impact when a boosting pod destroys a large shark. Paired with the freeze-frame and screen
+ * shake in Game.triggerBigKillFeedback, so it wants weight rather than brightness - this take is
+ * 12% above 2kHz, which is why it reads as a body blow instead of a slap.
+ */
+const BIG_KILL_SAMPLE = 'big-kill.mp3';
 
 class SfxEngine {
   private ctx: AudioContext | null = null;
@@ -49,6 +55,7 @@ class SfxEngine {
     this.ensureContext();
     this.preloadSample(RECRUIT_SAMPLE);
     this.preloadSample(BITE_SAMPLE);
+    this.preloadSample(BIG_KILL_SAMPLE);
   }
 
   /** Fetches and decodes a sample once, caching the result. Safe to call repeatedly. */
@@ -223,6 +230,20 @@ class SfxEngine {
 
     // Water closing over it.
     this.tone(ctx, 62, now + 0.02, 0.7, { type: 'sine', gain: 0.34, glideTo: 38 });
+  }
+
+  /**
+   * Destroying a large shark: the moment the pod's boost lands. Sits under the combo blip that
+   * every kill plays, so this carries the weight and the blip keeps carrying the streak.
+   */
+  playBigKill(): void {
+    if (this.playSample(BIG_KILL_SAMPLE, 0.9)) return;
+
+    // Synthesised stand-in, used only until the recording has loaded.
+    const ctx = this.ensureContext();
+    const now = ctx.currentTime;
+    this.tone(ctx, 150, now, 0.34, { type: 'sine', gain: 0.5, glideTo: 46 });
+    this.crunch(ctx, now, { dur: 0.16, grainMs: 5, from: 1600, to: 300, peak: 0.4, q: 0.8 });
   }
 
   /** Short percussive kill blip whose pitch climbs with the combo step (0-based), then caps. */
