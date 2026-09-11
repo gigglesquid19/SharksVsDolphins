@@ -23,7 +23,8 @@ import { sfx } from './sfx';
 import { LEVELS, LevelConfig, getLevelBackground, getLevelConfig } from './levels';
 import { CANVAS_SIZE, SIZE } from './constants';
 import { clampEntityY, directionDelta, sweptDistance, wrapX } from './utils';
-import { Dolphin, Shark, MagicShrimp, Jellyfish } from './entities';
+import { Dolphin, Shark, Jellyfish } from './entities';
+import { magicShrimpHeld, useMagicShrimp } from './inventory';
 import {
   loadCampaignScores,
   loadEndlessScores,
@@ -110,7 +111,6 @@ const SHARK_FADE_RESTORE_MS = 700;
 // so the opening of a level is never an ambush you could not have seen coming.
 const SHARK_SPAWN_CLEARANCE = 22;
 const Z_SHARK = 0;
-const Z_SHRIMP = 5;
 const Z_DOLPHIN = 10;
 const Z_PLAYER = 20;
 const SPRINT_DURATION = 300;
@@ -191,8 +191,6 @@ export class Game {
   private runElapsed = 0;
   private nextDolphinSpawnTime = 60;
   private lastFrameTime = 0;
-  private magicShrimp: MagicShrimp | null = null;
-  private shrimpSpawned = false;
   private playerHitCooldownUntil = 0;
   private huntingMode = false;
   private readyToSchool = false;
@@ -310,7 +308,6 @@ export class Game {
   private startBtn: HTMLButtonElement;
   private statTime: HTMLElement;
   private statSpawn: HTMLElement;
-  private statShrimp: HTMLElement;
   private statDolphins: HTMLElement;
   private statSharks: HTMLElement;
   private statStatus: HTMLElement;
@@ -373,6 +370,7 @@ export class Game {
   private onMusicTrackChange?: (url: string) => void;
   private onMusicDuck?: (durationMs: number) => void;
   private onEchoAvailabilityChange?: (available: boolean) => void;
+  private onShrimpCountChange?: (held: number) => void;
   private lastMusicLevel = 0;
   private paused = false;
 
@@ -393,7 +391,6 @@ export class Game {
   private particles!: ParticleSystem;
   private dolphinSprites = new Map<Dolphin, Container>();
   private sharkSprites = new Map<Shark, Container>();
-  private shrimpSprite: Container | null = null;
 
   private glowTexture: Texture;
   private sharkTextureSets: Partial<Record<SharkKind, SharkTextureSet>> = {};
@@ -406,7 +403,6 @@ export class Game {
       startBtn: HTMLButtonElement;
       statTime: HTMLElement;
       statSpawn: HTMLElement;
-      statShrimp: HTMLElement;
       statDolphins: HTMLElement;
       statSharks: HTMLElement;
       statStatus: HTMLElement;
@@ -422,6 +418,7 @@ export class Game {
       onMusicTrackChange?: (url: string) => void;
       onMusicDuck?: (durationMs: number) => void;
       onEchoAvailabilityChange?: (available: boolean) => void;
+      onShrimpCountChange?: (held: number) => void;
     }
   ) {
     this.canvas = canvas;
@@ -431,7 +428,6 @@ export class Game {
     this.startBtn = inputs.startBtn;
     this.statTime = inputs.statTime;
     this.statSpawn = inputs.statSpawn;
-    this.statShrimp = inputs.statShrimp;
     this.statDolphins = inputs.statDolphins;
     this.statSharks = inputs.statSharks;
     this.statStatus = inputs.statStatus;
@@ -490,6 +486,7 @@ export class Game {
     this.onMusicTrackChange = inputs.onMusicTrackChange;
     this.onMusicDuck = inputs.onMusicDuck;
     this.onEchoAvailabilityChange = inputs.onEchoAvailabilityChange;
+    this.onShrimpCountChange = inputs.onShrimpCountChange;
     this.lastLifeHeart = document.getElementById('lastLifeHeart');
     this.levelBadgeNumberEl = document.getElementById('levelBadgeNumber');
     this.dolphinsSavedBadgeEl = document.getElementById('dolphinsSavedBadge');
@@ -638,6 +635,38 @@ export class Game {
   private resetKillCombo(): void {
     this.killCombo = 0;
     this.lastKillTime = 0;
+  }
+
+  /** How many Magic Shrimp the player is carrying, for the in-run button. */
+  magicShrimpCount(): number {
+    return magicShrimpHeld();
+  }
+
+  /**
+   * Spends a Magic Shrimp for a speed boost lasting the rest of the level. Bought in the Store
+   * rather than found in the water: as a pickup it was a coin flip that could just as easily hand
+   * the boost to a shark and turn it large, which was punishment with no counterplay. Refuses
+   * when there is none to spend or a boost is already running, so one is never wasted.
+   */
+  useMagicShrimpItem(): boolean {
+    if (!this.running || this.paused || !this.player) return false;
+    if (Date.now() < this.player.speedBoostUntil) {
+      this.setStatus('A boost is already running');
+      return false;
+    }
+    if (!useMagicShrimp()) return false;
+
+    this.player.speedBoostUntil = Number.MAX_SAFE_INTEGER;
+    const scale = CANVAS_SIZE / SIZE;
+    this.particles.emit('sparkle', this.player._x * scale + scale / 2, this.player._y * scale + scale / 2, 18, {
+      speed: 2,
+      life: 0.8,
+    });
+    sfx.playShrimp();
+    this.setStatus('Speed boost for the level!');
+    this.showBanner('Magic Shrimp!', 'statup', 1400);
+    this.onShrimpCountChange?.(magicShrimpHeld());
+    return true;
   }
 
   /** True while a ping is lighting the water up. */
@@ -1084,7 +1113,6 @@ export class Game {
     this.entityContainer.removeChildren();
     this.dolphinSprites.clear();
     this.sharkSprites.clear();
-    this.shrimpSprite = null;
     this.particles.clear();
 
     this.dolphins = [];
@@ -1144,6 +1172,7 @@ export class Game {
       this.echoEndTime = 0;
       this.echoCooldownEnd = 0;
       this.onEchoAvailabilityChange?.(this.echoAvailable);
+      this.onShrimpCountChange?.(magicShrimpHeld());
     }
     this.wasOnLastLifeThisLevel = false;
 
@@ -1171,8 +1200,6 @@ export class Game {
 
     this.nextDolphinSpawnTime = this.dolphinSpawnInterval;
     this.lastFrameTime = 0;
-    this.magicShrimp = null;
-    this.shrimpSpawned = false;
     this.podHeading = 0;
     this.playerHitCooldownUntil = 0;
     this.hideBanner();
@@ -1518,34 +1545,6 @@ export class Game {
     body.moveTo(13, -3).lineTo(21, 0).lineTo(13, 3).closePath().fill({ color: 0x64748b });
     fish.addChild(body);
     return fish;
-  }
-
-  private addShrimpSprite(): void {
-    if (this.shrimpSprite) return;
-    const container = new Container();
-
-    const glowTex = makeRadialGradientTexture(64, 'rgba(250, 204, 21, 0.6)');
-    const glow = new Sprite(glowTex);
-    glow.anchor.set(0.5);
-    glow.width = 32;
-    glow.height = 32;
-    glow.alpha = 0.6;
-    container.addChild(glow);
-
-    const text = new Text({
-      text: '🍤',
-      style: {
-        fontFamily: '"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif',
-        fill: '#ffffff',
-        fontSize: 30,
-        align: 'center',
-      },
-    });
-    text.anchor.set(0.5);
-    container.addChild(text);
-
-    this.addEntitySprite(container, Z_SHRIMP);
-    this.shrimpSprite = container;
   }
 
   /**
@@ -2821,65 +2820,6 @@ export class Game {
     }
   }
 
-  private findFreeSpot(): { x: number; y: number } {
-    let x: number, y: number;
-    do {
-      x = Math.floor(Math.random() * SIZE);
-      y = Math.floor(Math.random() * SIZE);
-    } while (this.player && Math.abs(x - this.player._x) < 10 && Math.abs(y - this.player._y) < 10);
-    return { x, y };
-  }
-
-  private spawnMagicShrimp(): void {
-    const spot = this.findFreeSpot();
-    this.magicShrimp = new MagicShrimp();
-    this.magicShrimp._x = spot.x;
-    this.magicShrimp._y = clampEntityY(spot.y, 3);
-    this.shrimpSpawned = true;
-    this.addShrimpSprite();
-    this.setStatus('Magic shrimp appeared!');
-  }
-
-  private checkShrimpCollection(): void {
-    if (!this.magicShrimp) return;
-    const scale = CANVAS_SIZE / SIZE;
-    const shrimpX = this.magicShrimp._x * scale + scale / 2;
-    const shrimpY = this.magicShrimp._y * scale + scale / 2;
-
-    for (const dolphin of this.dolphins) {
-      if (!dolphin.isPlayer) continue;
-      if (dolphin.distanceBetween(this.magicShrimp) <= 4) {
-        dolphin.speedBoostUntil = Number.MAX_SAFE_INTEGER;
-        this.setStatus('Speed boost for the level!');
-        this.particles.emit('sparkle', shrimpX, shrimpY, 16, { speed: 2, life: 0.8 });
-        sfx.playShrimp();
-        this.magicShrimp = null;
-        if (this.shrimpSprite) {
-          this.entityContainer.removeChild(this.shrimpSprite);
-          this.shrimpSprite.destroy();
-          this.shrimpSprite = null;
-        }
-        return;
-      }
-    }
-
-    for (const shark of this.sharks) {
-      if (shark.distanceBetween(this.magicShrimp) <= 4) {
-        shark.large = true;
-        shark.sizeMultiplier = shark.kind === 'tiger' ? 2.5 : LARGE_SHARK_SIZE_MULTIPLIER;
-        this.setStatus('A shark grew to full size!');
-        this.particles.emit('sparkle', shrimpX, shrimpY, 16, { speed: 2, life: 0.8 });
-        this.magicShrimp = null;
-        if (this.shrimpSprite) {
-          this.entityContainer.removeChild(this.shrimpSprite);
-          this.shrimpSprite.destroy();
-          this.shrimpSprite = null;
-        }
-        return;
-      }
-    }
-  }
-
   private step(): void {
     if (!this.running || this.awaitingLevelUpChoice || this.awaitingSharkWarning || this.awaitingRunSummary || this.awaitingTutorialHint || this.awaitingMilestone || this.awaitingContinue) return;
 
@@ -3211,12 +3151,6 @@ export class Game {
       }
     }
 
-    if (!this.shrimpSpawned && this.gameTime >= 80) {
-      this.spawnMagicShrimp();
-    }
-
-    this.checkShrimpCollection();
-
     // The camera leans against the player's movement and decays back to centre when they stop.
     // directionDelta keeps it wrap-safe: crossing the seam is a small step, not a jump across
     // the whole world, which a position-based parallax would read as the camera being flung.
@@ -3248,12 +3182,6 @@ export class Game {
     this.statTime.textContent = this.gameTime.toFixed(1) + 's';
     const spawnCount = Math.max(0, this.nextDolphinSpawnTime - this.gameTime);
     this.statSpawn.textContent = spawnCount.toFixed(1) + 's';
-    const shrimpCount = Math.max(0, 80 - this.gameTime);
-    this.statShrimp.textContent = this.magicShrimp
-      ? 'On the board!'
-      : this.shrimpSpawned
-      ? 'Gone'
-      : shrimpCount.toFixed(1) + 's';
     this.statDolphins.textContent = String(this.dolphins.length);
     this.statSharks.textContent = String(this.sharks.length);
     this.updateLastLifeHeart();
@@ -3374,13 +3302,6 @@ export class Game {
       } else {
         sprite.visible = true;
       }
-    }
-
-    if (this.magicShrimp && this.shrimpSprite) {
-      const pulse = 1 + Math.sin(t * 6) * 0.12;
-      this.shrimpSprite.x = this.magicShrimp._x * scale + scale / 2;
-      this.shrimpSprite.y = this.magicShrimp._y * scale + scale / 2;
-      this.shrimpSprite.scale.set(pulse);
     }
 
     this.drawJellyfish();

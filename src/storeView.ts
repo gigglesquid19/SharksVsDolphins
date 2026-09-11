@@ -16,6 +16,12 @@ import {
   ownsSkin,
   upgradeLevel,
 } from './store';
+import {
+  MAGIC_SHRIMP_PRICE,
+  MAX_MAGIC_SHRIMP,
+  buyMagicShrimp,
+  magicShrimpHeld,
+} from './inventory';
 import { DOLPHIN_SKINS } from './skins';
 import { makeDolphinBodyCanvas } from './sprites';
 
@@ -29,8 +35,45 @@ export function setupStore(opts: { onPearlsChange: () => void }): { open: () => 
   const pearlsNumberEl = document.getElementById('storePearlsNumber') as HTMLElement;
   const upgradesEl = document.getElementById('storeUpgrades') as HTMLDivElement;
   const abilitiesEl = document.getElementById('storeAbilities') as HTMLDivElement;
+  const consumablesEl = document.getElementById('storeConsumables') as HTMLDivElement;
   const skinsEl = document.getElementById('storeSkins') as HTMLDivElement;
   const closeBtn = document.getElementById('storeCloseBtn') as HTMLButtonElement;
+
+  /**
+   * Magic Shrimp: the only item here that is spent rather than owned. It used to appear in the
+   * water mid-level, where a shark could reach it first and grow large - a coin flip the player
+   * could not influence. Bought and carried, it becomes a decision instead.
+   */
+  function renderConsumables(): void {
+    const balance = getPearls();
+    const held = magicShrimpHeld();
+    const full = held >= MAX_MAGIC_SHRIMP;
+
+    const item = document.createElement('div');
+    item.className = 'store-item';
+    if (full) item.classList.add('owned');
+
+    item.innerHTML = `
+      <div class="store-item-icon" aria-hidden="true">\u{1F990}</div>
+      <div class="store-item-name">Magic Shrimp</div>
+      <div class="store-item-desc">Use it mid-run for double swim speed that lasts the rest of the level.</div>
+      <div class="store-item-level">Carrying ${held} / ${MAX_MAGIC_SHRIMP}</div>`;
+
+    const btn = document.createElement('button');
+    btn.className = 'store-buy';
+    if (full) {
+      btn.textContent = 'Pack full';
+      btn.disabled = true;
+    } else {
+      btn.innerHTML = `<img class="pearl-icon" alt="" src="${pearlIconSrc()}"> ${MAGIC_SHRIMP_PRICE}`;
+      btn.disabled = balance < MAGIC_SHRIMP_PRICE;
+      btn.addEventListener('click', () => {
+        if (buyMagicShrimp()) refresh();
+      });
+    }
+    item.appendChild(btn);
+    consumablesEl.replaceChildren(item);
+  }
 
   /**
    * Echolocation: locked until the campaign has been cleared, then a one-off purchase. Shown even
@@ -177,6 +220,7 @@ export function setupStore(opts: { onPearlsChange: () => void }): { open: () => 
 
   function refresh(): void {
     pearlsNumberEl.textContent = String(getPearls());
+    renderConsumables();
     renderAbilities();
     renderUpgrades();
     renderSkins();

@@ -336,20 +336,6 @@ export class Shark {
   }
 }
 
-export class MagicShrimp {
-  _x: number;
-  _y: number;
-
-  constructor() {
-    this._x = Math.floor(Math.random() * 100);
-    this._y = Math.floor(Math.random() * 100);
-  }
-
-  distanceBetween(other: { _x: number; _y: number }): number {
-    return Math.sqrt((this._x - other._x) ** 2 + (this._y - other._y) ** 2);
-  }
-}
-
 export class Jellyfish {
   id: number;
   _x: number;

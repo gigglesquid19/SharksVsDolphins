@@ -19,7 +19,7 @@ Contents
 - `src/game.ts` - core game/simulation orchestration: level flow, spawning,
   Hunting Mode, procedural storm/jellyfish events, the matriarch boss, the
   Mega Shrimp upgrade choices, banners, and the render loop.
-- `src/entities.ts` - the Dolphin, Shark, MagicShrimp, and Jellyfish classes
+- `src/entities.ts` - the Dolphin, Shark, and Jellyfish classes
   and their movement logic (no Pixi/DOM dependencies).
 - `src/scoring.ts` - local top-10 leaderboard persistence (`localStorage`),
   separate boards for Campaign and Endless; entries are stamped with the
@@ -35,6 +35,9 @@ Contents
   per-level payout formula, and the spend path.
 - `src/progress.ts` - campaign milestones that gate content (`localStorage`).
   Currently just "has the campaign been cleared", which unlocks Echolocation.
+- `src/inventory.ts` - consumables the player has bought and is carrying
+  (`localStorage`). Unlike the Store's upgrades and abilities these are spent,
+  so the shape is a count that goes down; currently just the Magic Shrimp.
 - `src/store.ts` - the Store: persisted purchases (`localStorage`) of permanent
   Endless-mode stat upgrades, dolphin skins and one-off abilities, plus the
   derived Endless starting bonuses and Echolocation tuning.
@@ -279,8 +282,7 @@ How to Play
      anywhere on the water; the dolphin swims in that direction relative to
      the centre of the screen.
    - **Pause**, or press `Esc`/`P`, to bring up the pause menu at any time.
-4. Survive shark attacks, recruit lost dolphins into your pod, and grab the
-   magic shrimp when it appears.
+4. Survive shark attacks and recruit lost dolphins into your pod.
 5. Grow your pod to 4 dolphins to enter **Hunting Mode**: ramming a shark
    destroys it instead of costing you a life.
 6. Clear every shark to trigger **Level Complete**, then swim off the right
@@ -296,10 +298,12 @@ Game Features
   Swim close to recruit it (with a chime and banner), and recruited
   dolphins flock around you in formation and follow you through the
   screen-wrap edges.
-- **Magic Shrimp**: a bonus item appears after 2 minutes.
-  - Player dolphin: 30 seconds of double speed.
-  - Another dolphin: 30 seconds of invulnerability to sharks.
-  - A shark: grows larger and gains a permanent speed boost.
+- **Magic Shrimp**: bought in the Store for 60 Pearls and carried into a run,
+  up to three at a time. Tap the amber button (or press `Q`) to spend one for
+  double swim speed lasting the rest of the level, in Campaign or Endless.
+  It used to appear in the water after two minutes, where a shark could reach
+  it first and grow large - a coin flip the player had no way to influence.
+  Bought and carried, it is a decision about when to spend instead.
 - **Hunting Mode**: once your pod reaches 4, ramming *small* sharks destroys
   them. *Large* sharks (marked with a ⚡ and a higher number) also need you to
   be **Boosting** - tap Space, or the ⚡ button - into them at the moment of

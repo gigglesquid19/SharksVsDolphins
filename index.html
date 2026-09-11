@@ -86,6 +86,11 @@
         <span class="store-pearls" id="storePearls"><img class="pearl-icon" alt=""> <span id="storePearlsNumber">0</span></span>
       </div>
       <div class="store-section">
+        <h3>Consumables</h3>
+        <p class="store-note">Carried between runs and used up during one. Works in Campaign and Endless.</p>
+        <div class="store-grid" id="storeConsumables"></div>
+      </div>
+      <div class="store-section">
         <h3>Abilities</h3>
         <p class="store-note">Bought once, then usable in every Endless run.</p>
         <div class="store-grid" id="storeAbilities"></div>
@@ -333,7 +338,6 @@
         <div class="stats">
           <div class="stat"><div class="stat-label">Time</div><span class="stat-value" id="statTime">0.0s</span></div>
           <div class="stat stat-hidden"><div class="stat-label">Spawn</div><span class="stat-value" id="statSpawn">60.0s</span></div>
-          <div class="stat stat-hidden"><div class="stat-label">Shrimp</div><span class="stat-value" id="statShrimp">120.0s</span></div>
           <div class="stat dolphin stat-hidden"><div class="stat-label">Dolphins</div><span class="stat-value" id="statDolphins">1</span></div>
           <div class="stat shark stat-hidden"><div class="stat-label">Sharks</div><span class="stat-value" id="statSharks">0</span></div>
           <div class="stat stat-hidden"><div class="stat-label">Status</div><span class="stat-value" id="statStatus" style="font-size: 0.85rem; font-weight: 700;">Ready</span></div>
@@ -341,6 +345,11 @@
         <div class="sprint-btn-wrap">
           <button id="sprintBtn" class="sprint-btn" aria-label="Sprint">⚡</button>
           <div class="sprint-cooldown-ring" id="sprintCooldownRing"></div>
+        </div>
+        <div class="sprint-btn-wrap hidden" id="shrimpBtnWrap">
+          <button id="shrimpBtn" class="sprint-btn shrimp-btn" aria-label="Use a Magic Shrimp">
+            &#129424;<span class="shrimp-count" id="shrimpCount">0</span>
+          </button>
         </div>
         <div class="sprint-btn-wrap hidden" id="echoBtnWrap">
           <button id="echoBtn" class="sprint-btn echo-btn" aria-label="Echolocation">🔊</button>

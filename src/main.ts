@@ -312,6 +312,13 @@ const inputs = {
   onEchoAvailabilityChange: (available: boolean) => {
     document.getElementById('echoBtnWrap')?.classList.toggle('hidden', !available);
   },
+  // The Magic Shrimp button only exists while there is one to spend, so an empty pack does not
+  // leave a dead control on screen.
+  onShrimpCountChange: (held: number) => {
+    const count = document.getElementById('shrimpCount');
+    if (count) count.textContent = String(held);
+    document.getElementById('shrimpBtnWrap')?.classList.toggle('hidden', held <= 0);
+  },
   onMusicDuck: (durationMs: number) => {
     const restore = () => {
       bgMusic.volume = Math.min(1, Math.max(0, Number(volumeSlider.value) / 100));
@@ -440,6 +447,11 @@ const inputs = {
     // ability on a cooldown, so holding the key must not queue anything up.
     if ((e.key === 'e' || e.key === 'E') && !e.repeat) {
       fireEcho();
+      return;
+    }
+    // Same for the Magic Shrimp - holding the key must not burn the whole pack.
+    if ((e.key === 'q' || e.key === 'Q') && !e.repeat) {
+      useShrimp();
       return;
     }
     // Arrow keys scroll the page by default; that's what made the window "slide" during play.
@@ -672,6 +684,21 @@ const inputs = {
 
   const sprintCooldownRing = document.getElementById('sprintCooldownRing') as HTMLDivElement;
   let sprintWasReady = true;
+  const shrimpBtn = document.getElementById('shrimpBtn') as HTMLButtonElement;
+
+  function useShrimp(): void {
+    if (!game.useMagicShrimpItem()) return;
+    shrimpBtn.classList.add('active');
+    window.setTimeout(() => shrimpBtn.classList.remove('active'), 200);
+    inputs.onShrimpCountChange?.(game.magicShrimpCount());
+  }
+
+  shrimpBtn.addEventListener('click', useShrimp);
+  shrimpBtn.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    useShrimp();
+  });
+
   const echoBtn = document.getElementById('echoBtn') as HTMLButtonElement;
   const echoCooldownRing = document.getElementById('echoCooldownRing') as HTMLDivElement;
   let echoWasReady = true;

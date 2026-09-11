@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Dolphin, Jellyfish, MagicShrimp, Shark } from './entities';
+import { Dolphin, Jellyfish, Shark } from './entities';
 
 describe('Dolphin', () => {
   it('measures Euclidean distance between points', () => {
@@ -61,16 +61,6 @@ describe('Shark', () => {
     shark.move(1, null, [shark]);
     expect(shark._x).toBe(50);
     expect(shark._y).toBe(50);
-  });
-});
-
-describe('MagicShrimp', () => {
-  it('spawns within the world bounds', () => {
-    const shrimp = new MagicShrimp();
-    expect(shrimp._x).toBeGreaterThanOrEqual(0);
-    expect(shrimp._x).toBeLessThan(100);
-    expect(shrimp._y).toBeGreaterThanOrEqual(0);
-    expect(shrimp._y).toBeLessThan(100);
   });
 });
 
