@@ -341,13 +341,18 @@ const inputs = {
   document.getElementById('milestoneContinueBtn')!.addEventListener('click', () => game.dismissMilestone());
 
   // Android Game Over: Continue offer + a way back to the menu (no Retry button on Android).
-  function returnToTitle(): void {
-    game.reset();
+  /** Swaps the screens back to the title. Does not touch the run - callers decide that. */
+  function showTitleScreen(): void {
     appContent.classList.add('hidden');
     narrativeScreen.classList.add('hidden');
     titleScreen.classList.remove('hidden');
     if (loadRunCheckpoint()) titleContinueBtn.classList.remove('hidden');
     refreshTitlePearls();
+  }
+
+  function returnToTitle(): void {
+    game.reset();
+    showTitleScreen();
   }
   document.getElementById('continueAdBtn')!.addEventListener('click', () => void game.continueViaAd());
   document.getElementById('continuePayBtn')!.addEventListener('click', () => void game.continueViaPurchase());
@@ -373,6 +378,13 @@ const inputs = {
   document.getElementById('pauseResumeBtn')!.addEventListener('click', () => game.togglePause());
   document.getElementById('pauseRestartBtn')!.addEventListener('click', () => game.retry());
   document.getElementById('pauseResetBtn')!.addEventListener('click', () => game.reset());
+  // Quitting mid-run was only reachable from the Android Game Over screen before, so a paused
+  // player had no way back to the menu at all - on Android there is no browser chrome to fall
+  // back on. leaveToMenu() keeps the campaign checkpoint, so Continue Campaign still works.
+  document.getElementById('pauseHomeBtn')!.addEventListener('click', () => {
+    game.leaveToMenu();
+    showTitleScreen();
+  });
 
   const SCROLLING_KEYS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
 

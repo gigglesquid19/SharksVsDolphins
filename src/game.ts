@@ -85,6 +85,8 @@ const CLOAK_DURATION_MS = 20000;
 const CLOAK_COOLDOWN_MS = 20000;
 // Up to and including this level, a large great white needs 10 pod members rather than 12.
 const GREAT_WHITE_EASED_UNTIL_LEVEL = 5;
+// Breathing room at the start of a level, counted from the first tick that actually runs.
+const LEVEL_START_INVULNERABILITY_MS = 5000;
 const SPRINT_DURATION = 300;
 const SPRINT_COOLDOWN = 10000;
 const SPRINT_SPEED = 2;
@@ -209,6 +211,8 @@ export class Game {
   private seenLargeSharkKinds = new Set<SharkKind>();
   private seenLargeSharkVariety = false;
   private autoFormedForThisPod = false;
+  /** Set when a level is set up; consumed by the first tick of the loop that actually runs. */
+  private pendingLevelInvulnerability = false;
   private currentLevel = 1;
   private retries = 0;
   private totalRecruited = 0;
@@ -575,6 +579,25 @@ export class Game {
     return Math.max(0, Math.min(1, (now - startedAt) / total));
   }
 
+  /**
+   * Leaves the run and hands control back to the title screen. Unlike reset() this deliberately
+   * keeps any campaign checkpoint, so "Continue Campaign" still picks the run back up - quitting
+   * from the pause menu should not throw the campaign away.
+   */
+  leaveToMenu(): void {
+    // Tear the pause overlay down directly rather than via resumeGame(), which would restart the
+    // loop for a tick on the way out.
+    this.paused = false;
+    this.pauseOverlayEl.classList.add('hidden');
+    this.running = false;
+    if (this.timer) clearTimeout(this.timer);
+    this.flushLifetimeStats();
+    this.createEnvironment();
+    this.initModel(this.getSelectedLevelConfig());
+    this.setStatus('Ready');
+    this.startBtn.textContent = 'Start';
+  }
+
   reset(): void {
     this.running = false;
     if (this.timer) clearTimeout(this.timer);
@@ -889,7 +912,8 @@ export class Game {
     const py = Math.floor(SIZE / 2);
     this.player = new Dolphin(0, py, px);
     this.player.isPlayer = true;
-    this.player.invulnerableUntil = Date.now() + 5000;
+    this.player.invulnerableUntil = Date.now() + LEVEL_START_INVULNERABILITY_MS;
+    this.pendingLevelInvulnerability = true;
     this.dolphins.push(this.player);
     this.addDolphinSprite(this.player);
 
@@ -1921,7 +1945,8 @@ export class Game {
         this.spawnRecruitedDolphin(this.player._x, this.player._y);
       }
 
-      this.player.invulnerableUntil = Date.now() + 5000;
+      this.player.invulnerableUntil = Date.now() + LEVEL_START_INVULNERABILITY_MS;
+      this.pendingLevelInvulnerability = true;
       this.autoFormedForThisPod = false;
     }
 
@@ -2615,6 +2640,18 @@ export class Game {
     const sharkSpeed = parseInt(this.sharkSpeedInput.value, 10) || 1;
 
     const now = Date.now();
+
+    // The level's opening invulnerability is granted here, on the first tick that actually runs,
+    // rather than when the level was set up. A level commonly begins behind a level banner, a
+    // "New Shark Spotted!" card or the Mega Shrimp choice, and every one of those halts this
+    // loop (see the guard above) while the wall clock keeps running - on the later levels, where
+    // those cards are most common and the sharks converge fastest, the entire window could
+    // elapse before the player was ever allowed to move.
+    if (this.pendingLevelInvulnerability && this.player) {
+      this.pendingLevelInvulnerability = false;
+      this.player.invulnerableUntil = now + LEVEL_START_INVULNERABILITY_MS;
+    }
+
     if (now >= this.sprintEndTime) this.sprinting = false;
     if (this.keys[' '] && now >= this.sprintCooldownEnd) {
       this.sprinting = true;
