@@ -87,6 +87,17 @@ const CLOAK_COOLDOWN_MS = 20000;
 const GREAT_WHITE_EASED_UNTIL_LEVEL = 5;
 // Breathing room at the start of a level, counted from the first tick that actually runs.
 const LEVEL_START_INVULNERABILITY_MS = 5000;
+// Draw order inside the entity container. Sprites were previously stacked in creation order,
+// which put the sharks - spawned per level, after the player exists - on top of the pod, and
+// left the player dolphin at the very bottom under everything. A swarm arriving at the start of
+// a level then physically hid the dolphins you were steering. Your own pod always draws on top.
+// How much clear water a shark is given at spawn. Slightly wider than the old 15-per-axis box,
+// so the opening of a level is never an ambush you could not have seen coming.
+const SHARK_SPAWN_CLEARANCE = 22;
+const Z_SHARK = 0;
+const Z_SHRIMP = 5;
+const Z_DOLPHIN = 10;
+const Z_PLAYER = 20;
 const SPRINT_DURATION = 300;
 const SPRINT_COOLDOWN = 10000;
 const SPRINT_SPEED = 2;
@@ -464,6 +475,7 @@ export class Game {
     this.bgContainer = new Container();
     this.fxContainer = new Container();
     this.entityContainer = new Container();
+    this.entityContainer.sortableChildren = true;
     this.jellyfishContainer = new Container();
     this.stage.addChild(this.bgContainer);
     this.stage.addChild(this.jellyfishContainer);
@@ -1085,6 +1097,17 @@ export class Game {
     }
   }
 
+  /**
+   * Adds an entity sprite at the given draw layer. The sort is explicit because setting
+   * sortableChildren and a zIndex is not enough on its own here - Pixi never re-sorted, and the
+   * sprites stayed in insertion order, which is what put the sharks over the top of the pod.
+   */
+  private addEntitySprite(container: Container, zIndex: number): void {
+    this.entityContainer.addChild(container);
+    container.zIndex = zIndex;
+    this.entityContainer.sortChildren();
+  }
+
   private addDolphinSprite(dolphin: Dolphin): void {
     const container = new Container();
 
@@ -1110,7 +1133,7 @@ export class Game {
     fish.name = 'fish';
     container.addChild(fish);
 
-    this.entityContainer.addChild(container);
+    this.addEntitySprite(container, dolphin.isPlayer ? Z_PLAYER : Z_DOLPHIN);
     this.dolphinSprites.set(dolphin, container);
   }
 
@@ -1278,7 +1301,7 @@ export class Game {
     reqText.name = 'reqText';
     container.addChild(reqText);
 
-    this.entityContainer.addChild(container);
+    this.addEntitySprite(container, Z_SHARK);
     this.sharkSprites.set(shark, container);
   }
 
@@ -1316,7 +1339,7 @@ export class Game {
     text.anchor.set(0.5);
     container.addChild(text);
 
-    this.entityContainer.addChild(container);
+    this.addEntitySprite(container, Z_SHRIMP);
     this.shrimpSprite = container;
   }
 
@@ -2242,13 +2265,20 @@ export class Game {
       shark._x = Math.floor(Math.random() * SIZE);
       shark._y = Math.floor(Math.random() * SIZE);
       tries += 1;
-    } while (
-      Math.abs(shark._x - this.player._x) < 15 &&
-      Math.abs(shark._y - this.player._y) < 15 &&
-      tries < 20
-    );
+    } while (this.spawnDistanceToPlayer(shark) < SHARK_SPAWN_CLEARANCE && tries < 40);
     shark.lastX = shark._x;
     shark.lastY = shark._y;
+  }
+
+  /**
+   * Distance from a candidate spawn to the player, measured the way the world actually works.
+   * The keep-out used to compare raw x values, which ignores the horizontal wrap entirely: a
+   * shark placed at x=98 with the player at x=2 measured as 96 units clear when it was really 4,
+   * so sharks could appear right on top of the pod at the start of a level.
+   */
+  private spawnDistanceToPlayer(shark: Shark): number {
+    if (!this.player) return Infinity;
+    return Math.hypot(directionDelta(shark._x, this.player._x), shark._y - this.player._y);
   }
 
   private spawnSharksForLevel(config: LevelConfig): void {
