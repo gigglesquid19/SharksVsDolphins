@@ -87,6 +87,11 @@ const CLOAK_COOLDOWN_MS = 20000;
 const GREAT_WHITE_EASED_UNTIL_LEVEL = 5;
 // Breathing room at the start of a level, counted from the first tick that actually runs.
 const LEVEL_START_INVULNERABILITY_MS = 5000;
+// While that safety window runs the sharks fade back, so a swarm arriving on top of the pod
+// cannot bury it and the player can see at a glance that nothing can touch them yet. The fade
+// eases back to full over the last stretch rather than popping, so the threat returns smoothly.
+const SHARK_FADE_WHILE_SAFE = 0.55;
+const SHARK_FADE_RESTORE_MS = 700;
 // Draw order inside the entity container. Sprites were previously stacked in creation order,
 // which put the sharks - spawned per level, after the player exists - on top of the pod, and
 // left the player dolphin at the very bottom under everything. A swarm arriving at the start of
@@ -224,6 +229,12 @@ export class Game {
   private autoFormedForThisPod = false;
   /** Set when a level is set up; consumed by the first tick of the loop that actually runs. */
   private pendingLevelInvulnerability = false;
+  /**
+   * Deadline for the level-opening safety window, kept separate from the player's own
+   * invulnerableUntil: that is also set by a revive and after a bite, and fading every shark on
+   * screen mid-fight would read as a glitch rather than as a moment of safety.
+   */
+  private levelStartSafeUntil = 0;
   private currentLevel = 1;
   private retries = 0;
   private totalRecruited = 0;
@@ -2240,6 +2251,15 @@ export class Game {
     });
   }
 
+  /** Shark opacity for the level-opening safety window: faded, then eased back to full. */
+  private sharkAlphaWhileSafe(now: number): number {
+    const remaining = this.levelStartSafeUntil - now;
+    if (remaining <= 0) return 1;
+    if (remaining >= SHARK_FADE_RESTORE_MS) return SHARK_FADE_WHILE_SAFE;
+    const t = 1 - remaining / SHARK_FADE_RESTORE_MS;
+    return SHARK_FADE_WHILE_SAFE + (1 - SHARK_FADE_WHILE_SAFE) * t;
+  }
+
   private sharkPodRequirement(kind: SharkKind, large: boolean): number {
     if (large) {
       if (kind === 'tiger') return 8;
@@ -2680,6 +2700,7 @@ export class Game {
     if (this.pendingLevelInvulnerability && this.player) {
       this.pendingLevelInvulnerability = false;
       this.player.invulnerableUntil = now + LEVEL_START_INVULNERABILITY_MS;
+      this.levelStartSafeUntil = this.player.invulnerableUntil;
     }
 
     if (now >= this.sprintEndTime) this.sprinting = false;
@@ -3122,6 +3143,8 @@ export class Game {
       const glow = sprite.getChildByName('glow') as Sprite;
       glow.width = 48 * SHARK_KIND_SCALE[shark.kind] * shark.sizeMultiplier;
       glow.height = 48 * SHARK_KIND_SCALE[shark.kind] * shark.sizeMultiplier;
+
+      sprite.alpha = this.sharkAlphaWhileSafe(now);
 
       if (shark.cloaked) {
         sprite.visible = false;
