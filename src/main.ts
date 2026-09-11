@@ -791,3 +791,31 @@ spawnBubbles(document.getElementById('bubbles'), 22, {
 spawnBubbles(document.getElementById('splashBubbles'), 14, {
   minSize: 3, maxSize: 11, minDuration: 7, maxDuration: 15, spread: 9,
 });
+
+/**
+ * Sharks cruising behind the splash poster, drawn with the game's own sprite strips. Sizes and
+ * speeds are paired deliberately: the small, slow, high ones read as far away and the large,
+ * quicker, low ones as near, which is what gives the flat painting a sense of depth.
+ */
+(function spawnSplashSwimmers() {
+  const container = document.getElementById('splashSwimmers');
+  if (!container) return;
+  const base = import.meta.env.BASE_URL;
+  const swimmers = [
+    { strip: 'spr_shark_move_strip9.png', width: 10, top: 14, seconds: 30, delay: -6, dir: 'rightward', depth: 0.58 },
+    { strip: 'spr_hammerhead_shark_move_strip9.png', width: 7, top: 29, seconds: 42, delay: -22, dir: 'leftward', depth: 0.46 },
+    { strip: 'spr_tiger_shark_move_strip9.png', width: 15, top: 70, seconds: 23, delay: -13, dir: 'rightward', depth: 0.72 },
+  ];
+  for (const s of swimmers) {
+    const el = document.createElement('div');
+    el.className = `splash-swimmer ${s.dir}`;
+    el.style.backgroundImage = `url('${base}sharks/${s.strip}')`;
+    el.style.width = `${s.width}%`;
+    el.style.top = `${s.top}%`;
+    el.style.opacity = String(s.depth);
+    // Frame cycle then crossing: the strip runs at a fixed pace while the crossing is slow.
+    el.style.animationDuration = `${0.55 + Math.random() * 0.25}s, ${s.seconds}s`;
+    el.style.animationDelay = `0s, ${s.delay}s`;
+    container.appendChild(el);
+  }
+})();

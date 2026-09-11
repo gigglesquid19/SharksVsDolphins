@@ -19,10 +19,30 @@
 
   <audio id="bgMusic" loop preload="auto"></audio>
 
+  <!-- Water ripple for the splash poster. A turbulence field displaces the artwork, so the
+       painting itself moves rather than having motion laid over it. Animating baseFrequency is
+       what makes the ripple travel; the scale is kept low so the title and the painted Tap to
+       Start stay legible through it. Referenced by .splash-art in style.css. -->
+  <svg class="filter-defs" aria-hidden="true" focusable="false">
+    <defs>
+      <filter id="waterRipple" x="-8%" y="-8%" width="116%" height="116%" color-interpolation-filters="sRGB">
+        <feTurbulence type="fractalNoise" baseFrequency="0.012 0.026" numOctaves="2" seed="7" result="noise">
+          <animate attributeName="baseFrequency" dur="14s"
+                   values="0.012 0.026;0.016 0.020;0.012 0.026" repeatCount="indefinite"/>
+        </feTurbulence>
+        <feDisplacementMap in="SourceGraphic" in2="noise" scale="7"
+                           xChannelSelector="R" yChannelSelector="G"/>
+      </filter>
+    </defs>
+  </svg>
+
   <div class="splash-screen" id="splashScreen">
     <div class="splash-stage">
       <img class="splash-art" id="splashLogo" alt="Sharks Vs Dolphins" src="/splash-art.webp">
+      <div class="splash-caustics" aria-hidden="true"></div>
+      <div class="splash-caustics splash-caustics-b" aria-hidden="true"></div>
       <div class="splash-shafts" aria-hidden="true"></div>
+      <div class="splash-swimmers" id="splashSwimmers" aria-hidden="true"></div>
       <div class="splash-bubbles" id="splashBubbles" aria-hidden="true"></div>
     </div>
     <p class="visually-hidden">Tap or press any button to start</p>

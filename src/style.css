@@ -137,12 +137,24 @@ h1 {
   animation: splashArtIn 0.6s ease both;
 }
 
+/* Holds the SVG filter definitions; takes no space and paints nothing itself. */
+.filter-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
 .splash-art {
   display: block;
   width: 100%;
   height: 100%;
   /* cover, not contain: the stage is already the poster's aspect ratio, so nothing is cropped. */
   object-fit: cover;
+  /* The painting itself ripples - see #waterRipple in index.html. This is the one effect here
+     that distorts the artwork rather than layering over it, which is why the water reads as
+     moving rather than as a still with lights on it. */
+  filter: url(#waterRipple);
   /* A very slow drift with a barely-there brightness swell. Held to 3.5% so the painted Tap to
      Start never creeps out of frame, and slow enough (26s) to read as water rather than motion. */
   animation: splashDrift 26s ease-in-out 0.6s infinite alternate;
@@ -167,8 +179,59 @@ h1 {
   animation: splashShafts 19s ease-in-out infinite alternate;
 }
 
-/* Reuses the page's .bubble element and its floatUp keyframe unchanged; the stage just clips
-   them, so they rise through the poster and vanish instead of crossing the whole window. */
+/* Caustics: the bright, wandering light that plays over everything underwater. Two layers of
+   soft blobs, heavily blurred, screened over the art and drifting at different speeds so they
+   interfere with each other and never visibly repeat. Only transform and opacity are animated,
+   which the compositor handles on the GPU - animating the gradients themselves would repaint
+   the whole poster every frame. */
+.splash-caustics {
+  position: absolute;
+  inset: -30%;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 46% 30% at 28% 22%, rgba(205, 247, 255, 0.20), transparent 62%),
+    radial-gradient(ellipse 38% 26% at 68% 40%, rgba(168, 232, 255, 0.17), transparent 64%),
+    radial-gradient(ellipse 52% 22% at 44% 72%, rgba(190, 240, 255, 0.13), transparent 66%);
+  filter: blur(26px);
+  mix-blend-mode: screen;
+  animation: causticDriftA 17s ease-in-out infinite alternate;
+}
+.splash-caustics-b {
+  background:
+    radial-gradient(ellipse 40% 24% at 62% 18%, rgba(225, 250, 255, 0.16), transparent 60%),
+    radial-gradient(ellipse 48% 30% at 24% 58%, rgba(150, 225, 255, 0.15), transparent 64%);
+  filter: blur(34px);
+  animation: causticDriftB 23s ease-in-out infinite alternate;
+}
+
+/* Sharks cruising through the scene, drawn with the game's own 9-frame sprite strips - no new
+   art, and they are already precached. Dimmed and desaturated so they read as shapes in the
+   water behind the painted pair rather than competing with them. */
+.splash-swimmers {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.splash-swimmer {
+  position: absolute;
+  background-repeat: no-repeat;
+  /* The strip is nine frames wide, so the element shows one frame at a time. */
+  background-size: 900% 100%;
+  aspect-ratio: 1;
+  image-rendering: pixelated;
+  /* Sized as a share of the stage, not in pixels: the poster scales to fit the window, and a
+     fixed-pixel shark would be a speck on a desktop and a monster on a phone.
+     Rendered as dark silhouettes rather than dimmed sprites. A half-transparent grey shark
+     disappears into bright water; a dark shape reads instantly against it, which is also how a
+     fish at distance genuinely looks from below the surface. */
+  filter: brightness(0.12) saturate(0) contrast(1.5) blur(0.3px);
+  animation-timing-function: steps(9), linear;
+  animation-iteration-count: infinite, infinite;
+}
+.splash-swimmer.rightward { animation-name: swimFrames, swimRight; }
+.splash-swimmer.leftward { animation-name: swimFrames, swimLeft; transform: scaleX(-1); }
+
 .splash-bubbles {
   position: absolute;
   inset: 0;
@@ -180,20 +243,48 @@ h1 {
   from { opacity: 0; transform: scale(0.96); }
   to { opacity: 1; transform: scale(1); }
 }
+/* The ripple has to be repeated inside the keyframes: an animated `filter` replaces the
+   property outright each frame, so declaring url(#waterRipple) on .splash-art alone was being
+   overridden by this animation and silently doing nothing. */
 @keyframes splashDrift {
-  from { transform: scale(1) translate3d(0, 0, 0); filter: brightness(1); }
-  to { transform: scale(1.035) translate3d(-0.8%, -0.6%, 0); filter: brightness(1.05); }
+  from { transform: scale(1) translate3d(0, 0, 0); filter: url(#waterRipple) brightness(1); }
+  to { transform: scale(1.035) translate3d(-0.8%, -0.6%, 0); filter: url(#waterRipple) brightness(1.05); }
 }
 @keyframes splashShafts {
   from { transform: translate3d(-3.5%, 0, 0); opacity: 0.5; }
   to { transform: translate3d(3.5%, 0, 0); opacity: 1; }
 }
+@keyframes causticDriftA {
+  from { transform: translate3d(-4%, -2%, 0) scale(1); opacity: 0.55; }
+  to { transform: translate3d(5%, 3%, 0) scale(1.12); opacity: 1; }
+}
+@keyframes causticDriftB {
+  from { transform: translate3d(4%, 3%, 0) scale(1.1); opacity: 0.9; }
+  to { transform: translate3d(-5%, -2%, 0) scale(1); opacity: 0.45; }
+}
+/* steps(9) over the full strip width lands exactly on each frame boundary. */
+@keyframes swimFrames {
+  from { background-position-x: 0%; }
+  to { background-position-x: 100%; }
+}
+@keyframes swimRight {
+  from { left: -22%; }
+  to { left: 118%; }
+}
+@keyframes swimLeft {
+  from { left: 118%; }
+  to { left: -22%; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .splash-stage,
   .splash-art,
-  .splash-shafts { animation: none; }
-  .splash-bubbles { display: none; }
+  .splash-shafts,
+  .splash-caustics { animation: none; }
+  /* Drop the ripple too: a still displacement would leave the poster permanently warped. */
+  .splash-art { filter: none; }
+  .splash-bubbles,
+  .splash-swimmers { display: none; }
 }
 
 /* Kept in the DOM for screen readers - the prompt itself is painted into the poster. */
