@@ -3,6 +3,7 @@ import { Game } from './game';
 import { sfx } from './sfx';
 import { clearRunCheckpoint, loadRunCheckpoint } from './runState';
 import { getDolphinName, hasNamedDolphin, setDolphinName } from './profile';
+import { nextTrackIn, trackTitle } from './music';
 import { getPearls } from './pearls';
 import { setupStore } from './storeView';
 import { ads } from './ads';
@@ -98,6 +99,28 @@ applyVolume(initialVolume);
 bgMusic.muted = localStorage.getItem(MUSIC_MUTED_KEY) === 'true';
 muteBtn.textContent = bgMusic.muted ? 'Music: Off' : 'Music: On';
 sfx.setMuted(bgMusic.muted);
+
+// Skipping stays inside the current pool, so a boss fight never drops into ambient. The button
+// briefly shows what it switched to, which is the only feedback available while muted.
+const nextTrackBtn = document.getElementById('nextTrackBtn') as HTMLButtonElement;
+const NEXT_TRACK_LABEL = '\u266B Next Song';
+let nextTrackLabelTimer: number | null = null;
+
+nextTrackBtn.addEventListener('click', () => {
+  const next = nextTrackIn(bgMusic.currentSrc || bgMusic.src);
+  bgMusic.src = next;
+  bgMusic.load();
+  bgMusic.play().catch((err) => console.warn('Music track switch failed:', err));
+
+  const title = trackTitle(next);
+  nextTrackBtn.textContent = title;
+  nextTrackBtn.setAttribute('aria-label', `Now playing ${title}. Play the next song`);
+  if (nextTrackLabelTimer !== null) window.clearTimeout(nextTrackLabelTimer);
+  nextTrackLabelTimer = window.setTimeout(() => {
+    nextTrackBtn.textContent = NEXT_TRACK_LABEL;
+    nextTrackLabelTimer = null;
+  }, 1800);
+});
 
 muteBtn.addEventListener('click', () => {
   bgMusic.muted = !bgMusic.muted;
@@ -491,6 +514,7 @@ const inputs = {
     'achievementsBtn',
     'fullscreenBtn',
     'muteBtn',
+    'nextTrackBtn',
     'volumeControl',
   ];
   let relocatedControls: { el: HTMLElement; parent: HTMLElement; nextSibling: Node | null }[] = [];
