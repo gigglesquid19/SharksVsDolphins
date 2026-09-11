@@ -101,6 +101,10 @@ const BG_PARALLAX_PX = CANVAS_SIZE * 0.045;
 /** How much further the near plane travels than the background. This ratio is the parallax. */
 const NEAR_PARALLAX_FACTOR = 2.4;
 const MOTE_COUNT = 30;
+// Each Magic Shrimp spent adds this much swim speed for the rest of the level, and they
+// stack additively - three of them is +150%, not 3.4x, which keeps the maths legible to a
+// player deciding whether to spend a second one.
+const SHRIMP_SPEED_BONUS = 0.5;
 const SHARK_FADE_WHILE_SAFE = 0.55;
 const SHARK_FADE_RESTORE_MS = 700;
 // Draw order inside the entity container. Sprites were previously stacked in creation order,
@@ -237,6 +241,8 @@ export class Game {
   private autoFormedForThisPod = false;
   /** Set when a level is set up; consumed by the first tick of the loop that actually runs. */
   private pendingLevelInvulnerability = false;
+  /** Speed added by Magic Shrimp spent this level, as a fraction. Cleared on level entry. */
+  private shrimpSpeedBonus = 0;
   // Echolocation (Endless only, bought in the Store once the campaign is cleared). While it is
   // running, sharks inside echoRadius are drawn even if a storm or a tiger's cloak is hiding
   // them - see the draw loop and sharkRevealedByEcho.
@@ -643,28 +649,30 @@ export class Game {
   }
 
   /**
-   * Spends a Magic Shrimp for a speed boost lasting the rest of the level. Bought in the Store
+   * Spends a Magic Shrimp for extra swim speed lasting the rest of the level. Bought in the Store
    * rather than found in the water: as a pickup it was a coin flip that could just as easily hand
-   * the boost to a shark and turn it large, which was punishment with no counterplay. Refuses
-   * when there is none to spend or a boost is already running, so one is never wasted.
+   * the boost to a shark and turn it large, which was punishment with no counterplay.
+   *
+   * They stack, so spending a second one during a bad level is a real option rather than a waste.
    */
   useMagicShrimpItem(): boolean {
     if (!this.running || this.paused || !this.player) return false;
-    if (Date.now() < this.player.speedBoostUntil) {
-      this.setStatus('A boost is already running');
-      return false;
-    }
     if (!useMagicShrimp()) return false;
 
+    this.shrimpSpeedBonus += SHRIMP_SPEED_BONUS;
+    // Still flags "boosted" for the ring and the quicker fluke beat; the magnitude now comes
+    // from shrimpSpeedBonus rather than from this being a yes/no.
     this.player.speedBoostUntil = Number.MAX_SAFE_INTEGER;
+
     const scale = CANVAS_SIZE / SIZE;
     this.particles.emit('sparkle', this.player._x * scale + scale / 2, this.player._y * scale + scale / 2, 18, {
       speed: 2,
       life: 0.8,
     });
     sfx.playShrimp();
-    this.setStatus('Speed boost for the level!');
-    this.showBanner('Magic Shrimp!', 'statup', 1400);
+    const percent = Math.round(this.shrimpSpeedBonus * 100);
+    this.setStatus(`+${percent}% speed for the level!`);
+    this.showBanner(`Magic Shrimp! +${percent}%`, 'statup', 1400);
     this.onShrimpCountChange?.(magicShrimpHeld());
     return true;
   }
@@ -1122,6 +1130,7 @@ export class Game {
     this.player.isPlayer = true;
     this.player.invulnerableUntil = Date.now() + LEVEL_START_INVULNERABILITY_MS;
     this.pendingLevelInvulnerability = true;
+    this.shrimpSpeedBonus = 0;
     this.dolphins.push(this.player);
     this.addDolphinSprite(this.player);
 
@@ -1597,8 +1606,8 @@ export class Game {
 
   private moveFollowers(): void {
     if (!this.player) return;
-    const boosted = Date.now() < this.player.speedBoostUntil;
-    const followerSpeed = (boosted ? 4 : 2) * (1 + this.speedBonusPct) * (this.sprinting ? SPRINT_SPEED : 1);
+    // Followers read the same bonus, or the pod is left behind the moment a shrimp is spent.
+    const followerSpeed = 2 * (1 + this.speedBonusPct + this.shrimpSpeedBonus) * (this.sprinting ? SPRINT_SPEED : 1);
     const followers = this.dolphins.filter((d) => d.recruited && !d.isPlayer);
     // A single fixed-radius ring packs dolphins on top of each other once the pod gets big (the
     // Mega Pod especially). A golden-angle spiral instead spreads them across a disk whose area
@@ -2184,6 +2193,10 @@ export class Game {
       this.player.invulnerableUntil = Date.now() + LEVEL_START_INVULNERABILITY_MS;
       this.pendingLevelInvulnerability = true;
       this.autoFormedForThisPod = false;
+      // Shrimp last the level, not the run. Nothing cleared this before, so a single boost
+      // silently carried through every remaining level of a campaign.
+      this.shrimpSpeedBonus = 0;
+      this.player.speedBoostUntil = 0;
     }
 
     this.levelCompleted = false;
@@ -2772,8 +2785,8 @@ export class Game {
 
   private movePlayer(): void {
     if (!this.player) return;
-    const boosted = Date.now() < this.player.speedBoostUntil;
-    const maxSpeed = (boosted ? 4 : 2) * (1 + this.speedBonusPct) * (this.sprinting ? SPRINT_SPEED : 1);
+    // Shrimp stack additively with the Store's Speed upgrade rather than multiplying with it.
+    const maxSpeed = 2 * (1 + this.speedBonusPct + this.shrimpSpeedBonus) * (this.sprinting ? SPRINT_SPEED : 1);
 
     // dx/dy is a unit direction; throttle (0..1) scales the step so a half-pushed
     // joystick / a touch near the centre moves slower than a full deflection.

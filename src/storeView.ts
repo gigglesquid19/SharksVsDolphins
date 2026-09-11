@@ -56,7 +56,7 @@ export function setupStore(opts: { onPearlsChange: () => void }): { open: () => 
     item.innerHTML = `
       <div class="store-item-icon" aria-hidden="true">\u{1F990}</div>
       <div class="store-item-name">Magic Shrimp</div>
-      <div class="store-item-desc">Use it mid-run for double swim speed that lasts the rest of the level.</div>
+      <div class="store-item-desc">Spend one mid-run for +50% swim speed for the rest of the level. They stack.</div>
       <div class="store-item-level">Carrying ${held} / ${MAX_MAGIC_SHRIMP}</div>`;
 
     const btn = document.createElement('button');

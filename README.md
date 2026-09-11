@@ -300,7 +300,9 @@ Game Features
   screen-wrap edges.
 - **Magic Shrimp**: bought in the Store for 60 Pearls and carried into a run,
   up to three at a time. Tap the amber button (or press `Q`) to spend one for
-  double swim speed lasting the rest of the level, in Campaign or Endless.
+  +50% swim speed lasting the rest of the level, in Campaign or Endless. They
+  stack additively, so three spent in one level is +150%, and the pod speeds up
+  with you rather than being left behind.
   It used to appear in the water after two minutes, where a shark could reach
   it first and grow large - a coin flip the player had no way to influence.
   Bought and carried, it is a decision about when to spend instead.
