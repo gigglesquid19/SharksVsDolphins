@@ -91,6 +91,15 @@ const LEVEL_START_INVULNERABILITY_MS = 5000;
 // While that safety window runs the sharks fade back, so a swarm arriving on top of the pod
 // cannot bury it and the player can see at a glance that nothing can touch them yet. The fade
 // eases back to full over the last stretch rather than popping, so the threat returns smoothly.
+// Parallax. The backgrounds are single flat stills, so depth cannot come from separate layers
+// of artwork - it comes from the camera instead. The background is drawn slightly larger than
+// the canvas and leans against the player's movement, while a field of drifting motes sits in
+// front of it and leans further, so the two planes separate as you swim.
+const BG_OVERSCAN = 1.14;
+const BG_PARALLAX_PX = CANVAS_SIZE * 0.045;
+/** How much further the near plane travels than the background. This ratio is the parallax. */
+const NEAR_PARALLAX_FACTOR = 2.4;
+const MOTE_COUNT = 30;
 const SHARK_FADE_WHILE_SAFE = 0.55;
 const SHARK_FADE_RESTORE_MS = 700;
 // Draw order inside the entity container. Sprites were previously stacked in creation order,
@@ -371,6 +380,14 @@ export class Game {
   private bgContainer!: Container;
   private fxContainer!: Container;
   private echoRing!: Graphics;
+  /** Near parallax plane: slow motes of drifting matter in front of the background. */
+  private driftContainer!: Container;
+  private motes: { gfx: Graphics; speed: number; sway: number; phase: number }[] = [];
+  // The camera's lean, driven by how the player is moving and decaying back to centre.
+  private parallaxLeanX = 0;
+  private parallaxLeanY = 0;
+  private parallaxX = 0;
+  private parallaxY = 0;
   private entityContainer!: Container;
   private stormOverlay!: Graphics;
   private particles!: ParticleSystem;
@@ -507,7 +524,9 @@ export class Game {
     this.entityContainer = new Container();
     this.entityContainer.sortableChildren = true;
     this.jellyfishContainer = new Container();
+    this.driftContainer = new Container();
     this.stage.addChild(this.bgContainer);
+    this.stage.addChild(this.driftContainer);
     this.stage.addChild(this.jellyfishContainer);
     this.stage.addChild(this.fxContainer);
     this.stage.addChild(this.entityContainer);
@@ -515,8 +534,10 @@ export class Game {
     this.stormOverlay = new Graphics();
     this.stage.addChild(this.stormOverlay);
 
-    // Screen shake runs on Pixi's render ticker (smooth 60fps), decoupled from the ~80ms sim loop.
+    // Screen shake and parallax both run on Pixi's render ticker (smooth 60fps), decoupled from
+    // the ~80ms sim loop - at 12.5fps the parallax would visibly step rather than glide.
     this.app.ticker.add(() => {
+      this.updateParallax();
       if (this.shakeTime > 0) {
         // Clamp so a resume from a backgrounded tab can't blow the whole shake in one frame.
         this.shakeTime -= Math.min(this.app.ticker.deltaMS, 50) / 1000;
@@ -530,6 +551,7 @@ export class Game {
       this.reducedMotion = e.matches;
     });
 
+    this.buildMotes();
     this.particles = new ParticleSystem(this.fxContainer);
     this.echoRing = new Graphics();
     this.fxContainer.addChild(this.echoRing);
@@ -921,11 +943,81 @@ export class Game {
     await this.loadBackground(`${ASSET_BASE}OpenOceanBGImage.webp`);
   }
 
+  /**
+   * The near parallax plane: specks of drifting matter, the sort that catches the light in any
+   * underwater shot. Spawned across an area larger than the canvas so the plane can lean without
+   * running out of motes at the edges, and each one rises at its own pace so the field never
+   * looks like a single sheet sliding about.
+   */
+  /**
+   * Eases the two planes toward the camera's current lean and drifts the motes upward. Runs every
+   * rendered frame. The lean itself is set by the sim loop; here it is only smoothed and applied,
+   * so a slow tick rate never shows as stepping.
+   */
+  private updateParallax(): void {
+    const seconds = Math.min(this.app.ticker.deltaMS, 50) / 1000;
+
+    if (this.reducedMotion) {
+      this.bgContainer.position.set(0, 0);
+      this.driftContainer.position.set(0, 0);
+      return;
+    }
+
+    // A slow figure-of-eight so the scene still breathes while the player is holding still.
+    const t = performance.now() / 1000;
+    const ambientX = Math.sin(t * 0.06) * 0.3;
+    const ambientY = Math.cos(t * 0.045) * 0.22;
+
+    const targetX = (this.parallaxLeanX + ambientX) * BG_PARALLAX_PX;
+    const targetY = (this.parallaxLeanY + ambientY) * BG_PARALLAX_PX;
+    // Framerate-independent easing, so the glide is the same on a 60Hz and a 120Hz screen.
+    const ease = 1 - Math.pow(0.02, seconds);
+    this.parallaxX += (targetX - this.parallaxX) * ease;
+    this.parallaxY += (targetY - this.parallaxY) * ease;
+
+    this.bgContainer.position.set(this.parallaxX, this.parallaxY);
+    this.driftContainer.position.set(
+      this.parallaxX * NEAR_PARALLAX_FACTOR,
+      this.parallaxY * NEAR_PARALLAX_FACTOR,
+    );
+
+    const wrapSpan = CANVAS_SIZE * NEAR_PARALLAX_FACTOR * 0.14;
+    for (const mote of this.motes) {
+      mote.gfx.y -= mote.speed * seconds;
+      mote.gfx.x += Math.sin(t * 0.3 + mote.phase) * mote.sway * seconds;
+      if (mote.gfx.y < -wrapSpan) {
+        mote.gfx.y = CANVAS_SIZE + wrapSpan;
+        mote.gfx.x = -wrapSpan + Math.random() * (CANVAS_SIZE + wrapSpan * 2);
+      }
+    }
+  }
+
+  private buildMotes(): void {
+    this.driftContainer.removeChildren();
+    this.motes = [];
+    const spread = CANVAS_SIZE * NEAR_PARALLAX_FACTOR * 0.14;
+    for (let i = 0; i < MOTE_COUNT; i++) {
+      const gfx = new Graphics();
+      const radius = 0.8 + Math.random() * 2.2;
+      gfx.circle(0, 0, radius).fill({ color: 0xdff3ff, alpha: 0.1 + Math.random() * 0.22 });
+      gfx.x = -spread + Math.random() * (CANVAS_SIZE + spread * 2);
+      gfx.y = -spread + Math.random() * (CANVAS_SIZE + spread * 2);
+      this.driftContainer.addChild(gfx);
+      this.motes.push({
+        gfx,
+        speed: 2 + Math.random() * 7,
+        sway: 3 + Math.random() * 9,
+        phase: Math.random() * Math.PI * 2,
+      });
+    }
+  }
+
   private async loadBackground(url: string): Promise<void> {
     const texture = await Assets.load(url);
     const bg = new Sprite(texture);
 
-    const scale = Math.max(CANVAS_SIZE / bg.width, CANVAS_SIZE / bg.height);
+    // Overscanned, so the parallax lean never drags an edge into view.
+    const scale = Math.max(CANVAS_SIZE / bg.width, CANVAS_SIZE / bg.height) * BG_OVERSCAN;
     bg.anchor.set(0.5);
     bg.scale.set(scale);
     bg.position.set(CANVAS_SIZE / 2, CANVAS_SIZE / 2);
@@ -3124,6 +3216,16 @@ export class Game {
     }
 
     this.checkShrimpCollection();
+
+    // The camera leans against the player's movement and decays back to centre when they stop.
+    // directionDelta keeps it wrap-safe: crossing the seam is a small step, not a jump across
+    // the whole world, which a position-based parallax would read as the camera being flung.
+    if (this.player) {
+      const leanX = directionDelta(this.player._x, this.player.lastX);
+      const leanY = this.player._y - this.player.lastY;
+      this.parallaxLeanX = Math.max(-1, Math.min(1, this.parallaxLeanX * 0.9 - leanX * 0.12));
+      this.parallaxLeanY = Math.max(-1, Math.min(1, this.parallaxLeanY * 0.9 - leanY * 0.12));
+    }
 
     this.particles.update(dt);
     this.draw();
