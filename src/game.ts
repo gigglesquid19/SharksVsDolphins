@@ -45,7 +45,8 @@ import {
   PEARLS_FLAWLESS_CAMPAIGN_BONUS,
 } from './pearls';
 import { getDolphinName } from './profile';
-import { endlessStartBonuses, equippedSkinId, grantSkin, ownsSkin } from './store';
+import { echolocationStats, endlessStartBonuses, equippedSkinId, grantSkin, ownsEcholocation, ownsSkin } from './store';
+import { markCampaignCleared } from './progress';
 import { skinById } from './skins';
 import { shareMilestone, SHARE_REWARD_SKIN } from './share';
 import { playGames } from './playGames';
@@ -229,6 +230,17 @@ export class Game {
   private autoFormedForThisPod = false;
   /** Set when a level is set up; consumed by the first tick of the loop that actually runs. */
   private pendingLevelInvulnerability = false;
+  // Echolocation (Endless only, bought in the Store once the campaign is cleared). While it is
+  // running, sharks inside echoRadius are drawn even if a storm or a tiger's cloak is hiding
+  // them - see the draw loop and sharkRevealedByEcho.
+  private echoAvailable = false;
+  private echoEndTime = 0;
+  private echoCooldownEnd = 0;
+  private echoDurationMs = 0;
+  private echoCooldownMs = 0;
+  private echoRadius = 0;
+  /** When the current ping started, so the expanding ring can be drawn from it. */
+  private echoStartedAt = 0;
   /**
    * Deadline for the level-opening safety window, kept separate from the player's own
    * invulnerableUntil: that is also set by a revive and after a bite, and fading every shark on
@@ -351,12 +363,14 @@ export class Game {
   private onSchoolingChange?: (active: boolean) => void;
   private onMusicTrackChange?: (url: string) => void;
   private onMusicDuck?: (durationMs: number) => void;
+  private onEchoAvailabilityChange?: (available: boolean) => void;
   private lastMusicLevel = 0;
   private paused = false;
 
   private stage!: Container;
   private bgContainer!: Container;
   private fxContainer!: Container;
+  private echoRing!: Graphics;
   private entityContainer!: Container;
   private stormOverlay!: Graphics;
   private particles!: ParticleSystem;
@@ -390,6 +404,7 @@ export class Game {
       onSchoolingChange?: (active: boolean) => void;
       onMusicTrackChange?: (url: string) => void;
       onMusicDuck?: (durationMs: number) => void;
+      onEchoAvailabilityChange?: (available: boolean) => void;
     }
   ) {
     this.canvas = canvas;
@@ -457,6 +472,7 @@ export class Game {
     this.onSchoolingChange = inputs.onSchoolingChange;
     this.onMusicTrackChange = inputs.onMusicTrackChange;
     this.onMusicDuck = inputs.onMusicDuck;
+    this.onEchoAvailabilityChange = inputs.onEchoAvailabilityChange;
     this.lastLifeHeart = document.getElementById('lastLifeHeart');
     this.levelBadgeNumberEl = document.getElementById('levelBadgeNumber');
     this.dolphinsSavedBadgeEl = document.getElementById('dolphinsSavedBadge');
@@ -515,6 +531,8 @@ export class Game {
     });
 
     this.particles = new ParticleSystem(this.fxContainer);
+    this.echoRing = new Graphics();
+    this.fxContainer.addChild(this.echoRing);
 
     await this.createBackground();
     await this.loadSharkTextures();
@@ -598,6 +616,47 @@ export class Game {
   private resetKillCombo(): void {
     this.killCombo = 0;
     this.lastKillTime = 0;
+  }
+
+  /** True while a ping is lighting the water up. */
+  isEcholocating(): boolean {
+    return Date.now() < this.echoEndTime;
+  }
+
+  /** Whether the player has Echolocation available in this run at all (bought, and in Endless). */
+  hasEcholocation(): boolean {
+    return this.echoAvailable;
+  }
+
+  /** 0..1 recharge progress, 1 when ready. Mirrors getSprintCooldownFraction for the button ring. */
+  getEchoCooldownFraction(): number {
+    const now = Date.now();
+    if (!this.echoAvailable || now >= this.echoCooldownEnd) return 1;
+    const total = this.echoDurationMs + this.echoCooldownMs;
+    const startedAt = this.echoCooldownEnd - total;
+    return Math.max(0, Math.min(1, (now - startedAt) / total));
+  }
+
+  /** Fires a ping if one is available. Returns false when unavailable or still recharging. */
+  echolocate(): boolean {
+    const now = Date.now();
+    if (!this.echoAvailable || !this.running || this.paused) return false;
+    if (now < this.echoCooldownEnd) return false;
+    this.echoStartedAt = now;
+    this.echoEndTime = now + this.echoDurationMs;
+    this.echoCooldownEnd = this.echoEndTime + this.echoCooldownMs;
+    sfx.playEcho();
+    this.setStatus('Echolocation!');
+    return true;
+  }
+
+  /**
+   * Whether a shark that would otherwise be hidden is inside the current ping. Only ever widens
+   * visibility - it never hides a shark that would have been drawn anyway.
+   */
+  private sharkRevealedByEcho(shark: Shark): boolean {
+    if (!this.player || !this.isEcholocating()) return false;
+    return shark.distanceBetween(this.player) <= this.echoRadius;
   }
 
   getSprintCooldownFraction(): number {
@@ -981,7 +1040,18 @@ export class Game {
         this.charismaBonusDolphins = b.charismaBonusDolphins;
         this.sprintCooldownReduction = b.sprintCooldownReduction;
         this.sprintDurationBonus = b.sprintDurationBonus;
+
+        const echo = echolocationStats();
+        this.echoAvailable = ownsEcholocation();
+        this.echoDurationMs = echo.durationMs;
+        this.echoCooldownMs = echo.cooldownMs;
+        this.echoRadius = echo.radius;
+      } else {
+        this.echoAvailable = false;
       }
+      this.echoEndTime = 0;
+      this.echoCooldownEnd = 0;
+      this.onEchoAvailabilityChange?.(this.echoAvailable);
     }
     this.wasOnLastLifeThisLevel = false;
 
@@ -1119,6 +1189,32 @@ export class Game {
    * sortableChildren and a zIndex is not enough on its own here - Pixi never re-sorted, and the
    * sprites stayed in insertion order, which is what put the sharks over the top of the pod.
    */
+  /**
+   * The Echolocation ping: a ring sweeping out to the full radius over the first fraction of a
+   * second, then the boundary held at low opacity for as long as the ping lasts, so the player
+   * can see exactly how far their vision currently reaches.
+   */
+  private drawEchoRing(now: number, scale: number): void {
+    this.echoRing.clear();
+    if (!this.player || !this.isEcholocating()) return;
+
+    const SWEEP_MS = 550;
+    const elapsed = now - this.echoStartedAt;
+    const cx = this.player._x * scale + scale / 2;
+    const cy = this.player._y * scale + scale / 2;
+    const full = this.echoRadius * scale;
+
+    // The held boundary, so the reach is always legible.
+    this.echoRing.circle(cx, cy, full).stroke({ width: 1.5, color: 0x67e8f9, alpha: 0.22 });
+
+    if (elapsed < SWEEP_MS) {
+      const t = elapsed / SWEEP_MS;
+      this.echoRing
+        .circle(cx, cy, full * t)
+        .stroke({ width: 3, color: 0x67e8f9, alpha: 0.75 * (1 - t) });
+    }
+  }
+
   private addEntitySprite(container: Container, zIndex: number): void {
     this.entityContainer.addChild(container);
     container.zIndex = zIndex;
@@ -1650,6 +1746,9 @@ export class Game {
     if (this.totalLost === 0) this.tryUnlock('flawlessCampaign');
 
     this.awardRunPearls(PEARLS_CAMPAIGN_CLEAR + (this.totalLost === 0 ? PEARLS_FLAWLESS_CAMPAIGN_BONUS : 0));
+
+    // Unlocks Echolocation for purchase in the Store (src/store.ts reads this).
+    markCampaignCleared();
 
     this.setStatus('You cleared the campaign! The ocean is safe.');
     this.startBtn.textContent = 'Retry';
@@ -3076,6 +3175,8 @@ export class Game {
 
     const now = Date.now();
 
+    this.drawEchoRing(now, scale);
+
     for (const [dolphin, sprite] of this.dolphinSprites) {
       sprite.x = dolphin._x * scale + scale / 2;
       sprite.y = dolphin._y * scale + scale / 2;
@@ -3159,10 +3260,15 @@ export class Game {
 
       sprite.alpha = this.sharkAlphaWhileSafe(now);
 
+      // Echolocation only ever reveals: a shark hidden by its cloak or by a storm is drawn while
+      // it sits inside the ping, and a cloaked one stays ghosted so you can still tell it is
+      // hiding rather than simply swimming at you.
+      const revealed = this.sharkRevealedByEcho(shark);
       if (shark.cloaked) {
-        sprite.visible = false;
+        sprite.visible = revealed;
+        if (revealed) sprite.alpha = Math.min(sprite.alpha, 0.45);
       } else if (this.activeEvent?.type === 'storm' && this.player) {
-        sprite.visible = shark.distanceBetween(this.player) <= STORM_VISIBILITY_RADIUS;
+        sprite.visible = revealed || shark.distanceBetween(this.player) <= STORM_VISIBILITY_RADIUS;
       } else {
         sprite.visible = true;
       }

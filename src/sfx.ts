@@ -295,6 +295,21 @@ class SfxEngine {
     this.tone(ctx, 98, now + 0.66, 1.2, { type: 'sine', gain: 0.3, glideTo: 55 });
   }
 
+  /**
+   * The Echolocation ping. Synthesised rather than sampled: a sonar ping is a clean swept tone
+   * with a long tail, which is the one thing oscillators do better than a recording of a room.
+   */
+  playEcho(): void {
+    const ctx = this.ensureContext();
+    const now = ctx.currentTime;
+
+    this.click(ctx, now, 0.06, 4000);
+    // Two detuned partials sliding down together give the ping its metallic ring.
+    this.tone(ctx, 1760, now + 0.01, 1.1, { type: 'sine', gain: 0.22, glideTo: 900 });
+    this.tone(ctx, 2640, now + 0.01, 0.9, { type: 'sine', gain: 0.1, glideTo: 1360 });
+    this.tone(ctx, 440, now + 0.02, 1.3, { type: 'sine', gain: 0.12, glideTo: 300 });
+  }
+
   /** Short percussive kill blip whose pitch climbs with the combo step (0-based), then caps. */
   playSharkKill(step: number): void {
     const ctx = this.ensureContext();
@@ -322,12 +337,12 @@ class SfxEngine {
   }
 
   /** A single broadband tick - one echolocation click. */
-  private click(ctx: AudioContext, start: number, peak: number): void {
+  private click(ctx: AudioContext, start: number, peak: number, highpassHz = 3000): void {
     const noise = ctx.createBufferSource();
     noise.buffer = this.noiseBuffer(ctx, 0.02);
     const hp = ctx.createBiquadFilter();
     hp.type = 'highpass';
-    hp.frequency.value = 3000;
+    hp.frequency.value = highpassHz;
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(peak, start);
     gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.02);

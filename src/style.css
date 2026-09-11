@@ -1070,6 +1070,12 @@ button.mega-shrimp.green {
 .store-buy:disabled { opacity: 0.45; cursor: default; }
 .store-buy .pearl-icon { width: 14px; height: 14px; }
 .store-item.locked { border-style: dashed; opacity: 0.9; }
+/* Stands in for the skins' canvas preview on tiles that have no artwork of their own. */
+.store-item-icon {
+  font-size: 2.1rem;
+  line-height: 1;
+  margin-bottom: 2px;
+}
 .store-item.locked .store-skin-preview { opacity: 0.75; }
 
 /* --- Continue offer (Android Game Over) --- */
@@ -1419,6 +1425,27 @@ canvas {
   border-radius: 50%;
   pointer-events: none;
   background: conic-gradient(rgba(2, 6, 23, 0.7) calc(var(--remaining, 0) * 360deg), transparent 0deg);
+}
+
+/* Echolocation shares the sprint button's shape and cooldown ring, in cyan rather than amber so
+   the two are never confused at a glance. Hidden outside Endless, and until it has been bought. */
+.echo-btn {
+  background: rgba(103, 232, 249, 0.15);
+  color: #67e8f9;
+  font-size: 1.7rem;
+}
+.echo-btn:active,
+.echo-btn.active {
+  background: rgba(103, 232, 249, 0.5);
+}
+#echoBtnWrap.hidden { display: none; }
+
+@keyframes echoReadyFlash {
+  0% { box-shadow: 0 0 0 0 rgba(103, 232, 249, 0.9); }
+  100% { box-shadow: 0 0 0 22px rgba(103, 232, 249, 0); }
+}
+.echo-btn.ready-flash {
+  animation: echoReadyFlash 0.5s ease-out;
 }
 
 @keyframes sprintReadyFlash {

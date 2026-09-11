@@ -1,4 +1,5 @@
 import { spendPearls } from './pearls';
+import { hasClearedCampaign } from './progress';
 import { skinById } from './skins';
 
 /**
@@ -10,7 +11,22 @@ import { skinById } from './skins';
 
 const KEY = 'svsd-store';
 
-export type UpgradeId = 'vitality' | 'speed' | 'charisma' | 'boost' | 'boostDuration';
+export type UpgradeId =
+  | 'vitality'
+  | 'speed'
+  | 'charisma'
+  | 'boost'
+  | 'boostDuration'
+  | 'echoDuration'
+  | 'echoRadius';
+
+/**
+ * Echolocation: a one-off purchase rather than a levelled upgrade, locked until the campaign has
+ * been cleared, and usable only in Endless. Its two upgrades are levelled like the rest but are
+ * not buyable until the ability itself is owned - see canBuyUpgrade.
+ */
+export const ECHOLOCATION_ID = 'echolocation';
+export const ECHOLOCATION_PRICE = 200;
 
 export interface UpgradeDef {
   name: string;
@@ -25,7 +41,12 @@ export const UPGRADES: Record<UpgradeId, UpgradeDef> = {
   charisma: { name: 'Charisma', desc: '+1 starting pod dolphin', prices: [100, 220, 400] },
   boost: { name: 'Boost Cooldown', desc: '-0.75s between boosts', prices: [90, 170, 300, 480] },
   boostDuration: { name: 'Boost Duration', desc: '+0.1s per boost', prices: [100, 200, 340, 520] },
+  echoDuration: { name: 'Echo Duration', desc: '+1.5s of vision', prices: [120, 220, 360, 540] },
+  echoRadius: { name: 'Echo Range', desc: '+6 units of vision', prices: [120, 220, 360, 540] },
 };
+
+/** Upgrades that only make sense once Echolocation has been bought. */
+const ECHO_UPGRADES: UpgradeId[] = ['echoDuration', 'echoRadius'];
 
 const UPGRADE_IDS = Object.keys(UPGRADES) as UpgradeId[];
 
@@ -33,13 +54,16 @@ export interface StoreState {
   upgrades: Record<UpgradeId, number>;
   ownedSkins: string[];
   equippedSkin: string;
+  /** One-off abilities bought outright, rather than levelled. Currently just Echolocation. */
+  ownedAbilities: string[];
 }
 
 function empty(): StoreState {
   return {
-    upgrades: { vitality: 0, speed: 0, charisma: 0, boost: 0, boostDuration: 0 },
+    upgrades: { vitality: 0, speed: 0, charisma: 0, boost: 0, boostDuration: 0, echoDuration: 0, echoRadius: 0 },
     ownedSkins: ['classic'],
     equippedSkin: 'classic',
+    ownedAbilities: [],
   };
 }
 
@@ -58,6 +82,9 @@ function load(): StoreState {
     }
     if (typeof parsed.equippedSkin === 'string' && base.ownedSkins.includes(parsed.equippedSkin)) {
       base.equippedSkin = parsed.equippedSkin;
+    }
+    if (Array.isArray(parsed.ownedAbilities)) {
+      base.ownedAbilities = parsed.ownedAbilities.filter((a) => typeof a === 'string');
     }
     return base;
   } catch (e) {
@@ -90,12 +117,38 @@ export function nextUpgradeCost(id: UpgradeId): number | null {
 
 /** Buys the next level of `id` if it is affordable and not maxed. */
 export function buyUpgrade(id: UpgradeId): boolean {
+  if (ECHO_UPGRADES.includes(id) && !ownsEcholocation()) return false;
   const cost = nextUpgradeCost(id);
   if (cost === null || !spendPearls(cost)) return false;
   const state = load();
   state.upgrades[id] += 1;
   save(state);
   return true;
+}
+
+export function ownsEcholocation(): boolean {
+  return load().ownedAbilities.includes(ECHOLOCATION_ID);
+}
+
+/** Echolocation is the reward for finishing the campaign; Pearls alone are not enough. */
+export function echolocationUnlocked(): boolean {
+  return hasClearedCampaign();
+}
+
+/** Buys Echolocation. Fails if the campaign is unbeaten, it is already owned, or Pearls are short. */
+export function buyEcholocation(): boolean {
+  if (!echolocationUnlocked() || ownsEcholocation()) return false;
+  if (!spendPearls(ECHOLOCATION_PRICE)) return false;
+  const state = load();
+  state.ownedAbilities.push(ECHOLOCATION_ID);
+  save(state);
+  return true;
+}
+
+/** Whether an upgrade may be bought at all, ignoring price - Echo upgrades need the ability first. */
+export function canBuyUpgrade(id: UpgradeId): boolean {
+  if (ECHO_UPGRADES.includes(id) && !ownsEcholocation()) return false;
+  return nextUpgradeCost(id) !== null;
 }
 
 export function ownsSkin(id: string): boolean {
@@ -136,6 +189,24 @@ export function equipSkin(id: string): boolean {
 
 export function equippedSkinId(): string {
   return load().equippedSkin;
+}
+
+/** Base Echolocation numbers before upgrades. Cooldown is deliberately not upgradeable: it is
+ *  what stops the ability becoming permanent vision once duration is maxed. */
+export const ECHO_BASE_DURATION_MS = 4000;
+export const ECHO_DURATION_PER_LEVEL_MS = 1500;
+export const ECHO_BASE_RADIUS = 24;
+export const ECHO_RADIUS_PER_LEVEL = 6;
+export const ECHO_COOLDOWN_MS = 18000;
+
+/** Echolocation duration and radius at the levels currently bought. */
+export function echolocationStats(): { durationMs: number; radius: number; cooldownMs: number } {
+  const s = load().upgrades;
+  return {
+    durationMs: ECHO_BASE_DURATION_MS + s.echoDuration * ECHO_DURATION_PER_LEVEL_MS,
+    radius: ECHO_BASE_RADIUS + s.echoRadius * ECHO_RADIUS_PER_LEVEL,
+    cooldownMs: ECHO_COOLDOWN_MS,
+  };
 }
 
 /** Endless-run starting bonuses from the purchased upgrade levels. Stacks with in-run Mega Shrimp picks. */

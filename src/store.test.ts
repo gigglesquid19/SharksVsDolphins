@@ -1,18 +1,25 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { awardPearls, getPearls } from './pearls';
 import {
+  ECHOLOCATION_PRICE,
   UPGRADES,
+  buyEcholocation,
   buySkin,
   buyUpgrade,
+  canBuyUpgrade,
+  echolocationStats,
+  echolocationUnlocked,
   endlessStartBonuses,
   equipSkin,
   equippedSkinId,
   getStoreState,
   grantSkin,
   nextUpgradeCost,
+  ownsEcholocation,
   ownsSkin,
   upgradeLevel,
 } from './store';
+import { hasClearedCampaign, markCampaignCleared } from './progress';
 
 beforeEach(() => {
   localStorage.clear();
@@ -23,7 +30,16 @@ describe('default state', () => {
     const s = getStoreState();
     expect(s.ownedSkins).toEqual(['classic']);
     expect(s.equippedSkin).toBe('classic');
-    expect(s.upgrades).toEqual({ vitality: 0, speed: 0, charisma: 0, boost: 0, boostDuration: 0 });
+    expect(s.upgrades).toEqual({
+      vitality: 0,
+      speed: 0,
+      charisma: 0,
+      boost: 0,
+      boostDuration: 0,
+      echoDuration: 0,
+      echoRadius: 0,
+    });
+    expect(s.ownedAbilities).toEqual([]);
   });
 
   it('recovers from corrupt storage', () => {
@@ -105,5 +121,80 @@ describe('endlessStartBonuses', () => {
       sprintCooldownReduction: 750,
       sprintDurationBonus: 200,
     });
+  });
+});
+
+describe('Echolocation', () => {
+  it('stays locked until the campaign is cleared, however many Pearls you have', () => {
+    awardPearls(10_000);
+    expect(hasClearedCampaign()).toBe(false);
+    expect(echolocationUnlocked()).toBe(false);
+    expect(buyEcholocation()).toBe(false);
+    expect(ownsEcholocation()).toBe(false);
+    expect(getPearls()).toBe(10_000); // nothing was spent on the failed attempt
+  });
+
+  it('unlocks once the campaign is cleared and then costs Pearls', () => {
+    markCampaignCleared();
+    expect(echolocationUnlocked()).toBe(true);
+
+    awardPearls(ECHOLOCATION_PRICE - 1);
+    expect(buyEcholocation()).toBe(false); // unlocked, but not affordable
+
+    awardPearls(1);
+    expect(buyEcholocation()).toBe(true);
+    expect(ownsEcholocation()).toBe(true);
+    expect(getPearls()).toBe(0);
+  });
+
+  it('cannot be bought twice', () => {
+    markCampaignCleared();
+    awardPearls(ECHOLOCATION_PRICE * 2);
+    expect(buyEcholocation()).toBe(true);
+    expect(buyEcholocation()).toBe(false);
+    expect(getPearls()).toBe(ECHOLOCATION_PRICE);
+  });
+
+  it('gates its upgrades behind owning the ability', () => {
+    awardPearls(10_000);
+    expect(canBuyUpgrade('echoDuration')).toBe(false);
+    expect(buyUpgrade('echoDuration')).toBe(false);
+    expect(upgradeLevel('echoDuration')).toBe(0);
+
+    markCampaignCleared();
+    buyEcholocation();
+    expect(canBuyUpgrade('echoDuration')).toBe(true);
+    expect(buyUpgrade('echoDuration')).toBe(true);
+    expect(upgradeLevel('echoDuration')).toBe(1);
+  });
+
+  it('leaves the other upgrades ungated', () => {
+    expect(canBuyUpgrade('speed')).toBe(true);
+  });
+
+  it('grows duration and radius with the levels bought, leaving cooldown alone', () => {
+    const base = echolocationStats();
+    markCampaignCleared();
+    awardPearls(10_000);
+    buyEcholocation();
+    buyUpgrade('echoDuration');
+    buyUpgrade('echoRadius');
+    const upgraded = echolocationStats();
+
+    expect(upgraded.durationMs).toBeGreaterThan(base.durationMs);
+    expect(upgraded.radius).toBeGreaterThan(base.radius);
+    // Cooldown is deliberately fixed - it is what stops maxed duration becoming permanent vision.
+    expect(upgraded.cooldownMs).toBe(base.cooldownMs);
+  });
+
+  it('cannot be pushed past its maximum level', () => {
+    markCampaignCleared();
+    awardPearls(100_000);
+    buyEcholocation();
+    const max = UPGRADES.echoRadius.prices.length;
+    for (let i = 0; i < max; i++) expect(buyUpgrade('echoRadius')).toBe(true);
+    expect(nextUpgradeCost('echoRadius')).toBeNull();
+    expect(canBuyUpgrade('echoRadius')).toBe(false);
+    expect(upgradeLevel('echoRadius')).toBe(max);
   });
 });

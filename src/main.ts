@@ -284,6 +284,11 @@ const inputs = {
   // Dips the music under a sting, then brings it back. Reads the slider each time rather than
   // caching a level, so it still lands where the player left the volume if they move it mid-duck,
   // and a second duck starting before the first has finished simply restarts the timer.
+  // Echolocation is Endless-only and has to be bought, so the button only exists when the run
+  // actually offers it - see Game's per-run setup.
+  onEchoAvailabilityChange: (available: boolean) => {
+    document.getElementById('echoBtnWrap')?.classList.toggle('hidden', !available);
+  },
   onMusicDuck: (durationMs: number) => {
     const restore = () => {
       bgMusic.volume = Math.min(1, Math.max(0, Number(volumeSlider.value) / 100));
@@ -406,6 +411,12 @@ const inputs = {
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') {
       game.togglePause();
+      return;
+    }
+    // Echolocation fires on the press rather than being polled like Space: it is a one-shot
+    // ability on a cooldown, so holding the key must not queue anything up.
+    if ((e.key === 'e' || e.key === 'E') && !e.repeat) {
+      fireEcho();
       return;
     }
     // Arrow keys scroll the page by default; that's what made the window "slide" during play.
@@ -637,6 +648,35 @@ const inputs = {
 
   const sprintCooldownRing = document.getElementById('sprintCooldownRing') as HTMLDivElement;
   let sprintWasReady = true;
+  const echoBtn = document.getElementById('echoBtn') as HTMLButtonElement;
+  const echoCooldownRing = document.getElementById('echoCooldownRing') as HTMLDivElement;
+  let echoWasReady = true;
+
+  function fireEcho(): void {
+    if (!game.echolocate()) return;
+    echoBtn.classList.add('active');
+    window.setTimeout(() => echoBtn.classList.remove('active'), 200);
+  }
+
+  echoBtn.addEventListener('click', fireEcho);
+  echoBtn.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    fireEcho();
+  });
+
+  function updateEchoCooldownVisual(): void {
+    const fraction = game.getEchoCooldownFraction();
+    echoCooldownRing.style.setProperty('--remaining', String(1 - fraction));
+    const isReady = fraction >= 1;
+    if (isReady && !echoWasReady && game.hasEcholocation()) {
+      echoBtn.classList.add('ready-flash');
+      setTimeout(() => echoBtn.classList.remove('ready-flash'), 500);
+    }
+    echoWasReady = isReady;
+    requestAnimationFrame(updateEchoCooldownVisual);
+  }
+  requestAnimationFrame(updateEchoCooldownVisual);
+
   function updateSprintCooldownVisual(): void {
     const fraction = game.getSprintCooldownFraction();
     sprintCooldownRing.style.setProperty('--remaining', String(1 - fraction));

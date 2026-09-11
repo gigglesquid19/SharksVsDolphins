@@ -33,9 +33,11 @@ Contents
   `localStorage`.
 - `src/pearls.ts` - the persisted Pearl currency balance (`localStorage`), the
   per-level payout formula, and the spend path.
+- `src/progress.ts` - campaign milestones that gate content (`localStorage`).
+  Currently just "has the campaign been cleared", which unlocks Echolocation.
 - `src/store.ts` - the Store: persisted purchases (`localStorage`) of permanent
-  Endless-mode stat upgrades and dolphin skins, plus the derived Endless starting
-  bonuses.
+  Endless-mode stat upgrades, dolphin skins and one-off abilities, plus the
+  derived Endless starting bonuses and Echolocation tuning.
 - `src/skins.ts` - the dolphin skin catalogue (palette swaps, prices; `source`
   marks the share-only reward skin).
 - `src/storeView.ts` - renders and wires the Store screen.
@@ -311,6 +313,13 @@ Game Features
   once all small sharks are gone, every remaining large shark will hunt you
   across the entire map regardless of distance. Great whites and hammerheads
   never lose track of you at all.
+- **Echolocation** (Endless only): bought in the Store for 200 Pearls, but only
+  after the campaign has been cleared once. Tap the cyan button (or press `E`)
+  to ping the water: every shark within the radius is drawn for the duration,
+  including cloaked large tigers and anything a storm is hiding. Cloaked sharks
+  show ghosted, so you can still tell which ones are hiding. Duration (4s, +1.5s
+  a level) and range (24 units, +6 a level) are upgradeable; the 18-second
+  cooldown deliberately is not, so a maxed ability is never permanent vision.
 - **Large tigers cloak**: with the small sharks cleared, a large tiger drops out
   of sight completely for 20 seconds while it keeps hunting you, then has to
   spend 20 visible seconds recharging. Taking a dolphin gives it away
