@@ -38,8 +38,36 @@ To re-locate a track's Pixabay page, search its ID on pixabay.com.
 
 ### Sound effects
 
-Procedurally synthesized at runtime with the Web Audio API (`src/sfx.ts`).
-No external audio files — nothing to license.
+Every sound is procedurally synthesized at runtime with the Web Audio API
+(`src/sfx.ts`) except one, below.
+
+#### Recorded effects — Pixabay
+
+Two sounds are recordings rather than synthesis, both from **Pixabay** under the
+**Pixabay Content License**: free for commercial use, no attribution required,
+but not to be redistributed as standalone downloads. Source files in
+`audio/Sfx/`; the served copies are in `public/sfx/`.
+
+| In game | Source filename | Pixabay uploader | Pixabay sound ID |
+|---|---|---|---|
+| `dolphin-recruit.mp3` | `sondangsirait419-lumba-lumba-220055.mp3` | sondangsirait419 | 220055 |
+| `shark-bite.mp3` | `makigai_maimai-crunchy-bite-450650.mp3` | makigai_maimai | 450650 |
+
+`dolphin-recruit.mp3` plays when a dolphin joins the pod: trimmed to drop 18ms
+of leading silence, raised 6dB (peak -1.8dB), 45ms fade-out, mono at 96kbps —
+7.5KB.
+
+`shark-bite.mp3` plays when a dolphin is taken. The source holds eleven separate
+takes across 16 seconds; this is the second (2.33s in, 150ms), chosen because it
+carries the least high-frequency sizzle of the loud ones — 11.6% of its energy
+above 2kHz against 25-55% for the rest — so it reads as flesh rather than as a
+dry snack. Shelved -4dB above 4kHz, raised 6dB (peak -3.6dB), 33ms fade-out,
+mono at 96kbps — 3.2KB. Only the crunch is sampled: the impact underneath and
+the water closing over it are still synthesized, because the recording is
+close-mic'd and dry.
+
+Both have synthesized fallbacks in `src/sfx.ts` covering the first play of a
+session, before the files have finished loading.
 
 
 Graphics
