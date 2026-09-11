@@ -204,34 +204,6 @@ h1 {
   animation: causticDriftB 23s ease-in-out infinite alternate;
 }
 
-/* Sharks cruising through the scene, drawn with the game's own 9-frame sprite strips - no new
-   art, and they are already precached. Dimmed and desaturated so they read as shapes in the
-   water behind the painted pair rather than competing with them. */
-.splash-swimmers {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-.splash-swimmer {
-  position: absolute;
-  background-repeat: no-repeat;
-  /* The strip is nine frames wide, so the element shows one frame at a time. */
-  background-size: 900% 100%;
-  aspect-ratio: 1;
-  image-rendering: pixelated;
-  /* Sized as a share of the stage, not in pixels: the poster scales to fit the window, and a
-     fixed-pixel shark would be a speck on a desktop and a monster on a phone.
-     Rendered as dark silhouettes rather than dimmed sprites. A half-transparent grey shark
-     disappears into bright water; a dark shape reads instantly against it, which is also how a
-     fish at distance genuinely looks from below the surface. */
-  filter: brightness(0.12) saturate(0) contrast(1.5) blur(0.3px);
-  animation-timing-function: steps(9), linear;
-  animation-iteration-count: infinite, infinite;
-}
-.splash-swimmer.rightward { animation-name: swimFrames, swimRight; }
-.splash-swimmer.leftward { animation-name: swimFrames, swimLeft; transform: scaleX(-1); }
-
 .splash-bubbles {
   position: absolute;
   inset: 0;
@@ -262,20 +234,6 @@ h1 {
   from { transform: translate3d(4%, 3%, 0) scale(1.1); opacity: 0.9; }
   to { transform: translate3d(-5%, -2%, 0) scale(1); opacity: 0.45; }
 }
-/* steps(9) over the full strip width lands exactly on each frame boundary. */
-@keyframes swimFrames {
-  from { background-position-x: 0%; }
-  to { background-position-x: 100%; }
-}
-@keyframes swimRight {
-  from { left: -22%; }
-  to { left: 118%; }
-}
-@keyframes swimLeft {
-  from { left: 118%; }
-  to { left: -22%; }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .splash-stage,
   .splash-art,
@@ -283,8 +241,7 @@ h1 {
   .splash-caustics { animation: none; }
   /* Drop the ripple too: a still displacement would leave the poster permanently warped. */
   .splash-art { filter: none; }
-  .splash-bubbles,
-  .splash-swimmers { display: none; }
+  .splash-bubbles { display: none; }
 }
 
 /* Kept in the DOM for screen readers - the prompt itself is painted into the poster. */
