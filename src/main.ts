@@ -761,18 +761,33 @@ const inputs = {
   window.addEventListener('mouseup', () => game.setPointer(false));
 })().catch((e) => showFatal('[main init]', e));
 
-(function spawnBubbles() {
-  const container = document.getElementById('bubbles') as HTMLDivElement;
-  const count = 22;
+/**
+ * Fills a container with drifting bubbles. Used for the page background and again, smaller and
+ * quicker, inside the splash poster - the splash stage clips them, so the same .bubble element
+ * and floatUp keyframe serve both without a second animation.
+ */
+function spawnBubbles(container: HTMLElement | null, count: number, opts: {
+  minSize: number; maxSize: number; minDuration: number; maxDuration: number; spread: number;
+}): void {
+  if (!container) return;
   for (let i = 0; i < count; i++) {
     const bubble = document.createElement('div');
     bubble.className = 'bubble';
-    const size = 4 + Math.random() * 14;
+    const size = opts.minSize + Math.random() * (opts.maxSize - opts.minSize);
     bubble.style.width = `${size}px`;
     bubble.style.height = `${size}px`;
     bubble.style.left = `${Math.random() * 100}%`;
-    (bubble.style as CSSStyleDeclaration).animationDuration = `${10 + Math.random() * 18}s`;
-    (bubble.style as CSSStyleDeclaration).animationDelay = `${Math.random() * 20}s`;
+    bubble.style.animationDuration = `${opts.minDuration + Math.random() * (opts.maxDuration - opts.minDuration)}s`;
+    bubble.style.animationDelay = `${Math.random() * opts.spread}s`;
     container.appendChild(bubble);
   }
-})();
+}
+
+spawnBubbles(document.getElementById('bubbles'), 22, {
+  minSize: 4, maxSize: 18, minDuration: 10, maxDuration: 28, spread: 20,
+});
+// Smaller and faster inside the poster, so they read as close to the viewer rather than as the
+// same field seen twice. Delays are tight because the splash is only on screen for a moment.
+spawnBubbles(document.getElementById('splashBubbles'), 14, {
+  minSize: 3, maxSize: 11, minDuration: 7, maxDuration: 15, spread: 9,
+});

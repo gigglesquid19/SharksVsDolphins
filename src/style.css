@@ -123,33 +123,77 @@ h1 {
 }
 .splash-screen.hidden { display: none; }
 
-/* The start screen is one painted poster: the title, both characters and the Tap to Start
-   call to action are all inside the image. So it is letterboxed rather than cropped - cover
-   would cut the title off the top and the button off the bottom on any landscape window - and
-   nothing is drawn on top of it. The whole screen is the tap target (see main.ts), which is
-   what the painted button promises. */
+/* The start screen is one painted poster: the title, both characters and the Tap to Start call
+   to action are all inside the image, so nothing is drawn on top of it and it is never cropped.
+   The stage carries the poster's own 2:3 ratio and shrinks to fit, which means the light and
+   bubble layers inside it line up with the painted artwork exactly rather than with the
+   letterboxed window - and overflow:hidden lets the art drift inside it without bleeding out. */
+.splash-stage {
+  position: relative;
+  aspect-ratio: 1024 / 1536;
+  max-width: 100%;
+  max-height: 100%;
+  overflow: hidden;
+  animation: splashArtIn 0.6s ease both;
+}
+
 .splash-art {
+  display: block;
   width: 100%;
   height: 100%;
-  object-fit: contain;
-  animation:
-    splashArtIn 0.6s ease both,
-    splashArtBreathe 2.8s ease-in-out 0.6s infinite;
+  /* cover, not contain: the stage is already the poster's aspect ratio, so nothing is cropped. */
+  object-fit: cover;
+  /* A very slow drift with a barely-there brightness swell. Held to 3.5% so the painted Tap to
+     Start never creeps out of frame, and slow enough (26s) to read as water rather than motion. */
+  animation: splashDrift 26s ease-in-out 0.6s infinite alternate;
+}
+
+/* Sunlight through water: angled bands drifting sideways, screened over the art so they add
+   light instead of veiling it, and masked away toward the sea floor where shafts would not
+   reach. Pure CSS - no image, no video, no bytes. */
+.splash-shafts {
+  position: absolute;
+  inset: -12% -22%;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    100deg,
+    rgba(255, 255, 255, 0) 0 42px,
+    rgba(186, 236, 255, 0.06) 42px 68px,
+    rgba(255, 255, 255, 0) 68px 124px
+  );
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.95) 0%, rgba(0, 0, 0, 0.5) 48%, transparent 80%);
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.95) 0%, rgba(0, 0, 0, 0.5) 48%, transparent 80%);
+  mix-blend-mode: screen;
+  animation: splashShafts 19s ease-in-out infinite alternate;
+}
+
+/* Reuses the page's .bubble element and its floatUp keyframe unchanged; the stage just clips
+   them, so they rise through the poster and vanish instead of crossing the whole window. */
+.splash-bubbles {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
 }
 
 @keyframes splashArtIn {
   from { opacity: 0; transform: scale(0.96); }
   to { opacity: 1; transform: scale(1); }
 }
-/* A slow lift in brightness stands in for the old pulsing prompt: the call to action is part
-   of the artwork, so it cannot be animated on its own without drifting out of register with
-   the poster as it is letterboxed. */
-@keyframes splashArtBreathe {
-  0%, 100% { filter: brightness(1); }
-  50% { filter: brightness(1.07); }
+@keyframes splashDrift {
+  from { transform: scale(1) translate3d(0, 0, 0); filter: brightness(1); }
+  to { transform: scale(1.035) translate3d(-0.8%, -0.6%, 0); filter: brightness(1.05); }
 }
+@keyframes splashShafts {
+  from { transform: translate3d(-3.5%, 0, 0); opacity: 0.5; }
+  to { transform: translate3d(3.5%, 0, 0); opacity: 1; }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .splash-art { animation: none; }
+  .splash-stage,
+  .splash-art,
+  .splash-shafts { animation: none; }
+  .splash-bubbles { display: none; }
 }
 
 /* Kept in the DOM for screen readers - the prompt itself is painted into the poster. */
