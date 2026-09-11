@@ -79,6 +79,9 @@ const bgMusic = document.getElementById('bgMusic') as HTMLAudioElement;
 const muteBtn = document.getElementById('muteBtn') as HTMLButtonElement;
 const volumeSlider = document.getElementById('volumeSlider') as HTMLInputElement;
 const MUSIC_MUTED_KEY = 'svsd-music-muted';
+/** How far the music drops while a sting plays, as a fraction of the player's chosen volume. */
+const MUSIC_DUCK_LEVEL = 0.3;
+let duckTimer: number | null = null;
 const VOLUME_KEY = 'svsd-volume';
 
 function applyVolume(value: number): void {
@@ -277,6 +280,18 @@ const inputs = {
     bgMusic.src = url;
     bgMusic.load();
     bgMusic.play().catch((err) => console.warn('Music track switch failed:', err));
+  },
+  // Dips the music under a sting, then brings it back. Reads the slider each time rather than
+  // caching a level, so it still lands where the player left the volume if they move it mid-duck,
+  // and a second duck starting before the first has finished simply restarts the timer.
+  onMusicDuck: (durationMs: number) => {
+    const restore = () => {
+      bgMusic.volume = Math.min(1, Math.max(0, Number(volumeSlider.value) / 100));
+      duckTimer = null;
+    };
+    if (duckTimer !== null) window.clearTimeout(duckTimer);
+    bgMusic.volume = Math.min(1, Math.max(0, (Number(volumeSlider.value) / 100) * MUSIC_DUCK_LEVEL));
+    duckTimer = window.setTimeout(restore, durationMs);
   },
 };
 

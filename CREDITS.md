@@ -54,12 +54,14 @@ but not to be redistributed as standalone downloads. Source files in
 | `shark-bite.mp3` | `makigai_maimai-crunchy-bite-450650.mp3` | makigai_maimai | 450650 |
 | `big-kill.mp3` | `universfield-punch-140236.mp3` | universfield | 140236 |
 | `matriarch-hit.mp3` | `MatriarchHit3.mp3` | **unconfirmed** | **unconfirmed** |
+| `level-complete.mp3` | `LevelComplete.mp3` | **unconfirmed** | **unconfirmed** |
+| `game-over.mp3` | `GameOver.mp3` | **unconfirmed** | **unconfirmed** |
 
-> The Matriarch hit was supplied already renamed, so its original uploader and
-> sound ID are not recoverable from the filename. Confirm its source before any
-> store release: if it is not Pixabay (or another licence permitting commercial
-> use), it must be replaced. Every other entry here was identified from its
-> original download filename.
+> The last three were supplied already renamed, so their original uploaders and
+> sound IDs are not recoverable from the filenames. Confirm their sources before
+> any store release: anything not covered by Pixabay's licence (or another
+> permitting commercial use) has to be replaced. The first three were identified
+> from their original download filenames.
 
 `dolphin-recruit.mp3` plays when a dolphin joins the pod: trimmed to drop 18ms
 of leading silence, raised 6dB (peak -1.8dB), 45ms fade-out, mono at 96kbps —
@@ -88,7 +90,15 @@ mono at 96kbps — 22KB. It is deliberately far heavier than the large-shark
 impact: all of its energy sits below 2kHz and it rings for over a second, so a
 boss hit does not sound like an ordinary kill.
 
-All four have synthesized fallbacks in `src/sfx.ts` covering the first play of a
+`level-complete.mp3` (2.6s, 32KB) plays when a level is cleared and
+`game-over.mp3` (5.4s, 66KB) when a run ends. Both are musical phrases rather
+than impacts, so unlike the others they are trimmed only where the source had
+gone quiet — audible content ended at 2.4s and 5.0s respectively — and both duck
+the background music to 30% for their duration (`onMusicDuck` in `src/main.ts`).
+Nothing stops the level music at a game over, and a five-second phrase over a
+running loop just sounds muddy.
+
+All six have synthesized fallbacks in `src/sfx.ts` covering the first play of a
 session, before the files have finished loading.
 
 

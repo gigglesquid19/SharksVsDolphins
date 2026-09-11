@@ -30,6 +30,9 @@ const BIG_KILL_SAMPLE = 'big-kill.mp3';
  * down and each one should feel like it moved something enormous.
  */
 const MATRIARCH_HIT_SAMPLE = 'matriarch-hit.mp3';
+/** Stings for the two moments a run changes state. Both are phrases, not impacts. */
+const LEVEL_COMPLETE_SAMPLE = 'level-complete.mp3';
+const GAME_OVER_SAMPLE = 'game-over.mp3';
 
 class SfxEngine {
   private ctx: AudioContext | null = null;
@@ -63,6 +66,8 @@ class SfxEngine {
     this.preloadSample(BITE_SAMPLE);
     this.preloadSample(BIG_KILL_SAMPLE);
     this.preloadSample(MATRIARCH_HIT_SAMPLE);
+    this.preloadSample(LEVEL_COMPLETE_SAMPLE);
+    this.preloadSample(GAME_OVER_SAMPLE);
   }
 
   /** Fetches and decodes a sample once, caching the result. Safe to call repeatedly. */
@@ -263,6 +268,31 @@ class SfxEngine {
     this.tone(ctx, 110, now, 0.9, { type: 'sine', gain: 0.5, glideTo: 38 });
     this.tone(ctx, 78, now + 0.04, 0.8, { type: 'triangle', gain: 0.3 });
     this.crunch(ctx, now, { dur: 0.22, grainMs: 7, from: 1200, to: 200, peak: 0.4, q: 0.9 });
+  }
+
+  /** Clearing a level. Roughly 2.4 seconds of fanfare. */
+  playLevelComplete(): void {
+    if (this.playSample(LEVEL_COMPLETE_SAMPLE, 0.9)) return;
+
+    // Synthesised stand-in, used only until the recording has loaded.
+    const ctx = this.ensureContext();
+    const now = ctx.currentTime;
+    [523.25, 659.25, 783.99, 1046.5].forEach((freq, i) => {
+      this.tone(ctx, freq, now + i * 0.1, 0.3, { type: 'triangle', gain: 0.24 });
+    });
+  }
+
+  /** The end of a run. Roughly 5 seconds, so the music ducks under it - see Game.gameOver. */
+  playGameOver(): void {
+    if (this.playSample(GAME_OVER_SAMPLE, 0.9)) return;
+
+    // Synthesised stand-in, used only until the recording has loaded.
+    const ctx = this.ensureContext();
+    const now = ctx.currentTime;
+    [392, 349.23, 293.66, 261.63].forEach((freq, i) => {
+      this.tone(ctx, freq, now + i * 0.22, 0.5, { type: 'triangle', gain: 0.26 });
+    });
+    this.tone(ctx, 98, now + 0.66, 1.2, { type: 'sine', gain: 0.3, glideTo: 55 });
   }
 
   /** Short percussive kill blip whose pitch climbs with the combo step (0-based), then caps. */

@@ -350,6 +350,7 @@ export class Game {
   private sharkWarningListEl: HTMLDivElement;
   private onSchoolingChange?: (active: boolean) => void;
   private onMusicTrackChange?: (url: string) => void;
+  private onMusicDuck?: (durationMs: number) => void;
   private lastMusicLevel = 0;
   private paused = false;
 
@@ -388,6 +389,7 @@ export class Game {
       sharkWarningList: HTMLDivElement;
       onSchoolingChange?: (active: boolean) => void;
       onMusicTrackChange?: (url: string) => void;
+      onMusicDuck?: (durationMs: number) => void;
     }
   ) {
     this.canvas = canvas;
@@ -454,6 +456,7 @@ export class Game {
     this.sharkWarningListEl = inputs.sharkWarningList;
     this.onSchoolingChange = inputs.onSchoolingChange;
     this.onMusicTrackChange = inputs.onMusicTrackChange;
+    this.onMusicDuck = inputs.onMusicDuck;
     this.lastLifeHeart = document.getElementById('lastLifeHeart');
     this.levelBadgeNumberEl = document.getElementById('levelBadgeNumber');
     this.dolphinsSavedBadgeEl = document.getElementById('dolphinsSavedBadge');
@@ -1447,6 +1450,10 @@ export class Game {
     this.flushLifetimeStats();
     this.setStatus('Eaten by a shark');
     this.showBanner('Game Over', 'gameover');
+    // Nothing stops the level music at a game over, and this sting is a five-second phrase
+    // rather than an impact - played over the top of a loop it just sounds muddy.
+    sfx.playGameOver();
+    this.onMusicDuck?.(5000);
 
     // Android only: one Continue per Endless run - watch a rewarded ad or buy it (src/ads.ts, src/iap.ts).
     if (this.mode === 'endless' && isAndroid && !this.continueUsedThisRun && (ads.available || iap.available)) {
@@ -1574,6 +1581,8 @@ export class Game {
     if (this.mode === 'endless' && this.currentLevel === 50) this.pendingMilestone = true;
     this.saveDolphinsAndDepart();
     this.setStatus('All sharks destroyed!');
+    sfx.playLevelComplete();
+    this.onMusicDuck?.(2400);
 
     // The campaign finale gets a longer pause and skips the generic banner - it's reached right
     // after the Matriarch's own "Matriarch Defeated!" banner, which this would otherwise stomp.
