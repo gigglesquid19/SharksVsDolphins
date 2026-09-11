@@ -4,3 +4,6 @@ dist/
 .DS_Store
 ~$*.doc*
 ~WRL*.tmp
+
+# Packaged Android release artifacts (tens of MB each) - kept locally, uploaded to Play
+/Release Builds/
