@@ -57,3 +57,19 @@ export function pearlsForLevel(level: number, flawless: boolean): number {
 
 export const PEARLS_CAMPAIGN_CLEAR = 100;
 export const PEARLS_FLAWLESS_CAMPAIGN_BONUS = 50;
+
+/**
+ * Milestone payout for liberating a depth zone in the Depthless Campaign, growing with depth:
+ * 100 for the Eutrophic up to 300 for the Hadal, 1000 across a full descent to level 50.
+ *
+ * Sized against the Store rather than against the per-level trickle - the deepest liberation
+ * buys a skin outright, which is what makes reaching it worth the ten levels it took.
+ */
+export const PEARLS_ZONE_CLEAR_BASE = 100;
+export const PEARLS_ZONE_CLEAR_STEP = 50;
+
+/** @param zoneNumber 1-based: 1 is the Eutrophic, 5 the Hadal. */
+export function pearlsForZoneClear(zoneNumber: number): number {
+  const n = Math.max(1, Math.floor(zoneNumber));
+  return PEARLS_ZONE_CLEAR_BASE + (n - 1) * PEARLS_ZONE_CLEAR_STEP;
+}

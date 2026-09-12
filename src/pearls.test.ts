@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { awardPearls, getPearls, pearlsForLevel, spendPearls } from './pearls';
+import { awardPearls, getPearls, pearlsForLevel, spendPearls,
+  PEARLS_ZONE_CLEAR_BASE,
+  PEARLS_ZONE_CLEAR_STEP,
+  pearlsForZoneClear,
+} from './pearls';
 
 beforeEach(() => {
   localStorage.clear();
@@ -55,5 +59,23 @@ describe('pearlsForLevel', () => {
 
   it('adds a flawless bonus', () => {
     expect(pearlsForLevel(1, true)).toBe(16);
+  });
+});
+
+describe('pearlsForZoneClear', () => {
+  it('pays more the deeper the zone', () => {
+    expect(pearlsForZoneClear(1)).toBe(PEARLS_ZONE_CLEAR_BASE);
+    expect(pearlsForZoneClear(2)).toBe(PEARLS_ZONE_CLEAR_BASE + PEARLS_ZONE_CLEAR_STEP);
+    expect(pearlsForZoneClear(5)).toBe(PEARLS_ZONE_CLEAR_BASE + 4 * PEARLS_ZONE_CLEAR_STEP);
+  });
+
+  it('pays 1000 across a full descent to level 50', () => {
+    const total = [1, 2, 3, 4, 5].reduce((sum, n) => sum + pearlsForZoneClear(n), 0);
+    expect(total).toBe(1000);
+  });
+
+  it('never pays less than the base, however it is called', () => {
+    expect(pearlsForZoneClear(0)).toBe(PEARLS_ZONE_CLEAR_BASE);
+    expect(pearlsForZoneClear(-3)).toBe(PEARLS_ZONE_CLEAR_BASE);
   });
 });

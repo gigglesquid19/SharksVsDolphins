@@ -20,7 +20,15 @@ import {
   SharkTextureSet,
 } from './sprites';
 import { sfx } from './sfx';
-import { LEVELS, LevelConfig, getLevelBackground, getLevelConfig, zoneClearedAt, zoneEnteredAt } from './levels';
+import {
+  LEVELS,
+  LevelConfig,
+  getLevelBackground,
+  getLevelConfig,
+  zoneClearedAt,
+  zoneEnteredAt,
+  zoneNumber,
+} from './levels';
 import { CANVAS_SIZE, SIZE } from './constants';
 import { clampEntityY, directionDelta, sweptDistance, wrapX } from './utils';
 import { Dolphin, Shark, Jellyfish } from './entities';
@@ -43,6 +51,7 @@ import {
   awardPearls,
   getPearls,
   pearlsForLevel,
+  pearlsForZoneClear,
   PEARLS_CAMPAIGN_CLEAR,
   PEARLS_FLAWLESS_CAMPAIGN_BONUS,
 } from './pearls';
@@ -1400,6 +1409,15 @@ export class Game {
     return true;
   }
 
+  /**
+   * The zone-liberation payout for the level just cleared, or 0. Derived from currentLevel rather
+   * than stored, so the banner and the award cannot disagree about the figure.
+   */
+  private zoneClearBonus(): number {
+    const cleared = this.mode === 'endless' ? zoneClearedAt(this.currentLevel) : null;
+    return cleared ? pearlsForZoneClear(zoneNumber(cleared)) : 0;
+  }
+
   private announceLevel(duration = 2200): void {
     this.updateLevelBadge();
 
@@ -1923,6 +1941,10 @@ ${zone.depth}`, 'levelup', duration + 1400);
     this.flushLifetimeStats();
     const pearls = pearlsForLevel(this.currentLevel, this.lostThisLevel === 0);
     this.awardRunPearls(pearls);
+    // Liberating a depth zone pays a milestone bonus on top of the level's own Pearls. Banked
+    // here rather than on the card that announces it, so it is already in the balance by the
+    // time the player reads the number.
+    this.awardRunPearls(this.zoneClearBonus());
     if (this.mode === 'endless' && this.currentLevel === 50) this.pendingMilestone = true;
     this.saveDolphinsAndDepart();
     this.setStatus('All sharks destroyed!');
@@ -2339,10 +2361,17 @@ ${zone.depth}`, 'levelup', duration + 1400);
     // generic "Level Up!" rather than being queued behind it, since both would land on the same
     // banner within a second of each other.
     const cleared = this.mode === 'endless' ? zoneClearedAt(this.currentLevel) : null;
-    const bannerText = cleared ? `Sharks Vanquished
-${cleared.name} Zone Liberated` : 'Level Up!';
+    const bonus = this.zoneClearBonus();
+    const bannerText = cleared
+      ? `Sharks Vanquished
+${cleared.name} Zone Liberated
++${bonus} Pearls`
+      : 'Level Up!';
     this.showBanner(bannerText, 'levelup', cleared ? 3400 : 2600);
-    if (cleared) this.setStatus(`${cleared.name} Zone liberated!`);
+    if (cleared) {
+      this.setStatus(`${cleared.name} Zone liberated! +${bonus} Pearls`);
+      sfx.playAchievement();
+    }
     if (this.megaShrimpHintEl) {
       const firstTime = !hasSeenHint('megaShrimp');
       this.megaShrimpHintEl.classList.toggle('hidden', !firstTime);

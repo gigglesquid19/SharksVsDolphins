@@ -89,6 +89,11 @@ export function zoneEnteredAt(level: number): DepthZone | null {
   return DEPTH_ZONES.find((z) => z.firstLevel === level) ?? null;
 }
 
+/** 1-based position of a zone in the descent: 1 is the Eutrophic, 5 the Hadal. */
+export function zoneNumber(zone: DepthZone): number {
+  return DEPTH_ZONES.indexOf(zone) + 1;
+}
+
 /** The zone this level completes, if it is the last of one. Null past level 50. */
 export function zoneClearedAt(level: number): DepthZone | null {
   return DEPTH_ZONES.find((z) => z.lastLevel === level) ?? null;

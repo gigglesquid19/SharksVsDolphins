@@ -276,7 +276,10 @@ How to Play
      (2000m-4000m) and Hadal (4000m+), defined in `DEPTH_ZONES` in
      `src/levels.ts`. Entering the first level of a zone announces "Entered the
      X Zone" with its depth range, and clearing the last announces "Sharks
-     Vanquished / X Zone Liberated" in place of the usual "Level Up!". Each zone
+     Vanquished / X Zone Liberated" in place of the usual "Level Up!", and pays
+     a **milestone bonus** on top of the level's own Pearls - 100 for the
+     Eutrophic rising to 300 for the Hadal, 1000 across a full descent to
+     level 50 (`pearlsForZoneClear` in `src/pearls.ts`). Each zone
      has its own ten backgrounds, so the water gets visibly deeper and stranger
      the further a run goes. Past level 50 the backgrounds cycle and the run
      stays in the Hadal - announcing a return to the shallows at level 51 would
