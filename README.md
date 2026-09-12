@@ -37,7 +37,9 @@ Contents
   Currently just "has the campaign been cleared", which unlocks Echolocation.
 - `src/inventory.ts` - consumables the player has bought and is carrying
   (`localStorage`). Unlike the Store's upgrades and abilities these are spent,
-  so the shape is a count that goes down; currently just the Magic Shrimp.
+  so the shape is a count that goes down. Three kinds of shrimp, each with its
+  own price, carry limit and keyboard shortcut, defined in one table the Store
+  tiles and the in-run buttons are both generated from.
 - `src/store.ts` - the Store: persisted purchases (`localStorage`) of permanent
   Endless-mode stat upgrades, dolphin skins and one-off abilities, plus the
   derived Endless starting bonuses and Echolocation tuning.
@@ -298,14 +300,29 @@ Game Features
   Swim close to recruit it (with a chime and banner), and recruited
   dolphins flock around you in formation and follow you through the
   screen-wrap edges.
-- **Magic Shrimp**: bought in the Store for 60 Pearls and carried into a run,
-  up to three at a time. Tap the amber button (or press `Q`) to spend one for
-  +50% swim speed lasting the rest of the level, in Campaign or Endless. They
-  stack additively, so three spent in one level is +150%, and the pod speeds up
-  with you rather than being left behind.
-  It used to appear in the water after two minutes, where a shark could reach
-  it first and grow large - a coin flip the player had no way to influence.
-  Bought and carried, it is a decision about when to spend instead.
+- **Shrimp**: three consumables, bought in the Store and carried into a run,
+  three of each at most. They work in Campaign and Endless alike, and any that
+  are left over stay in the pack for the next run.
+  - **Magic Shrimp** (60 Pearls, amber button or `Q`): +50% swim speed for the
+    rest of the level. They stack additively, so three spent in one level is
+    +150%, and the pod speeds up with you rather than being left behind.
+  - **Ghost Shrimp** (90 Pearls, violet button or `F`): thirty seconds where no
+    shark can find the pod or take a dolphin from it. Sharks keep cruising and
+    searching, so the water still feels alive, but nothing converges on you and
+    charges already in flight are broken off. The pod is drawn translucent for
+    the duration, and a banner warns you when it ends. Spending a second one
+    while the first is running is refused rather than wasted.
+  - **Pistol Shrimp** (75 Pearls, rose button or `R`): a shockwave that throws
+    every shark within 20 units clear of the pod and leaves it tumbling and
+    harmless for four seconds. It breaks charges and ambushes already running
+    and exposes a cloaked tiger, which makes it the answer to being swarmed.
+    Tapping it with nothing in range is refused, so the Pearls are not burned
+    on empty water.
+
+  The Magic Shrimp used to appear in the water after two minutes, where a shark
+  could reach it first and grow large - a coin flip the player had no way to
+  influence. Bought and carried, it is a decision about when to spend instead,
+  and the other two were built on the same footing.
 - **Hunting Mode**: once your pod reaches 4, ramming *small* sharks destroys
   them. *Large* sharks (marked with a ⚡ and a higher number) also need you to
   be **Boosting** - tap Space, or the ⚡ button - into them at the moment of

@@ -16,12 +16,7 @@ import {
   ownsSkin,
   upgradeLevel,
 } from './store';
-import {
-  MAGIC_SHRIMP_PRICE,
-  MAX_MAGIC_SHRIMP,
-  buyMagicShrimp,
-  magicShrimpHeld,
-} from './inventory';
+import { CONSUMABLES, CONSUMABLE_ORDER, buyConsumable, getInventory } from './inventory';
 import { DOLPHIN_SKINS } from './skins';
 import { makeDolphinBodyCanvas } from './sprites';
 
@@ -46,33 +41,39 @@ export function setupStore(opts: { onPearlsChange: () => void }): { open: () => 
    */
   function renderConsumables(): void {
     const balance = getPearls();
-    const held = magicShrimpHeld();
-    const full = held >= MAX_MAGIC_SHRIMP;
+    const inventory = getInventory();
 
-    const item = document.createElement('div');
-    item.className = 'store-item';
-    if (full) item.classList.add('owned');
+    const tiles = CONSUMABLE_ORDER.map((id) => {
+      const def = CONSUMABLES[id];
+      const held = inventory[id];
+      const full = held >= def.max;
 
-    item.innerHTML = `
-      <div class="store-item-icon" aria-hidden="true">\u{1F990}</div>
-      <div class="store-item-name">Magic Shrimp</div>
-      <div class="store-item-desc">Spend one mid-run for +50% swim speed for the rest of the level. They stack.</div>
-      <div class="store-item-level">Carrying ${held} / ${MAX_MAGIC_SHRIMP}</div>`;
+      const item = document.createElement('div');
+      item.className = 'store-item';
+      if (full) item.classList.add('owned');
 
-    const btn = document.createElement('button');
-    btn.className = 'store-buy';
-    if (full) {
-      btn.textContent = 'Pack full';
-      btn.disabled = true;
-    } else {
-      btn.innerHTML = `<img class="pearl-icon" alt="" src="${pearlIconSrc()}"> ${MAGIC_SHRIMP_PRICE}`;
-      btn.disabled = balance < MAGIC_SHRIMP_PRICE;
-      btn.addEventListener('click', () => {
-        if (buyMagicShrimp()) refresh();
-      });
-    }
-    item.appendChild(btn);
-    consumablesEl.replaceChildren(item);
+      item.innerHTML = `
+        <div class="store-item-icon" aria-hidden="true">${def.icon}</div>
+        <div class="store-item-name">${def.name}</div>
+        <div class="store-item-desc">${def.desc} Press <b>${def.key}</b> in a run.</div>
+        <div class="store-item-level">Carrying ${held} / ${def.max}</div>`;
+
+      const btn = document.createElement('button');
+      btn.className = 'store-buy';
+      if (full) {
+        btn.textContent = 'Pack full';
+        btn.disabled = true;
+      } else {
+        btn.innerHTML = `<img class="pearl-icon" alt="" src="${pearlIconSrc()}"> ${def.price}`;
+        btn.disabled = balance < def.price;
+        btn.addEventListener('click', () => {
+          if (buyConsumable(id)) refresh();
+        });
+      }
+      item.appendChild(btn);
+      return item;
+    });
+    consumablesEl.replaceChildren(...tiles);
   }
 
   /**

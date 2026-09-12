@@ -433,6 +433,54 @@ class SfxEngine {
     });
   }
 
+  /** Ghost Shrimp: a soft swell that falls away to nothing, like sinking out of sight. */
+  playGhostShrimp(): void {
+    const ctx = this.ensureContext();
+    const now = ctx.currentTime;
+
+    this.tone(ctx, 880, now, 0.9, { type: 'sine', gain: 0.18, glideTo: 220 });
+    this.tone(ctx, 1320, now + 0.05, 0.7, { type: 'sine', gain: 0.1, glideTo: 330 });
+    // A breath of noise under it so it reads as water closing over the pod rather than a chime.
+    const noise = ctx.createBufferSource();
+    noise.buffer = this.noiseBuffer(ctx, 0.9);
+    const band = ctx.createBiquadFilter();
+    band.type = 'bandpass';
+    band.frequency.setValueAtTime(1200, now);
+    band.frequency.exponentialRampToValueAtTime(180, now + 0.9);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.14, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.9);
+    noise.connect(band);
+    band.connect(gain);
+    gain.connect(this.masterGain!);
+    noise.start(now);
+    noise.stop(now + 0.9);
+  }
+
+  /** Pistol Shrimp: the snap itself, then the cavitation bubble collapsing. */
+  playPistolShrimp(): void {
+    const ctx = this.ensureContext();
+    const now = ctx.currentTime;
+
+    this.click(ctx, now, 0.5, 2000);
+    const noise = ctx.createBufferSource();
+    noise.buffer = this.noiseBuffer(ctx, 0.5);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(3200, now);
+    lp.frequency.exponentialRampToValueAtTime(240, now + 0.45);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.32, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+    noise.connect(lp);
+    lp.connect(gain);
+    gain.connect(this.masterGain!);
+    noise.start(now);
+    noise.stop(now + 0.5);
+    // The low thump that sells it as a pressure wave rather than a hi-hat.
+    this.tone(ctx, 140, now + 0.01, 0.35, { type: 'sine', gain: 0.3, glideTo: 45 });
+  }
+
   playAchievement(): void {
     const ctx = this.ensureContext();
     const now = ctx.currentTime;

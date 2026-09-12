@@ -24,7 +24,8 @@ import { LEVELS, LevelConfig, getLevelBackground, getLevelConfig } from './level
 import { CANVAS_SIZE, SIZE } from './constants';
 import { clampEntityY, directionDelta, sweptDistance, wrapX } from './utils';
 import { Dolphin, Shark, Jellyfish } from './entities';
-import { magicShrimpHeld, useMagicShrimp } from './inventory';
+import type { ConsumableId, Inventory } from './inventory';
+import { getInventory, magicShrimpHeld, useConsumable } from './inventory';
 import {
   loadCampaignScores,
   loadEndlessScores,
@@ -105,6 +106,14 @@ const MOTE_COUNT = 30;
 // stack additively - three of them is +150%, not 3.4x, which keeps the maths legible to a
 // player deciding whether to spend a second one.
 const SHRIMP_SPEED_BONUS = 0.5;
+// Ghost Shrimp: half a minute where no shark can find the pod or touch it. Long enough to cross
+// the map and rebuild a pod that has just been shredded, which is the moment it exists for.
+const GHOST_DURATION_MS = 30000;
+const GHOST_POD_ALPHA = 0.45;
+// Pistol Shrimp: a real one stuns its prey with a cavitation bubble, so the blast reads as a
+// snap rather than an explosion. Radius is a little under half the play area's height.
+const PISTOL_BLAST_RADIUS = 20;
+const PISTOL_STUN_MS = 4000;
 const SHARK_FADE_WHILE_SAFE = 0.55;
 const SHARK_FADE_RESTORE_MS = 700;
 // Draw order inside the entity container. Sprites were previously stacked in creation order,
@@ -243,6 +252,8 @@ export class Game {
   private pendingLevelInvulnerability = false;
   /** Speed added by Magic Shrimp spent this level, as a fraction. Cleared on level entry. */
   private shrimpSpeedBonus = 0;
+  /** While Date.now() is under this, a Ghost Shrimp is hiding the pod from every shark. */
+  private ghostUntil = 0;
   // Echolocation (Endless only, bought in the Store once the campaign is cleared). While it is
   // running, sharks inside echoRadius are drawn even if a storm or a tiger's cloak is hiding
   // them - see the draw loop and sharkRevealedByEcho.
@@ -376,7 +387,7 @@ export class Game {
   private onMusicTrackChange?: (url: string) => void;
   private onMusicDuck?: (durationMs: number) => void;
   private onEchoAvailabilityChange?: (available: boolean) => void;
-  private onShrimpCountChange?: (held: number) => void;
+  private onConsumableChange?: (counts: Inventory) => void;
   private lastMusicLevel = 0;
   private paused = false;
 
@@ -424,7 +435,7 @@ export class Game {
       onMusicTrackChange?: (url: string) => void;
       onMusicDuck?: (durationMs: number) => void;
       onEchoAvailabilityChange?: (available: boolean) => void;
-      onShrimpCountChange?: (held: number) => void;
+      onConsumableChange?: (counts: Inventory) => void;
     }
   ) {
     this.canvas = canvas;
@@ -492,7 +503,7 @@ export class Game {
     this.onMusicTrackChange = inputs.onMusicTrackChange;
     this.onMusicDuck = inputs.onMusicDuck;
     this.onEchoAvailabilityChange = inputs.onEchoAvailabilityChange;
-    this.onShrimpCountChange = inputs.onShrimpCountChange;
+    this.onConsumableChange = inputs.onConsumableChange;
     this.lastLifeHeart = document.getElementById('lastLifeHeart');
     this.levelBadgeNumberEl = document.getElementById('levelBadgeNumber');
     this.dolphinsSavedBadgeEl = document.getElementById('dolphinsSavedBadge');
@@ -648,6 +659,21 @@ export class Game {
     return magicShrimpHeld();
   }
 
+  /** Everything the player is carrying, for the in-run buttons. */
+  consumableCounts(): Inventory {
+    return getInventory();
+  }
+
+  /** True while a Ghost Shrimp is hiding the pod. */
+  isGhosted(): boolean {
+    return Date.now() < this.ghostUntil;
+  }
+
+  /** Shared guard: a consumable can only be spent during live play. */
+  private canUseConsumable(): boolean {
+    return this.running && !this.paused && !!this.player;
+  }
+
   /**
    * Spends a Magic Shrimp for extra swim speed lasting the rest of the level. Bought in the Store
    * rather than found in the water: as a pickup it was a coin flip that could just as easily hand
@@ -657,7 +683,7 @@ export class Game {
    */
   useMagicShrimpItem(): boolean {
     if (!this.running || this.paused || !this.player) return false;
-    if (!useMagicShrimp()) return false;
+    if (!useConsumable('magicShrimp')) return false;
 
     this.shrimpSpeedBonus += SHRIMP_SPEED_BONUS;
     // Still flags "boosted" for the ring and the quicker fluke beat; the magnitude now comes
@@ -673,8 +699,105 @@ export class Game {
     const percent = Math.round(this.shrimpSpeedBonus * 100);
     this.setStatus(`+${percent}% speed for the level!`);
     this.showBanner(`Magic Shrimp! +${percent}%`, 'statup', 1400);
-    this.onShrimpCountChange?.(magicShrimpHeld());
+    this.onConsumableChange?.(getInventory());
     return true;
+  }
+
+  /**
+   * Spends a Ghost Shrimp: for thirty seconds no shark can find the pod, and none can take a
+   * dolphin from it. Sharks are not frozen - they cruise and search, so the water still feels
+   * alive - they simply have nothing to converge on, which is what makes it read as hiding
+   * rather than as a pause button.
+   *
+   * Stacking would only extend an effect that is already long, so a second one spent while the
+   * first is running is refused rather than wasted.
+   */
+  useGhostShrimpItem(): boolean {
+    if (!this.canUseConsumable() || !this.player) return false;
+    if (this.isGhosted()) {
+      this.setStatus('Already hidden');
+      return false;
+    }
+    if (!useConsumable('ghostShrimp')) return false;
+
+    this.ghostUntil = Date.now() + GHOST_DURATION_MS;
+    // Every shark loses the trail it was on, so the pod is not still being tracked by a shark
+    // that happened to be mid-charge.
+    for (const shark of this.sharks) {
+      shark.charging = false;
+      shark.ambushing = false;
+      shark.stalking = false;
+    }
+
+    const scale = CANVAS_SIZE / SIZE;
+    this.particles.emit('bubble', this.player._x * scale + scale / 2, this.player._y * scale + scale / 2, 24, {
+      speed: 2.4,
+      life: 1.1,
+    });
+    sfx.playGhostShrimp();
+    this.setStatus('Hidden from the sharks!');
+    this.showBanner('Ghost Shrimp!', 'statup', 1600);
+    this.onConsumableChange?.(getInventory());
+    return true;
+  }
+
+  /**
+   * Spends a Pistol Shrimp: a shockwave that throws every nearby shark clear of the pod and
+   * leaves it tumbling for a few seconds. It breaks charges and lunges already in flight, which
+   * is the whole point of carrying one - it is the answer to being swarmed at the wrong moment.
+   *
+   * Refused outright when nothing is in range, so a mistimed tap does not burn 75 Pearls on
+   * empty water.
+   */
+  usePistolShrimpItem(): boolean {
+    if (!this.canUseConsumable() || !this.player) return false;
+
+    const inRange = this.sharks.filter((s) => s.distanceBetween(this.player!) <= PISTOL_BLAST_RADIUS);
+    if (inRange.length === 0) {
+      this.setStatus('No sharks in range');
+      return false;
+    }
+    if (!useConsumable('pistolShrimp')) return false;
+
+    const now = Date.now();
+    for (const shark of inRange) {
+      const awayX = directionDelta(shark._x, this.player._x);
+      const awayY = shark._y - this.player._y;
+      const len = Math.hypot(awayX, awayY);
+      // A shark sitting exactly on the player has no direction to be thrown in; pick one.
+      const angle = len > 0.001 ? Math.atan2(awayY, awayX) : Math.random() * Math.PI * 2;
+      shark.stunDx = Math.cos(angle);
+      shark.stunDy = Math.sin(angle);
+      shark.stunnedUntil = now + PISTOL_STUN_MS;
+      shark.charging = false;
+      shark.ambushing = false;
+      shark.stalking = false;
+      // The blast gives a cloaked tiger away, the same as feeding does.
+      this.revealShark(shark, now);
+    }
+
+    const scale = CANVAS_SIZE / SIZE;
+    this.particles.emit('sparkle', this.player._x * scale + scale / 2, this.player._y * scale + scale / 2, 30, {
+      speed: 5,
+      life: 0.7,
+    });
+    sfx.playPistolShrimp();
+    if (!this.reducedMotion) {
+      this.shakeMagnitude = SHAKE_MAGNITUDE;
+      this.shakeTime = SHAKE_DURATION_MS / 1000;
+    }
+    const many = inRange.length > 1;
+    this.setStatus(many ? `${inRange.length} sharks stunned!` : 'Shark stunned!');
+    this.showBanner('Pistol Shrimp!', 'statup', 1400);
+    this.onConsumableChange?.(getInventory());
+    return true;
+  }
+
+  /** Spends one of any kind, for the shared HUD button handler. */
+  useConsumableItem(id: ConsumableId): boolean {
+    if (id === 'magicShrimp') return this.useMagicShrimpItem();
+    if (id === 'ghostShrimp') return this.useGhostShrimpItem();
+    return this.usePistolShrimpItem();
   }
 
   /** True while a ping is lighting the water up. */
@@ -1131,6 +1254,7 @@ export class Game {
     this.player.invulnerableUntil = Date.now() + LEVEL_START_INVULNERABILITY_MS;
     this.pendingLevelInvulnerability = true;
     this.shrimpSpeedBonus = 0;
+    this.ghostUntil = 0;
     this.dolphins.push(this.player);
     this.addDolphinSprite(this.player);
 
@@ -1181,7 +1305,7 @@ export class Game {
       this.echoEndTime = 0;
       this.echoCooldownEnd = 0;
       this.onEchoAvailabilityChange?.(this.echoAvailable);
-      this.onShrimpCountChange?.(magicShrimpHeld());
+      this.onConsumableChange?.(getInventory());
     }
     this.wasOnLastLifeThisLevel = false;
 
@@ -2196,6 +2320,7 @@ export class Game {
       // Shrimp last the level, not the run. Nothing cleared this before, so a single boost
       // silently carried through every remaining level of a campaign.
       this.shrimpSpeedBonus = 0;
+      this.ghostUntil = 0;
       this.player.speedBoostUntil = 0;
     }
 
@@ -2859,6 +2984,14 @@ export class Game {
       this.levelStartSafeUntil = this.player.invulnerableUntil;
     }
 
+    // Coming back into view is worth announcing - the sharks have not moved on the player for
+    // half a minute and are about to, and nothing else on screen would have told them.
+    if (this.ghostUntil > 0 && now >= this.ghostUntil) {
+      this.ghostUntil = 0;
+      this.setStatus('The sharks can see you again');
+      this.showBanner('Visible!', 'lost', 1400);
+    }
+
     if (now >= this.sprintEndTime) this.sprinting = false;
     if (this.keys[' '] && now >= this.sprintCooldownEnd) {
       this.sprinting = true;
@@ -2881,9 +3014,12 @@ export class Game {
       // track the player from anywhere; this is what brings large tigers up to that, and is the
       // behaviour the README and the shark guide have always described.
       const allSharksLarge = this.sharks.length > 0 && this.sharks.every((s) => s.large);
+      // A Ghost Shrimp overrides all of that: nothing in the water can sense the pod, however
+      // large or far-sighted it is.
+      const ghosted = now < this.ghostUntil;
       for (const shark of this.sharks) {
         const unlimitedRange = allSharksLarge || shark.kind === 'greatWhite' || shark.kind === 'hammerhead';
-        shark.move(sharkSpeed, this.player, this.sharks, unlimitedRange, now);
+        shark.move(sharkSpeed, this.player, this.sharks, unlimitedRange, now, ghosted);
       }
     }
 
@@ -3019,7 +3155,7 @@ export class Game {
     }
 
     if (this.activeEvent?.type !== 'jellyfish') {
-      if (this.player && now >= this.playerHitCooldownUntil && now >= this.player.invulnerableUntil) {
+      if (this.player && now >= this.playerHitCooldownUntil && now >= this.player.invulnerableUntil && now >= this.ghostUntil) {
         for (const shark of this.sharks) {
           if (this.sharkContactsPod(shark)) {
             sfx.playBite();
@@ -3249,6 +3385,10 @@ export class Game {
       fish.scale.set(dir * stretch, 1 / stretch);
       fish.rotation = Math.sin(beat - 0.8) * 0.05 + dir * Math.max(-1.4, Math.min(1.4, dy)) * 0.12;
       fish.y = Math.sin(t * 4.5 + dolphin.id) * 0.7;
+
+      // A ghosted pod is drawn translucent, so the player can see the state they paid for
+      // without the pod disappearing out from under them.
+      sprite.alpha = now < this.ghostUntil ? GHOST_POD_ALPHA : 1;
 
       const invulnerable = now < dolphin.invulnerableUntil;
       const boostRing = sprite.getChildByName('boostRing') as Graphics;

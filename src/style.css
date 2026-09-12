@@ -1555,6 +1555,27 @@ canvas {
 }
 #shrimpBtnWrap.hidden { display: none; }
 
+/* The other two shrimp share the shape and the count badge, and differ only in colour: violet
+   for hiding, rose for the blast. Three amber buttons in a row would be unreadable at a glance
+   in the middle of a level, which is the only time these are ever pressed. */
+.ghost-shrimp-btn {
+  background: rgba(167, 139, 250, 0.15);
+  color: #a78bfa;
+}
+.ghost-shrimp-btn:active,
+.ghost-shrimp-btn.active { background: rgba(167, 139, 250, 0.5); }
+.ghost-shrimp-btn .shrimp-count { color: #ddd6fe; }
+#ghostShrimpBtnWrap.hidden { display: none; }
+
+.pistol-shrimp-btn {
+  background: rgba(251, 113, 133, 0.15);
+  color: #fb7185;
+}
+.pistol-shrimp-btn:active,
+.pistol-shrimp-btn.active { background: rgba(251, 113, 133, 0.5); }
+.pistol-shrimp-btn .shrimp-count { color: #fecdd3; }
+#pistolShrimpBtnWrap.hidden { display: none; }
+
 @keyframes echoReadyFlash {
   0% { box-shadow: 0 0 0 0 rgba(103, 232, 249, 0.9); }
   100% { box-shadow: 0 0 0 22px rgba(103, 232, 249, 0); }

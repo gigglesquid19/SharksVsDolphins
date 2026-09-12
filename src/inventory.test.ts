@@ -1,12 +1,19 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { awardPearls, getPearls } from './pearls';
 import {
+  CONSUMABLES,
+  CONSUMABLE_ORDER,
   MAGIC_SHRIMP_PRICE,
   MAX_MAGIC_SHRIMP,
+  anyConsumableHeld,
+  buyConsumable,
   buyMagicShrimp,
+  consumableFull,
+  consumableHeld,
   getInventory,
   magicShrimpFull,
   magicShrimpHeld,
+  useConsumable,
   useMagicShrimp,
 } from './inventory';
 
@@ -16,7 +23,7 @@ beforeEach(() => {
 
 describe('default state', () => {
   it('starts with an empty pack', () => {
-    expect(getInventory()).toEqual({ magicShrimp: 0 });
+    expect(getInventory()).toEqual({ magicShrimp: 0, ghostShrimp: 0, pistolShrimp: 0 });
     expect(magicShrimpHeld()).toBe(0);
     expect(magicShrimpFull()).toBe(false);
   });
@@ -69,7 +76,11 @@ describe('using', () => {
     buyMagicShrimp();
     expect(useMagicShrimp()).toBe(true);
     expect(magicShrimpHeld()).toBe(1);
-    expect(JSON.parse(localStorage.getItem('svsd-inventory') as string)).toEqual({ magicShrimp: 1 });
+    expect(JSON.parse(localStorage.getItem('svsd-inventory') as string)).toEqual({
+      magicShrimp: 1,
+      ghostShrimp: 0,
+      pistolShrimp: 0,
+    });
   });
 
   it('refuses on an empty pack rather than going negative', () => {
@@ -84,5 +95,54 @@ describe('using', () => {
     useMagicShrimp();
     expect(magicShrimpFull()).toBe(false);
     expect(buyMagicShrimp()).toBe(true);
+  });
+});
+
+describe('the other kinds of shrimp', () => {
+  it('buys, carries and spends each kind independently', () => {
+    awardPearls(10_000);
+    expect(buyConsumable('ghostShrimp')).toBe(true);
+    expect(buyConsumable('pistolShrimp')).toBe(true);
+    expect(buyConsumable('pistolShrimp')).toBe(true);
+
+    expect(consumableHeld('ghostShrimp')).toBe(1);
+    expect(consumableHeld('pistolShrimp')).toBe(2);
+    expect(consumableHeld('magicShrimp')).toBe(0);
+
+    expect(useConsumable('ghostShrimp')).toBe(true);
+    expect(consumableHeld('ghostShrimp')).toBe(0);
+    // Spending one kind leaves the others alone.
+    expect(consumableHeld('pistolShrimp')).toBe(2);
+    expect(useConsumable('ghostShrimp')).toBe(false);
+  });
+
+  it('holds each kind to its own carry limit', () => {
+    awardPearls(100_000);
+    for (const id of CONSUMABLE_ORDER) {
+      for (let i = 0; i < CONSUMABLES[id].max; i++) expect(buyConsumable(id)).toBe(true);
+      expect(consumableFull(id)).toBe(true);
+      expect(buyConsumable(id)).toBe(false);
+    }
+  });
+
+  it('charges each kind its own price', () => {
+    awardPearls(10_000);
+    const before = getPearls();
+    buyConsumable('ghostShrimp');
+    expect(getPearls()).toBe(before - CONSUMABLES.ghostShrimp.price);
+  });
+
+  it('reports whether anything at all is carried', () => {
+    expect(anyConsumableHeld()).toBe(false);
+    awardPearls(10_000);
+    buyConsumable('pistolShrimp');
+    expect(anyConsumableHeld()).toBe(true);
+    useConsumable('pistolShrimp');
+    expect(anyConsumableHeld()).toBe(false);
+  });
+
+  it('loads a save written before the new kinds existed', () => {
+    localStorage.setItem('svsd-inventory', JSON.stringify({ magicShrimp: 2 }));
+    expect(getInventory()).toEqual({ magicShrimp: 2, ghostShrimp: 0, pistolShrimp: 0 });
   });
 });

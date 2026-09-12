@@ -303,3 +303,65 @@ describe('Shark.move search drift', () => {
     expect(closed).toBeLessThan(travelled * 0.95);
   });
 });
+
+describe('Shark.move while the pod is ghosted', () => {
+  it('does not close on a player it cannot sense, even with unlimited range', () => {
+    const p = playerAt(50, 50);
+    const s = testShark(70, 50);
+    const start = s.distanceBetween(p);
+    let closest = start;
+    for (let i = 0; i < 60; i++) {
+      s.move(1, p, [s], true, NOW, true);
+      closest = Math.min(closest, s.distanceBetween(p));
+    }
+    // A pursuing shark covers this in a handful of ticks; a searching one can still stumble
+    // nearer by chance, so the bar is that it never actually reaches the pod.
+    expect(closest).toBeGreaterThan(5);
+  });
+
+  it('closes on the same player once the Ghost Shrimp wears off', () => {
+    const p = playerAt(50, 50);
+    const s = testShark(70, 50);
+    for (let i = 0; i < 20; i++) s.move(1, p, [s], true, NOW, false);
+    expect(s.distanceBetween(p)).toBeLessThan(5);
+  });
+
+  it('will not start a great white charge it cannot aim', () => {
+    const p = playerAt(50, 50);
+    const s = testShark(65, 50, { kind: 'greatWhite', large: true });
+    s.move(1, p, [s], true, NOW, true);
+    expect(s.charging).toBe(false);
+  });
+
+  it('will not start a large tiger ambush it cannot aim', () => {
+    const p = playerAt(50, 50);
+    const s = testShark(60, 50, { kind: 'tiger', large: true });
+    s.move(1, p, [s], true, NOW, true);
+    expect(s.ambushing).toBe(false);
+  });
+});
+
+describe('Shark.move while stunned by a Pistol Shrimp', () => {
+  it('drifts the way it was thrown instead of hunting', () => {
+    const p = playerAt(50, 50);
+    const s = testShark(55, 50, { stunnedUntil: NOW + 4000, stunDx: 1, stunDy: 0 });
+    const start = s.distanceBetween(p);
+    for (let i = 0; i < 10; i++) s.move(1, p, [s], true, NOW);
+    expect(s.distanceBetween(p)).toBeGreaterThan(start);
+  });
+
+  it('resumes the chase the moment the stun expires', () => {
+    const p = playerAt(50, 50);
+    const s = testShark(55, 50, { stunnedUntil: NOW, stunDx: 1, stunDy: 0 });
+    const start = s.distanceBetween(p);
+    for (let i = 0; i < 10; i++) s.move(1, p, [s], true, NOW);
+    expect(s.distanceBetween(p)).toBeLessThan(start);
+  });
+
+  it('cannot charge while stunned, however close the player is', () => {
+    const p = playerAt(50, 50);
+    const s = testShark(60, 50, { kind: 'greatWhite', large: true, stunnedUntil: NOW + 4000, stunDx: 1, stunDy: 0 });
+    s.move(1, p, [s], true, NOW);
+    expect(s.charging).toBe(false);
+  });
+});

@@ -27,6 +27,8 @@ const WANDER_SPEED = 0.6;
  *  simulated level-1 openings, 99% of sharks reach within 10 units inside 30 seconds (65% at
  *  0.55), with the average gap going 15 -> 6 -> 4 units at 5s, 15s and 30s. */
 const SEARCH_DRIFT = 1.0;
+/** How fast a Pistol-Shrimp-stunned shark tumbles away, as a fraction of its pursuit speed. */
+const STUN_DRIFT = 0.8;
 
 export class Dolphin {
   id: number;
@@ -121,6 +123,14 @@ export class Shark {
   cloakCooldownEnd = 0;
   /** Matriarch only: set once every escort has been destroyed, and never cleared again. */
   enraged = false;
+  /**
+   * Reeling from a Pistol Shrimp blast until this time. A stunned shark drifts away from the
+   * blast and cannot hunt, charge or ambush - see Game.usePistolShrimpItem.
+   */
+  stunnedUntil = 0;
+  /** Unit direction the blast threw it in, held for the length of the stun. */
+  stunDx = 0;
+  stunDy = 0;
 
   constructor(i: number) {
     this.id = i;
@@ -159,18 +169,37 @@ export class Shark {
     }
   }
 
+  /**
+   * @param hidden The pod has eaten a Ghost Shrimp: the shark cannot sense the player at all, so
+   *   it neither hunts nor drifts toward them. Specials already in flight still finish, because a
+   *   lunge that stops dead in the water looks like a bug rather than a trick.
+   */
   move(
     speed: number,
     player: Dolphin | null,
     sharks: Shark[],
     unlimitedRange = false,
     now: number = Date.now(),
+    hidden = false,
   ): void {
     if (!player) return;
     const huntRadius = this.large ? LARGE_HUNT_RADIUS : HUNT_RADIUS;
     const distToPlayer = this.distanceBetween(player);
     const margin = Math.ceil((24 * this.sizeMultiplier) / (CANVAS_SIZE / SIZE));
     const keepX = this.kind === 'tiger' || this.matriarch ? clampX : wrapX;
+
+    // Blasted by a Pistol Shrimp: tumbling away and no threat to anyone until it rights itself.
+    // Checked before every special so the blast also breaks a charge that is already running.
+    if (now < this.stunnedUntil) {
+      const drift = speed * this.speedMultiplier * STUN_DRIFT;
+      this._x = keepX(this._x + this.stunDx * drift);
+      this._y = clampEntityY(this._y + this.stunDy * drift, margin);
+      // Leave the heading pointing the way it was thrown, or it snaps back round the instant
+      // the stun ends.
+      this.headingX = this.stunDx;
+      this.headingY = this.stunDy;
+      return;
+    }
 
     // The Matriarch gets this same charge ability once every escort is gone - see
     // updateMatriarch() in game.ts, which also bumps her speedMultiplier at that point. It keys
@@ -191,7 +220,7 @@ export class Shark {
           this.charging = false;
           this.chargeCooldownEnd = now + CHARGE_COOLDOWN;
         }
-      } else if (now >= this.chargeCooldownEnd && distToPlayer >= CHARGE_MIN_DIST && distToPlayer <= CHARGE_MAX_DIST) {
+      } else if (!hidden && now >= this.chargeCooldownEnd && distToPlayer >= CHARGE_MIN_DIST && distToPlayer <= CHARGE_MAX_DIST) {
         // Aims straight at the player, deliberately without leading the target: a predicted
         // intercept sent the charge into empty water whenever the player turned, which read as
         // far less threatening than a shark barrelling directly at you.
@@ -235,7 +264,7 @@ export class Shark {
           this.ambushing = false;
           this.ambushCooldownEnd = now + AMBUSH_COOLDOWN;
         }
-      } else if (now >= this.ambushCooldownEnd && distToPlayer >= AMBUSH_MIN_DIST && distToPlayer <= AMBUSH_RANGE) {
+      } else if (!hidden && now >= this.ambushCooldownEnd && distToPlayer >= AMBUSH_MIN_DIST && distToPlayer <= AMBUSH_RANGE) {
         this.ambushing = true;
         this.stalking = true;
         this.stalkEndTime = now + AMBUSH_STALK_DURATION;
@@ -243,7 +272,7 @@ export class Shark {
       }
     }
 
-    if (unlimitedRange || distToPlayer <= huntRadius) {
+    if (!hidden && (unlimitedRange || distToPlayer <= huntRadius)) {
       // Continuous heading toward the player - the base of every pursuit behaviour below.
       const toPlayerX = directionDelta(player._x, this._x);
       const toPlayerY = player._y - this._y;
@@ -306,10 +335,12 @@ export class Shark {
       // exactly the wrong feeling for the opening of a level - they should be converging on you
       // from the first seconds. Weighted below the wander itself so the approach still meanders
       // like an animal casting about, rather than turning into a second, slower pursuit.
+      // Nothing to converge on while the pod is ghosted, so the shark genuinely casts about
+      // instead of quietly homing in on a player it is not supposed to be able to find.
       const toPlayerX = directionDelta(player._x, this._x);
       const toPlayerY = player._y - this._y;
       const toPlayerLen = Math.hypot(toPlayerX, toPlayerY);
-      if (toPlayerLen > 0) {
+      if (!hidden && toPlayerLen > 0) {
         desX += (toPlayerX / toPlayerLen) * SEARCH_DRIFT;
         desY += (toPlayerY / toPlayerLen) * SEARCH_DRIFT;
       }

@@ -5,11 +5,25 @@ import { clearRunCheckpoint, loadRunCheckpoint } from './runState';
 import { getDolphinName, hasNamedDolphin, setDolphinName } from './profile';
 import { nextTrackIn, trackTitle } from './music';
 import { getPearls } from './pearls';
+import type { ConsumableId, Inventory } from './inventory';
+import { CONSUMABLE_ORDER, CONSUMABLES } from './inventory';
 import { setupStore } from './storeView';
 import { ads } from './ads';
 import { iap } from './iap';
 import { registerSW } from 'virtual:pwa-register';
 import { Capacitor } from '@capacitor/core';
+
+/** Element-id stem for each consumable's HUD button, count badge and wrapper. */
+const SHRIMP_ELEMENT_ID: Record<ConsumableId, string> = {
+  magicShrimp: 'shrimp',
+  ghostShrimp: 'ghostShrimp',
+  pistolShrimp: 'pistolShrimp',
+};
+
+/** Keyboard shortcut -> consumable, built from the same table the Store quotes to the player. */
+const SHRIMP_KEYS: Record<string, ConsumableId> = Object.fromEntries(
+  CONSUMABLE_ORDER.map((id) => [CONSUMABLES[id].key.toLowerCase(), id]),
+);
 
 // Android WebView's console bridge only relays file/line/message for uncaught errors and
 // promise rejections (no stack) - re-log through console.error, which it relays in full,
@@ -312,12 +326,15 @@ const inputs = {
   onEchoAvailabilityChange: (available: boolean) => {
     document.getElementById('echoBtnWrap')?.classList.toggle('hidden', !available);
   },
-  // The Magic Shrimp button only exists while there is one to spend, so an empty pack does not
-  // leave a dead control on screen.
-  onShrimpCountChange: (held: number) => {
-    const count = document.getElementById('shrimpCount');
-    if (count) count.textContent = String(held);
-    document.getElementById('shrimpBtnWrap')?.classList.toggle('hidden', held <= 0);
+  // A shrimp button only exists while there is one of that kind to spend, so an empty pack does
+  // not leave dead controls on screen.
+  onConsumableChange: (counts: Inventory) => {
+    for (const id of CONSUMABLE_ORDER) {
+      const held = counts[id];
+      const count = document.getElementById(`${SHRIMP_ELEMENT_ID[id]}Count`);
+      if (count) count.textContent = String(held);
+      document.getElementById(`${SHRIMP_ELEMENT_ID[id]}BtnWrap`)?.classList.toggle('hidden', held <= 0);
+    }
   },
   onMusicDuck: (durationMs: number) => {
     const restore = () => {
@@ -449,10 +466,13 @@ const inputs = {
       fireEcho();
       return;
     }
-    // Same for the Magic Shrimp - holding the key must not burn the whole pack.
-    if ((e.key === 'q' || e.key === 'Q') && !e.repeat) {
-      useShrimp();
-      return;
+    // Same for the shrimp - holding a key must not burn the whole pack.
+    if (!e.repeat) {
+      const shrimpKey = SHRIMP_KEYS[e.key.toLowerCase()];
+      if (shrimpKey) {
+        useShrimp(shrimpKey);
+        return;
+      }
     }
     // Arrow keys scroll the page by default; that's what made the window "slide" during play.
     if (SCROLLING_KEYS.has(e.key)) {
@@ -684,20 +704,25 @@ const inputs = {
 
   const sprintCooldownRing = document.getElementById('sprintCooldownRing') as HTMLDivElement;
   let sprintWasReady = true;
-  const shrimpBtn = document.getElementById('shrimpBtn') as HTMLButtonElement;
-
-  function useShrimp(): void {
-    if (!game.useMagicShrimpItem()) return;
-    shrimpBtn.classList.add('active');
-    window.setTimeout(() => shrimpBtn.classList.remove('active'), 200);
-    inputs.onShrimpCountChange?.(game.magicShrimpCount());
+  // One handler per kind, built from the same table the Store renders from, so adding a fourth
+  // shrimp later means adding a row and a button rather than another copy of this block.
+  function useShrimp(id: ConsumableId): void {
+    const btn = document.getElementById(`${SHRIMP_ELEMENT_ID[id]}Btn`) as HTMLButtonElement | null;
+    if (!game.useConsumableItem(id)) return;
+    btn?.classList.add('active');
+    window.setTimeout(() => btn?.classList.remove('active'), 200);
+    inputs.onConsumableChange?.(game.consumableCounts());
   }
 
-  shrimpBtn.addEventListener('click', useShrimp);
-  shrimpBtn.addEventListener('touchstart', (e) => {
-    e.preventDefault();
-    useShrimp();
-  });
+  for (const id of CONSUMABLE_ORDER) {
+    const btn = document.getElementById(`${SHRIMP_ELEMENT_ID[id]}Btn`) as HTMLButtonElement | null;
+    if (!btn) continue;
+    btn.addEventListener('click', () => useShrimp(id));
+    btn.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      useShrimp(id);
+    });
+  }
 
   const echoBtn = document.getElementById('echoBtn') as HTMLButtonElement;
   const echoCooldownRing = document.getElementById('echoCooldownRing') as HTMLDivElement;
