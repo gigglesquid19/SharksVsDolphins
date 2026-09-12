@@ -1198,6 +1198,54 @@ button.mega-shrimp.green {
 }
 #runSummaryDoubleBtn.hidden { display: none; }
 
+/* Daily reward: the seven-day strip, with today's square lit and the days already taken ticked.
+   Sized to fit a phone without scrolling, since it is the first thing shown on a cold launch. */
+.daily-text {
+  margin: 0 0 14px;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+.daily-strip {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  margin-bottom: 18px;
+}
+.daily-day {
+  border-radius: 10px;
+  padding: 8px 2px 7px;
+  background: rgba(148, 163, 184, 0.12);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  text-align: center;
+  line-height: 1.25;
+}
+.daily-day .daily-day-label {
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.daily-day .daily-day-value {
+  font-size: 0.86rem;
+  font-weight: 800;
+  color: var(--text);
+}
+.daily-day.claimed {
+  background: rgba(34, 211, 238, 0.14);
+  border-color: rgba(34, 211, 238, 0.35);
+}
+.daily-day.claimed .daily-day-value { color: #67e8f9; }
+.daily-day.today {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.28), rgba(245, 158, 11, 0.22));
+  border-color: rgba(251, 191, 36, 0.7);
+  box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.35);
+}
+.daily-day.today .daily-day-value { color: #fde68a; }
+/* Above the title screen's own z-index of 100 - this is the one overlay that appears while the
+   title is up, so it does not inherit the in-game overlays' stacking. */
+#dailyRewardOverlay { z-index: 110; }
+#dailyRewardOverlay.hidden { display: none; }
+
 .continue-panel { text-align: center; }
 .continue-panel p {
   color: var(--text);

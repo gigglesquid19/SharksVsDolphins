@@ -35,6 +35,9 @@ Contents
   per-level payout formula, and the spend path.
 - `src/progress.ts` - campaign milestones that gate content (`localStorage`).
   Currently just "has the campaign been cleared", which unlocks Echolocation.
+- `src/dailyReward.ts` - the daily login streak (`localStorage`): the last day
+  claimed and how many days in a row. Nothing to do with the planned Daily
+  Challenge, which needs a seeded generator; this needs only a date.
 - `src/inventory.ts` - consumables the player has bought and is carrying
   (`localStorage`). Unlike the Store's upgrades and abilities these are spent,
   so the shape is a count that goes down. Three kinds of shrimp, each with its
@@ -393,6 +396,13 @@ Game Features
   spend 20 visible seconds recharging. Taking a dolphin gives it away
   immediately - it surfaces and starts the recharge early. Watch for the puff of
   water it leaves as it goes.
+- **Daily reward**: opening the game on a new day offers a Pearl payout that
+  climbs through a seven-day streak - 20, 30, 40, 50, 60, 80, then 150 on the
+  seventh - and starts over after the payout day or whenever a day is missed.
+  The card appears on the title screen once per day and not at all once the
+  day's reward is taken. Days are the player's own local calendar days, so a
+  streak does not break at teatime for anyone west of Greenwich, and a device
+  clock wound backwards restarts the streak rather than paying twice.
 - **Living water**: every level in both modes runs the same four-plane parallax
   off the one background still, since the art is flat and the depth comes from
   the camera. Back to front: the background, angled **light shafts** that sway

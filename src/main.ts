@@ -5,6 +5,7 @@ import { clearRunCheckpoint, loadRunCheckpoint } from './runState';
 import { getDolphinName, hasNamedDolphin, setDolphinName } from './profile';
 import { nextTrackIn, trackTitle } from './music';
 import { getPearls } from './pearls';
+import { DAILY_REWARDS, claimDailyReward, dailyRewardAvailable, nextStreakDay } from './dailyReward';
 import type { ConsumableId, Inventory } from './inventory';
 import { CONSUMABLE_ORDER, CONSUMABLES } from './inventory';
 import { setupStore } from './storeView';
@@ -208,6 +209,9 @@ function dismissSplash(): void {
   splashDismissed = true;
   splashScreen.classList.add('hidden');
   titleScreen.classList.remove('hidden');
+  // Offered here rather than on the splash, so the first thing a player sees is the game's own
+  // art and not a reward prompt. Nothing appears at all once the day's reward is taken.
+  maybeShowDailyReward();
 }
 
 window.addEventListener(
@@ -234,6 +238,67 @@ const titlePearlsNumberEl = document.getElementById('titlePearlsNumber');
 function refreshTitlePearls(): void {
   if (titlePearlsNumberEl) titlePearlsNumberEl.textContent = String(getPearls());
 }
+
+// ---------------------------------------------------------------- daily reward
+const dailyOverlay = document.getElementById('dailyRewardOverlay') as HTMLDivElement | null;
+const dailyStripEl = document.getElementById('dailyStrip') as HTMLDivElement | null;
+const dailyTextEl = document.getElementById('dailyRewardText') as HTMLElement | null;
+const dailyClaimBtn = document.getElementById('dailyClaimBtn') as HTMLButtonElement | null;
+
+/**
+ * Paints the seven-day strip. `today` is the day a claim would land on; anything before it in
+ * the current streak is already banked, so it is ticked rather than lit.
+ */
+function renderDailyStrip(today: number, claimedToday: boolean): void {
+  if (!dailyStripEl) return;
+  dailyStripEl.innerHTML = DAILY_REWARDS.map((pearls, i) => {
+    const day = i + 1;
+    const banked = day < today || (day === today && claimedToday);
+    const isToday = day === today && !claimedToday;
+    const classes = ['daily-day'];
+    if (banked) classes.push('claimed');
+    if (isToday) classes.push('today');
+    return `<div class="${classes.join(' ')}">
+        <div class="daily-day-label">Day ${day}</div>
+        <div class="daily-day-value">${banked ? '✓' : pearls}</div>
+      </div>`;
+  }).join('');
+}
+
+function refreshDailyCard(): void {
+  const day = nextStreakDay();
+  const available = dailyRewardAvailable();
+  renderDailyStrip(day, !available);
+  if (dailyTextEl) {
+    dailyTextEl.textContent = available
+      ? `Day ${day} of your streak. Come back tomorrow for more.`
+      : `Day ${day} claimed. Come back tomorrow to keep the streak.`;
+  }
+  if (dailyClaimBtn) {
+    dailyClaimBtn.textContent = available ? `Claim ${DAILY_REWARDS[day - 1]} Pearls` : 'Claimed today';
+    dailyClaimBtn.disabled = !available;
+  }
+}
+
+/** Shown once per launch, and only when there is something to take. */
+function maybeShowDailyReward(): void {
+  if (!dailyOverlay || !dailyRewardAvailable()) return;
+  refreshDailyCard();
+  dailyOverlay.classList.remove('hidden');
+}
+
+dailyClaimBtn?.addEventListener('click', () => {
+  const claim = claimDailyReward();
+  if (!claim.claimed) return;
+  refreshTitlePearls();
+  refreshDailyCard();
+  sfx.resume();
+  sfx.playAchievement();
+});
+
+document.getElementById('dailyCloseBtn')?.addEventListener('click', () => {
+  dailyOverlay?.classList.add('hidden');
+});
 refreshTitlePearls();
 
 // --- Store ---
