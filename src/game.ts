@@ -422,6 +422,10 @@ export class Game {
   private onSchoolingChange?: (active: boolean) => void;
   private onMusicTrackChange?: (url: string) => void;
   private onMusicDuck?: (durationMs: number) => void;
+  /** Stops the level music outright, for the game over. Paired with onMusicResume. */
+  private onMusicStop?: () => void;
+  /** Starts the music again when a run begins - the counterpart to onMusicStop. */
+  private onMusicResume?: () => void;
   private onEchoAvailabilityChange?: (available: boolean) => void;
   private onConsumableChange?: (counts: Inventory) => void;
   private lastMusicLevel = 0;
@@ -479,6 +483,8 @@ export class Game {
       onSchoolingChange?: (active: boolean) => void;
       onMusicTrackChange?: (url: string) => void;
       onMusicDuck?: (durationMs: number) => void;
+      onMusicStop?: () => void;
+      onMusicResume?: () => void;
       onEchoAvailabilityChange?: (available: boolean) => void;
       onConsumableChange?: (counts: Inventory) => void;
     }
@@ -548,6 +554,8 @@ export class Game {
     this.onSchoolingChange = inputs.onSchoolingChange;
     this.onMusicTrackChange = inputs.onMusicTrackChange;
     this.onMusicDuck = inputs.onMusicDuck;
+    this.onMusicStop = inputs.onMusicStop;
+    this.onMusicResume = inputs.onMusicResume;
     this.onEchoAvailabilityChange = inputs.onEchoAvailabilityChange;
     this.onConsumableChange = inputs.onConsumableChange;
     this.lastLifeHeart = document.getElementById('lastLifeHeart');
@@ -924,6 +932,7 @@ export class Game {
 
   reset(): void {
     this.running = false;
+    this.onMusicResume?.();
     if (this.timer) clearTimeout(this.timer);
     clearRunCheckpoint();
     this.createEnvironment();
@@ -944,6 +953,8 @@ export class Game {
     if (firstRun) this.sessionStartTime = Date.now();
     else this.retries++;
     this.running = true;
+    // Retrying after a game over is the common case, and the music is stopped by then.
+    this.onMusicResume?.();
     this.startBtn.textContent = firstRun ? 'Restart' : 'Retry';
     this.setStatus('Swimming');
     this.step();
@@ -1941,10 +1952,12 @@ ${zone.depth}`, 'levelup', duration + 1400);
     this.flushLifetimeStats();
     this.setStatus('Eaten by a shark');
     this.showBanner('Game Over', 'gameover');
-    // Nothing stops the level music at a game over, and this sting is a five-second phrase
-    // rather than an impact - played over the top of a loop it just sounds muddy.
+    // The game-over sting is a five-second phrase rather than an impact, so the level music
+    // stops outright rather than ducking under it: a loop carrying on underneath sounds muddy,
+    // and a loop swelling back up afterwards undercuts the ending entirely. It starts again
+    // from the top when a run does - see onMusicResume.
     sfx.playGameOver();
-    this.onMusicDuck?.(5000);
+    this.onMusicStop?.();
 
     // Android only: one Continue per Endless run - watch a rewarded ad or buy it (src/ads.ts, src/iap.ts).
     if (this.mode === 'endless' && isAndroid && !this.continueUsedThisRun && (ads.available || iap.available)) {
@@ -2045,6 +2058,8 @@ ${zone.depth}`, 'levelup', duration + 1400);
     this.continueUsedThisRun = true;
     this.awaitingContinue = false;
     this.continueOverlayEl?.classList.add('hidden');
+    // Taking the Continue goes straight back into the same run, so the music has to come back.
+    this.onMusicResume?.();
 
     this.player.invulnerableUntil = Date.now() + 4000;
     this.player._x = Math.floor(SIZE / 2);

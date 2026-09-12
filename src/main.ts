@@ -99,6 +99,12 @@ const MUSIC_DUCK_LEVEL = 0.3;
 let duckTimer: number | null = null;
 const VOLUME_KEY = 'svsd-volume';
 
+/** The volume the player has chosen, 0-1. Read fresh every time, never cached, so moving the
+ *  slider during a duck or after a game over still lands where they left it. */
+function chosenMusicVolume(): number {
+  return Math.min(1, Math.max(0, Number(volumeSlider.value) / 100));
+}
+
 function applyVolume(value: number): void {
   const normalized = Math.min(100, Math.max(0, value)) / 100;
   bgMusic.volume = normalized;
@@ -338,12 +344,30 @@ const inputs = {
   },
   onMusicDuck: (durationMs: number) => {
     const restore = () => {
-      bgMusic.volume = Math.min(1, Math.max(0, Number(volumeSlider.value) / 100));
+      bgMusic.volume = chosenMusicVolume();
       duckTimer = null;
     };
     if (duckTimer !== null) window.clearTimeout(duckTimer);
-    bgMusic.volume = Math.min(1, Math.max(0, (Number(volumeSlider.value) / 100) * MUSIC_DUCK_LEVEL));
+    bgMusic.volume = chosenMusicVolume() * MUSIC_DUCK_LEVEL;
     duckTimer = window.setTimeout(restore, durationMs);
+  },
+  // Game over: the music stops rather than dipping, and stays stopped. Any duck still running
+  // is cancelled first - otherwise its timer would quietly restore the volume, and the next run
+  // would be fine but a scrubbed playhead would not be.
+  onMusicStop: () => {
+    if (duckTimer !== null) {
+      window.clearTimeout(duckTimer);
+      duckTimer = null;
+    }
+    bgMusic.pause();
+    // Back to the top, so the next run opens on the phrase rather than halfway through it.
+    bgMusic.currentTime = 0;
+    bgMusic.volume = chosenMusicVolume();
+  },
+  onMusicResume: () => {
+    if (!bgMusic.paused) return;
+    bgMusic.volume = chosenMusicVolume();
+    bgMusic.play().catch((err) => console.warn('Music resume failed:', err));
   },
 };
 
