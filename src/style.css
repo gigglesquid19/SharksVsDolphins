@@ -1236,6 +1236,95 @@ button.mega-shrimp.green {
 .store-recommend-cost.short { color: #fbbf24; }
 #storeRecommend.hidden { display: none; }
 
+/* Depthless level select: five zone blocks of ten, every depth shown whether owned or not, so a
+   player can see how far the mode goes and what it would cost to get there. */
+.level-select-panel {
+  max-height: 86vh;
+  overflow-y: auto;
+  text-align: left;
+}
+.level-select-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.level-select-head h2 { margin: 0; }
+.level-select-zones {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 14px 0 16px;
+}
+.level-zone-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+.level-zone-name {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.level-zone-depth {
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+.level-zone-grid {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 4px;
+}
+.level-cell {
+  position: relative;
+  aspect-ratio: 1;
+  min-width: 0;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.level-cell-number { font-size: 0.72rem; font-weight: 800; }
+.level-cell-state { font-size: 0.5rem; }
+.level-cell.unlocked {
+  background: rgba(34, 211, 238, 0.18);
+  border-color: rgba(34, 211, 238, 0.45);
+  color: #a5f3fc;
+}
+.level-cell.selected {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  color: var(--text);
+}
+.level-select-detail {
+  font-size: 0.85rem;
+  color: var(--muted);
+  line-height: 1.4;
+  margin: 0 0 14px;
+  min-height: 2.4em;
+}
+#levelSelectOverlay { z-index: 110; }
+#levelSelectOverlay.hidden { display: none; }
+
+/* The run summary's explanation when a dive started at a bought depth. */
+.run-summary-unranked {
+  font-size: 0.82rem;
+  color: #fbbf24;
+  line-height: 1.4;
+  margin: 0 0 12px;
+}
+.run-summary-unranked.hidden { display: none; }
+
 /* The dolphin panel: everything the player owns, on one screen, reachable from the title and
    from the pause menu. Scrolls rather than shrinking, since the upgrade list grows. */
 .dolphin-panel {

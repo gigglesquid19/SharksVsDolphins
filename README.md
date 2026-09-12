@@ -35,6 +35,15 @@ Contents
   per-level payout formula, and the spend path.
 - `src/progress.ts` - campaign milestones that gate content (`localStorage`).
   Currently just "has the campaign been cleared", which unlocks Echolocation.
+- `src/levelAccess.ts` - paid starting depths for the Depthless Campaign
+  (`localStorage`): which levels are unlocked, what each costs, and the one rule
+  the feature rests on - a dive that starts below level 1 is never ranked.
+- `src/levelSelectView.ts` - the "Dive Deeper" grid: all fifty depths by zone,
+  locked until bought, with one action button that either unlocks or dives.
+- `src/recommendation.ts` - what to spend Pearls on next, as one suggestion with
+  a reason. Pure rules over the Store, inventory and progress state, in priority
+  order: an unclaimed ability, then an empty pack, then survivability, then
+  breadth, then whichever upgrade is furthest behind.
 - `src/dolphinView.ts` - the read-only "Your Dolphin" panel: the dolphin in its
   equipped skin and name, which abilities it has, how far each Store upgrade is
   levelled, the Mega Shrimp picks of a run in progress, and the three-slot pack.
@@ -290,6 +299,13 @@ How to Play
      than by a speed nothing can answer - and has no free resume
      - a death ends the run. This is the intended hook for a future
      pay-to-continue offer (see "Ideas for Further Development").
+     **Dive Deeper** on the title screen opens a level select: all fifty depths
+     as a grid by zone, each locked until bought with Pearls, priced from 50 at
+     level 2 up to 1,225 at level 50 - more than a full descent pays, so the
+     shortcut is never the efficient way to play. A dive that starts below
+     level 1 **never reaches the leaderboard**, which is what lets the shortcut
+     exist without hollowing the mode out. The run-summary card says so in place
+     of the Save button, and the submission refuses on its own as well.
      It runs in five **depth zones** of ten levels each - Eutrophic (0m-200m),
      Mesopelagic (200m-1000m), Bathypelagic (1000m-2000m), Abyssopelagic
      (2000m-4000m) and Hadal (4000m+), defined in `DEPTH_ZONES` in

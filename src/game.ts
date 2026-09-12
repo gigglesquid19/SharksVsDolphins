@@ -58,6 +58,7 @@ import {
 import { getDolphinName } from './profile';
 import { echolocationStats, endlessStartBonuses, equippedSkinId, grantSkin, ownsEcholocation, ownsSkin } from './store';
 import { markCampaignCleared } from './progress';
+import { hasLevelAccess, startLevelIsRanked } from './levelAccess';
 import { skinById } from './skins';
 import { shareMilestone, SHARE_REWARD_SKIN } from './share';
 import { playGames } from './playGames';
@@ -302,6 +303,11 @@ export class Game {
    */
   private levelStartSafeUntil = 0;
   private currentLevel = 1;
+  /**
+   * The level a Depthless run began at. 1 for an ordinary dive; deeper when the player bought
+   * their way down, which is what keeps that run off the leaderboard - see startLevelIsRanked.
+   */
+  private depthlessStartLevel = 1;
   private retries = 0;
   private totalRecruited = 0;
   private totalLost = 0;
@@ -392,6 +398,8 @@ export class Game {
   private runSummaryAchievementsEl: HTMLElement | null = null;
   private runSummaryShareBtnEl: HTMLButtonElement | null = null;
   private runSummaryDoubleBtnEl: HTMLButtonElement | null = null;
+  private runSummarySaveBtnEl: HTMLButtonElement | null = null;
+  private runSummaryUnrankedEl: HTMLElement | null = null;
   /** One rewarded double per run, whether or not the player took it. */
   private pearlsDoubledThisRun = false;
   /** Bumped on every render of the offer, so a slow preload from an earlier one cannot
@@ -530,6 +538,8 @@ export class Game {
     this.runSummaryAchievementsEl = document.getElementById('runSummaryAchievements');
     this.runSummaryShareBtnEl = document.getElementById('runSummaryShareBtn') as HTMLButtonElement | null;
     this.runSummaryDoubleBtnEl = document.getElementById('runSummaryDoubleBtn') as HTMLButtonElement | null;
+    this.runSummarySaveBtnEl = document.getElementById('runSummarySaveBtn') as HTMLButtonElement | null;
+    this.runSummaryUnrankedEl = document.getElementById('runSummaryUnranked');
     this.runSummaryHomeBtnEl = document.getElementById('runSummaryHomeBtn') as HTMLButtonElement | null;
     this.milestoneOverlayEl = document.getElementById('milestoneOverlay') as HTMLDivElement | null;
     this.milestoneTextEl = document.getElementById('milestoneText');
@@ -642,8 +652,30 @@ export class Game {
     void playGames.ensureSignedIn();
   }
 
+  /**
+   * Sets the depth a Depthless run will begin at. Refused without access, so a tampered UI cannot
+   * skip the purchase, and reset to 1 whenever the mode is chosen afresh.
+   */
+  setDepthlessStartLevel(level: number): boolean {
+    const depth = Math.floor(level);
+    if (this.mode !== 'endless' || !Number.isFinite(depth) || depth < 1) return false;
+    if (!hasLevelAccess(depth)) return false;
+    this.depthlessStartLevel = depth;
+    return true;
+  }
+
+  /** The depth the current Depthless run began at, for the level select and the run summary. */
+  getDepthlessStartLevel(): number {
+    return this.depthlessStartLevel;
+  }
+
+  /** False when this run began at a bought depth, which bars it from the leaderboard. */
+  private runIsRanked(): boolean {
+    return this.mode !== 'endless' || startLevelIsRanked(this.depthlessStartLevel);
+  }
+
   private getSelectedLevelConfig(): LevelConfig {
-    if (this.mode === 'endless') return LEVELS[0];
+    if (this.mode === 'endless') return getLevelConfig(this.depthlessStartLevel);
     const level = parseInt(this.levelSelect?.value ?? '1', 10);
     return LEVELS[level - 1] ?? LEVELS[0];
   }
@@ -651,6 +683,9 @@ export class Game {
   /** Sets which mode a fresh start/reset begins in. Campaign: pick a level 1-10, saves/resumes, ends at level 10. Endless: always starts at level 1, no free resume, continues past level 10 until death. */
   setMode(mode: GameMode): void {
     this.mode = mode;
+    // Choosing a mode starts the choice over: a depth bought and used once should not silently
+    // apply to every later dive, which would quietly bar a player from the leaderboard forever.
+    this.depthlessStartLevel = 1;
   }
 
   private async loadSharkTextures(): Promise<void> {
@@ -2220,6 +2255,21 @@ ${zone.depth}`, 'levelup', duration + 1400);
         .join('');
     }
 
+    // A run bought its way into never reaches the board, and the card has to say so rather than
+    // offering a Save that silently does nothing.
+    const ranked = this.runIsRanked();
+    if (this.runSummarySaveBtnEl) {
+      this.runSummarySaveBtnEl.classList.toggle('hidden', !ranked);
+      this.runSummarySaveBtnEl.disabled = !ranked;
+    }
+    if (this.runSummaryUnrankedEl) {
+      this.runSummaryUnrankedEl.classList.toggle('hidden', ranked);
+      if (!ranked) {
+        this.runSummaryUnrankedEl.textContent =
+          `Started at level ${this.depthlessStartLevel}, so this dive is not eligible for the leaderboard. Dive from level 1 to post a score.`;
+      }
+    }
+
     // The Share button (and its Orca-skin reward) is a campaign-clear thing only.
     if (this.runSummaryShareBtnEl) {
       this.runSummaryShareBtnEl.classList.toggle('hidden', board !== 'campaign');
@@ -2401,6 +2451,12 @@ ${zone.depth}`, 'levelup', duration + 1400);
   /** Saves the pending score to the local + Play Games leaderboards under the dolphin's name. */
   submitPendingScore(): void {
     if (!this.pendingScore) return;
+    // Belt and braces: the button is hidden for an unranked run, but the submission refuses on
+    // its own so nothing reaching this method by another route can post a bought score.
+    if (!this.runIsRanked()) {
+      this.dismissRunSummary();
+      return;
+    }
     const name = getDolphinName();
     if (this.pendingScore.board === 'campaign') {
       saveCampaignScore({ ...this.pendingScore.score, name });

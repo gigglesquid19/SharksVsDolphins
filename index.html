@@ -55,10 +55,25 @@
       <button id="titleCampaignBtn" class="school ready">Campaign Mode<span class="title-mode-sub">Levels 1-10 Classic</span></button>
       <button id="titleEndlessBtn" class="school ready">Depthless Campaign<span class="title-mode-sub">Dive as deep as you can</span></button>
     </div>
+    <button id="titleDepthSelectBtn" class="secondary">Dive Deeper</button>
     <button id="titleDolphinBtn" class="secondary">Your Dolphin</button>
     <button id="titleStoreBtn" class="secondary">Store</button>
     <button id="titleAboutBtn" class="secondary">About Me</button>
     <button id="titleContinueBtn" class="secondary hidden">Continue Campaign</button>
+  </div>
+
+  <div class="leaderboard-overlay hidden" id="levelSelectOverlay">
+    <div class="leaderboard-panel level-select-panel">
+      <div class="level-select-head">
+        <h2>Dive Deeper</h2>
+        <span class="store-pearls"><img class="pearl-icon" alt="" src="/pearl.png"> <span id="levelSelectPearls">0</span></span>
+      </div>
+      <p class="dolphin-note">Buy a starting depth for the Depthless Campaign. Bought once and yours for good &ndash; but a dive that starts below level 1 never reaches the leaderboard.</p>
+      <div class="level-select-zones" id="levelSelectZones"></div>
+      <p class="level-select-detail" id="levelSelectDetail"></p>
+      <button id="levelSelectAction" class="school ready"></button>
+      <button id="levelSelectCloseBtn" class="secondary">Back</button>
+    </div>
   </div>
 
   <div class="leaderboard-overlay hidden" id="dolphinOverlay">
@@ -356,6 +371,7 @@
           <div id="runSummaryStats" class="run-summary-stats"></div>
           <div id="runSummaryAchievements" class="run-summary-achievements"></div>
           <button id="runSummaryDoubleBtn" class="school ready double-pearls-btn hidden"></button>
+          <p id="runSummaryUnranked" class="run-summary-unranked hidden"></p>
           <button id="runSummarySaveBtn" class="school ready">Save to Leaderboard</button>
           <button id="runSummaryShareBtn" class="share-btn hidden">Share</button>
           <button id="runSummarySkipBtn" class="secondary">Skip</button>

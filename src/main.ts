@@ -10,6 +10,7 @@ import type { ConsumableId, Inventory } from './inventory';
 import { CONSUMABLE_ORDER, CONSUMABLES } from './inventory';
 import { setupStore } from './storeView';
 import { setupDolphinView } from './dolphinView';
+import { setupLevelSelect } from './levelSelectView';
 import { ads } from './ads';
 import { iap } from './iap';
 import { registerSW } from 'virtual:pwa-register';
@@ -477,6 +478,20 @@ const inputs = {
     levelSelectWrap.classList.add('hidden');
     enterAppFromTitle();
   });
+
+  // Dive Deeper: the same entry as the button above, but starting at a bought depth. setMode is
+  // called first because it resets the depth, and the chosen level is set after it.
+  const depthSelect = setupLevelSelect({
+    onPearlsChange: refreshTitlePearls,
+    onDive: (level) => {
+      game.setMode('endless');
+      if (!game.setDepthlessStartLevel(level)) return;
+      depthSelect.close();
+      levelSelectWrap.classList.add('hidden');
+      enterAppFromTitle();
+    },
+  });
+  document.getElementById('titleDepthSelectBtn')!.addEventListener('click', () => depthSelect.open());
   titleContinueBtn.addEventListener('click', () => {
     // Re-read: a checkpoint may have been written this session (e.g. after an Android Game Over).
     const checkpoint = loadRunCheckpoint();
