@@ -1008,15 +1008,20 @@ export class Game {
    * retry of the current level with upgrades and run stats kept.
    */
   retry(): void {
-    const firstRun = this.sessionStartTime === 0;
-    const config = firstRun ? this.getSelectedLevelConfig() : getLevelConfig(this.currentLevel);
-    if (!this.initModel(config, !firstRun)) return;
-    if (firstRun) this.sessionStartTime = Date.now();
+    // The Depthless Campaign has no resume, so a retry there is always a new descent from the
+    // chosen depth rather than a second go at the level that just ended. Resuming at the level
+    // the player died on, with their progress intact and the run still counted, meant one deep
+    // level could be farmed for a leaderboard score indefinitely - which is the opposite of what
+    // the board is for, and undid the rule that keeps bought starting depths off it.
+    const freshRun = this.sessionStartTime === 0 || this.mode === 'endless';
+    const config = freshRun ? this.getSelectedLevelConfig() : getLevelConfig(this.currentLevel);
+    if (!this.initModel(config, !freshRun)) return;
+    if (freshRun) this.sessionStartTime = Date.now();
     else this.retries++;
     this.running = true;
     // Retrying after a game over is the common case, and the music is stopped by then.
     this.onMusicResume?.();
-    this.startBtn.textContent = firstRun ? 'Restart' : 'Retry';
+    this.startBtn.textContent = freshRun ? 'Restart' : 'Retry';
     this.setStatus('Swimming');
     this.step();
   }
@@ -2034,7 +2039,9 @@ ${zone.depth}`, 'levelup', duration + 1400);
       // No free retry on Android - the run is over (or you took the Continue offer).
       this.startBtn.classList.add('hidden');
     } else {
-      this.startBtn.textContent = 'Retry';
+      // "Dive Again", not "Retry": in the Depthless Campaign the button starts a new descent
+      // rather than handing the level back, and the label has to say which it is doing.
+      this.startBtn.textContent = this.mode === 'endless' ? 'Dive Again' : 'Retry';
     }
 
     if (this.mode === 'endless') {

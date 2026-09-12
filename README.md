@@ -304,9 +304,13 @@ How to Play
      where the campaign left off and reaches its 2x ceiling exactly at level 50,
      the end of the last depth zone, so every zone is faster than the one above
      it and no stretch of the descent plays identically to another - and has no
-     free resume
-     - a death ends the run. This is the intended hook for a future
-     pay-to-continue offer (see "Ideas for Further Development").
+     free resume: a death ends the run, and the button that follows reads
+     **Dive Again** because it begins a new descent from the chosen depth
+     rather than handing back the level that just ended. Restart from the pause
+     menu does the same. Resuming at the death level would let one deep level
+     be farmed for a leaderboard score, which is the opposite of what the board
+     is for. This is the intended hook for a future pay-to-continue offer (see
+     "Ideas for Further Development").
      **Dive Deeper** on the title screen opens a level select: all fifty depths
      as a grid by zone, each locked until bought with Pearls, priced from 50 at
      level 2 up to 1,225 at level 50 - more than a full descent pays, so the
