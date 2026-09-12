@@ -64,15 +64,29 @@
 
   <div class="leaderboard-overlay hidden" id="levelSelectOverlay">
     <div class="leaderboard-panel level-select-panel">
-      <div class="level-select-head">
-        <h2 id="levelSelectHeading">Level Select</h2>
-        <span class="store-pearls"><img class="pearl-icon" alt="" src="/pearl.png"> <span id="levelSelectPearls">0</span></span>
+      <div id="levelSelectGridView">
+        <div class="level-select-head">
+          <h2 id="levelSelectHeading">Level Select</h2>
+          <span class="store-pearls"><img class="pearl-icon" alt="" src="/pearl.png"> <span id="levelSelectPearls">0</span></span>
+        </div>
+        <p class="dolphin-note">Pick a depth to see what is down there. Bought once and yours for good &ndash; but a dive that starts below level 1 never reaches the leaderboard.</p>
+        <div class="level-select-zones" id="levelSelectZones"></div>
+        <p class="level-select-detail" id="levelSelectDetail"></p>
+        <button id="levelSelectCloseBtn" class="secondary">Back</button>
       </div>
-      <p class="dolphin-note">Buy a starting depth for the Depthless Campaign. Bought once and yours for good &ndash; but a dive that starts below level 1 never reaches the leaderboard.</p>
-      <div class="level-select-zones" id="levelSelectZones"></div>
-      <p class="level-select-detail" id="levelSelectDetail"></p>
-      <button id="levelSelectAction" class="school ready"></button>
-      <button id="levelSelectCloseBtn" class="secondary">Back</button>
+
+      <div id="levelSelectPreview" class="hidden">
+        <div class="level-preview-art">
+          <img id="levelPreviewImage" alt="" src="">
+          <div class="level-preview-badge" id="levelPreviewBadge"></div>
+        </div>
+        <h2 class="level-preview-title" id="levelPreviewTitle"></h2>
+        <p class="level-preview-zone" id="levelPreviewZone"></p>
+        <div class="level-preview-stats" id="levelPreviewStats"></div>
+        <p class="level-preview-note" id="levelPreviewNote"></p>
+        <button id="levelPreviewAction" class="school ready"></button>
+        <button id="levelPreviewBack" class="secondary">Back to levels</button>
+      </div>
     </div>
   </div>
 

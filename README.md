@@ -44,7 +44,10 @@ Contents
   what the player bought, and it does not make a deep dive rankable. Tell early
   testers about it; it is not a secret the code hides.
 - `src/levelSelectView.ts` - the Level Select grid: all fifty depths by zone,
-  locked until bought, with one action button that either unlocks or dives.
+  locked until bought. Tapping one opens a preview of that depth in place of
+  the grid - its own background art, the sharks waiting in it and whether a
+  dive from there is ranked - with a single button beneath that either unlocks
+  it or starts the level.
 - `src/recommendation.ts` - what to spend Pearls on next, as one suggestion with
   a reason. Pure rules over the Store, inventory and progress state, in priority
   order: an unclaimed ability, then an empty pack, then survivability, then

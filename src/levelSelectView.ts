@@ -1,4 +1,4 @@
-import { DEPTH_ZONES, DepthZone, zoneNumber } from './levels';
+import { DEPTH_ZONES, DepthZone, getLevelBackground, getLevelConfig, zoneNumber } from './levels';
 import { getPearls } from './pearls';
 import {
   FREE_START_LEVEL,
@@ -37,7 +37,15 @@ export function setupLevelSelect(opts: LevelSelectOpts): LevelSelectHandles {
   const zonesEl = document.getElementById('levelSelectZones');
   const pearlsEl = document.getElementById('levelSelectPearls');
   const detailEl = document.getElementById('levelSelectDetail');
-  const actionBtn = document.getElementById('levelSelectAction') as HTMLButtonElement | null;
+  const gridViewEl = document.getElementById('levelSelectGridView');
+  const previewEl = document.getElementById('levelSelectPreview');
+  const previewImgEl = document.getElementById('levelPreviewImage') as HTMLImageElement | null;
+  const previewBadgeEl = document.getElementById('levelPreviewBadge');
+  const previewTitleEl = document.getElementById('levelPreviewTitle');
+  const previewZoneEl = document.getElementById('levelPreviewZone');
+  const previewStatsEl = document.getElementById('levelPreviewStats');
+  const previewNoteEl = document.getElementById('levelPreviewNote');
+  const previewActionBtn = document.getElementById('levelPreviewAction') as HTMLButtonElement | null;
 
   /** The level the player has tapped. Null until they pick one. */
   let selected: number | null = null;
@@ -69,7 +77,7 @@ export function setupLevelSelect(opts: LevelSelectOpts): LevelSelectHandles {
       ? 'Testing: every depth is open. Dives from them still do not count on the leaderboard. Seven taps again to switch it off.'
       : 'Testing unlock off. Back to the depths you have actually bought.';
     selected = null;
-    render();
+    showGrid();
   }
 
   function zoneOf(level: number): DepthZone {
@@ -108,60 +116,102 @@ export function setupLevelSelect(opts: LevelSelectOpts): LevelSelectHandles {
       btn.addEventListener('click', () => {
         selected = Number(btn.dataset.level);
         notice = '';
-        render();
+        showPreview();
       });
     }
   }
 
-  /** The line under the grid, and what the one action button does about it. */
+  /** The hint line under the grid. Only ever a prompt or the testing-unlock notice now. */
   function renderDetail(): void {
     if (pearlsEl) pearlsEl.textContent = String(getPearls());
-    if (!detailEl || !actionBtn) return;
-
-    if (notice) {
-      detailEl.textContent = notice;
-      actionBtn.textContent = 'Dive from level 1';
-      actionBtn.disabled = false;
-      actionBtn.onclick = () => opts.onDive(FREE_START_LEVEL);
-      return;
-    }
-
-    if (selected === null) {
-      detailEl.textContent = 'Pick a depth to dive from. Level 1 is always open; the rest are bought once and yours for good.';
-      actionBtn.textContent = 'Dive from level 1';
-      actionBtn.disabled = false;
-      actionBtn.onclick = () => opts.onDive(FREE_START_LEVEL);
-      return;
-    }
-
-    const zone = zoneOf(selected);
-    const unlocked = hasLevelAccess(selected);
-    const price = levelAccessPrice(selected);
-    const ranked = selected <= FREE_START_LEVEL;
-
-    if (unlocked) {
-      detailEl.textContent = ranked
-        ? `Level ${selected}, the ${zone.name} Zone at ${zone.depth}. A dive from here counts on the leaderboard.`
-        : `Level ${selected}, the ${zone.name} Zone at ${zone.depth}. A dive from here does not count on the leaderboard.`;
-      actionBtn.textContent = `Dive from level ${selected}`;
-      actionBtn.disabled = false;
-      actionBtn.onclick = () => opts.onDive(selected as number);
-      return;
-    }
-
-    const short = price - getPearls();
+    if (!detailEl) return;
     detailEl.textContent =
-      short > 0
-        ? `Level ${selected}, the ${zone.name} Zone at ${zone.depth}. ${short} more Pearls needed.`
-        : `Level ${selected}, the ${zone.name} Zone at ${zone.depth}. Dives from here never count on the leaderboard.`;
-    actionBtn.textContent = `Unlock for ${price} Pearls`;
-    actionBtn.disabled = short > 0;
-    actionBtn.onclick = () => {
-      if (selected !== null && buyLevelAccess(selected)) {
-        opts.onPearlsChange();
-        render();
+      notice || 'Tap a depth to look at it before you dive. Level 1 is always open; the rest are bought once and yours for good.';
+  }
+
+  /** Plain-English shark composition for a depth, from the config the level is actually built from. */
+  function previewStats(level: number): [string, string][] {
+    const config = getLevelConfig(level);
+    const kinds = config.sharkKinds
+      .map((k) => (k === 'greatWhite' ? 'great whites' : k === 'hammerhead' ? 'hammerheads' : 'tigers'))
+      .join(', ');
+    return [
+      ['Sharks', `${config.normalSharkCount} small, ${config.largeSharkCount} large`],
+      ['Kinds', kinds],
+      ['Shark speed', `${config.sharkSpeedMultiplier.toFixed(2)}x`],
+      ['Pod limit', String(config.maxDolphins)],
+    ];
+  }
+
+  /**
+   * The preview: the depth's own artwork and what is swimming in it, with one button underneath.
+   *
+   * Shown in place of the grid rather than over it, so a player is never two panels deep, and
+   * shown for locked levels too - seeing what you would be buying is the point of it.
+   */
+  function showPreview(): void {
+    if (selected === null) return;
+    const level = selected;
+    const zone = zoneOf(level);
+    const unlocked = hasLevelAccess(level);
+    const price = levelAccessPrice(level);
+    const ranked = level <= FREE_START_LEVEL;
+    const short = price - getPearls();
+
+    if (previewImgEl) {
+      previewImgEl.src = getLevelBackground(level, 'endless');
+      previewImgEl.alt = `Level ${level}, the ${zone.name} Zone`;
+    }
+    if (previewBadgeEl) previewBadgeEl.textContent = `Level ${level}`;
+    if (previewTitleEl) previewTitleEl.textContent = `${zone.name} Zone`;
+    if (previewZoneEl) previewZoneEl.textContent = `${zone.depth} \u00b7 level ${level} of ${MAX_START_LEVEL}`;
+    if (previewStatsEl) {
+      previewStatsEl.innerHTML = previewStats(level)
+        .map(
+          ([label, value]) =>
+            `<div class="level-preview-stat"><span class="label">${label}</span><span class="value">${value}</span></div>`,
+        )
+        .join('');
+    }
+
+    if (previewNoteEl) {
+      previewNoteEl.classList.toggle('warn', !ranked);
+      previewNoteEl.textContent = ranked
+        ? 'A dive from the surface counts on the leaderboard.'
+        : 'A dive from this depth never counts on the leaderboard.';
+    }
+
+    if (previewActionBtn) {
+      if (unlocked) {
+        previewActionBtn.textContent = 'Start Level';
+        previewActionBtn.disabled = false;
+        previewActionBtn.onclick = () => opts.onDive(level);
+      } else if (short > 0) {
+        previewActionBtn.textContent = `${short} more Pearls needed`;
+        previewActionBtn.disabled = true;
+        previewActionBtn.onclick = null;
+      } else {
+        previewActionBtn.textContent = `Unlock for ${price} Pearls`;
+        previewActionBtn.disabled = false;
+        previewActionBtn.onclick = () => {
+          if (buyLevelAccess(level)) {
+            opts.onPearlsChange();
+            // Straight back into the preview, now offering Start Level rather than a price.
+            showPreview();
+          }
+        };
       }
-    };
+    }
+
+    gridViewEl?.classList.add('hidden');
+    previewEl?.classList.remove('hidden');
+  }
+
+  /** Back out of the preview to the grid, repainted so a purchase shows as unlocked. */
+  function showGrid(): void {
+    previewEl?.classList.add('hidden');
+    gridViewEl?.classList.remove('hidden');
+    render();
   }
 
   function render(): void {
@@ -172,6 +222,10 @@ export function setupLevelSelect(opts: LevelSelectOpts): LevelSelectHandles {
   document.getElementById('levelSelectCloseBtn')?.addEventListener('click', () => {
     overlay?.classList.add('hidden');
   });
+  document.getElementById('levelPreviewBack')?.addEventListener('click', () => {
+    selected = null;
+    showGrid();
+  });
   document.getElementById('levelSelectHeading')?.addEventListener('click', onHeadingTap);
 
   return {
@@ -181,6 +235,9 @@ export function setupLevelSelect(opts: LevelSelectOpts): LevelSelectHandles {
       selected = null;
       notice = '';
       taps = 0;
+      // Always opens on the grid, never on whatever preview was last looked at.
+      previewEl?.classList.add('hidden');
+      gridViewEl?.classList.remove('hidden');
       render();
       overlay?.classList.remove('hidden');
     },
