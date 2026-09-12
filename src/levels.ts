@@ -51,9 +51,10 @@ export const ENDLESS_BACKGROUND_COUNT = 50;
  * and clearing its last one are both announced, which is what gives a run past the campaign a
  * sense of going somewhere rather than just counting upwards.
  *
- * The names run in the real ocean's order, but the depths are the game's own: each zone is a
- * flat 1000m band rather than the real ones, which are nothing like even, and there is a
- * deliberate gap between 1000m and 2000m.
+ * The names run in the real ocean's order and the depths are continuous - each zone starts
+ * where the last one ended, so a player reading the cards can add them up. The figures are the
+ * game's own rather than a textbook's: the real bands are nothing like this even, and the real
+ * Hadal does not begin until 6000m.
  */
 export interface DepthZone {
   /** Bare name, with no "Zone" on it - the announcements add that, so every zone reads the same
@@ -68,8 +69,8 @@ export interface DepthZone {
 export const DEPTH_ZONES: DepthZone[] = [
   { name: 'Eutrophic', depth: '0m - 200m', firstLevel: 1, lastLevel: 10 },
   { name: 'Mesopelagic', depth: '200m - 1000m', firstLevel: 11, lastLevel: 20 },
-  { name: 'Bathypelagic', depth: '2000m - 3000m', firstLevel: 21, lastLevel: 30 },
-  { name: 'Abyssopelagic', depth: '3000m - 4000m', firstLevel: 31, lastLevel: 40 },
+  { name: 'Bathypelagic', depth: '1000m - 2000m', firstLevel: 21, lastLevel: 30 },
+  { name: 'Abyssopelagic', depth: '2000m - 4000m', firstLevel: 31, lastLevel: 40 },
   { name: 'Hadal', depth: '4000m+', firstLevel: 41, lastLevel: 50 },
 ];
 

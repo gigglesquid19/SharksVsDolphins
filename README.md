@@ -269,8 +269,8 @@ How to Play
      - a death ends the run. This is the intended hook for a future
      pay-to-continue offer (see "Ideas for Further Development").
      It runs in five **depth zones** of ten levels each - Eutrophic (0m-200m),
-     Mesopelagic (200m-1000m), Bathypelagic (2000m-3000m), Abyssopelagic
-     (3000m-4000m) and Hadal (4000m+), defined in `DEPTH_ZONES` in
+     Mesopelagic (200m-1000m), Bathypelagic (1000m-2000m), Abyssopelagic
+     (2000m-4000m) and Hadal (4000m+), defined in `DEPTH_ZONES` in
      `src/levels.ts`. Entering the first level of a zone announces "Entered the
      X Zone" with its depth range, and clearing the last announces "Sharks
      Vanquished / X Zone Liberated" in place of the usual "Level Up!". Each zone

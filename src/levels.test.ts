@@ -110,4 +110,14 @@ describe('depth zones', () => {
   it('gives every zone a depth range to show under its name', () => {
     for (const zone of DEPTH_ZONES) expect(zone.depth).toMatch(/m/);
   });
+
+  it('runs the depths continuously, with no gap between one zone and the next', () => {
+    // Each card shows a range, and a player reading them in order should be able to add them
+    // up. The last zone is open-ended ("4000m+"), so it only has to start where 40 ended.
+    const bounds = DEPTH_ZONES.map((z) => (z.depth.match(/\d+/g) ?? []).map(Number));
+    bounds.forEach((pair, i) => {
+      if (i > 0) expect(pair[0]).toBe(bounds[i - 1][1]);
+      if (i < bounds.length - 1) expect(pair[1]).toBeGreaterThan(pair[0]);
+    });
+  });
 });
