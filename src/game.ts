@@ -752,13 +752,13 @@ export class Game {
   }
 
   /**
-   * The Mega Shrimp picks made during this run, for the "Your Dolphin" panel. Null when no run
-   * is in progress, which is what tells the panel to leave the section out entirely rather than
-   * showing a row of zeroes on the title screen.
+   * The stat bonuses in effect this run, for the "Your Dolphin" panel. Null when no run is in
+   * progress, which is what tells the panel to leave the section out entirely rather than showing
+   * a row of zeroes on the title screen.
    *
-   * These are the in-run picks only. They sit on top of the Store's permanent upgrades in the
-   * Depthless Campaign, and stand alone in the Campaign, which the Store does not touch at all -
-   * hence the mode, so the panel can say which it is looking at.
+   * Where they came from depends on the mode, hence reporting it: in the Campaign they are the
+   * Mega Shrimp picks made during the run and nothing else, and in the Depthless Campaign they
+   * are the Store upgrades and nothing else.
    */
   runUpgrades(): {
     mode: GameMode;
@@ -1508,7 +1508,7 @@ export class Game {
       this.leaderboardOverlayEl?.classList.add('hidden');
 
       // Endless only: the Store's permanent upgrades seed this run's starting stats;
-      // in-run Mega Shrimp picks then add on top (chooseUpgrade). Campaign is untouched.
+      // and they are the whole of it - the Depthless Campaign has no Mega Shrimp picks.
       if (this.mode === 'endless') {
         const b = endlessStartBonuses();
         this.vitalityLives = b.vitalityLives;
@@ -2580,23 +2580,50 @@ ${zone.depth}`, 'levelup', duration + 1400);
     }
   }
 
+  /**
+   * The between-levels beat. In the Campaign this is the Mega Shrimp pick; in the Depthless
+   * Campaign there is nothing to pick, because a Depthless dolphin only grows in the Store, so
+   * it announces the level and sends the player east without stopping them.
+   *
+   * Both paths still have to do the same two jobs the overlay used to do on its way past: put up
+   * the banner - including the zone liberation, which is the run's milestone - and arm the swim
+   * east prompt, or the run simply stops at the end of a level.
+   */
   private showLevelUpChoice(): void {
-    this.awaitingLevelUpChoice = true;
     // Clearing the last level of a depth zone is the run's milestone beat - it replaces the
     // generic "Level Up!" rather than being queued behind it, since both would land on the same
     // banner within a second of each other.
     const cleared = this.mode === 'endless' ? zoneClearedAt(this.currentLevel) : null;
     const bonus = this.zoneClearBonus();
+    // "Level Up!" belongs to the Campaign's Mega Shrimp pick. In the Depthless Campaign nothing
+    // levels up between levels, so an ordinary clear gets no second banner at all - the level's
+    // own "Level Complete" and the swim-east prompt already say everything there is to say.
     const bannerText = cleared
       ? `Sharks Vanquished
 ${cleared.name} Zone Liberated
 +${bonus} Pearls`
-      : 'Level Up!';
-    this.showBanner(bannerText, 'levelup', cleared ? 3400 : 2600);
+      : this.mode === 'endless'
+        ? ''
+        : 'Level Up!';
+    if (bannerText) this.showBanner(bannerText, 'levelup', cleared ? 3400 : 2600);
     if (cleared) {
       this.setStatus(`${cleared.name} Zone liberated! +${bonus} Pearls`);
       sfx.playAchievement();
     }
+
+    // Depthless: no pick, so head straight for the next level rather than opening the overlay.
+    if (this.mode === 'endless') {
+      if (!cleared) this.setStatus(`Swim east to reach Level ${this.currentLevel + 1}`);
+      this.awaitingNewWaters = true;
+      this.newWatersPromptEl.classList.add('visible');
+      if (this.running && !this.paused) {
+        this.lastFrameTime = 0;
+        this.step();
+      }
+      return;
+    }
+
+    this.awaitingLevelUpChoice = true;
     if (this.megaShrimpHintEl) {
       const firstTime = !hasSeenHint('megaShrimp');
       this.megaShrimpHintEl.classList.toggle('hidden', !firstTime);

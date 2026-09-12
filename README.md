@@ -51,7 +51,8 @@ Contents
   breadth, then whichever upgrade is furthest behind.
 - `src/dolphinView.ts` - the read-only "Your Dolphin" panel: the dolphin in its
   equipped skin and name, which abilities it has, how far each Store upgrade is
-  levelled, the Mega Shrimp picks of a run in progress, and the three-slot pack.
+  levelled, the stat bonuses in effect in a run in progress, and the three-slot
+  pack.
   Reachable from the title screen and the pause menu; its one action is a button
   through to the Store, where every purchase still happens. It is mode-aware,
   because the Store touches only the Depthless Campaign: paused in a Campaign
@@ -329,10 +330,13 @@ How to Play
      announced this way. They are
      cached on first load rather than precached, because three megabytes of art
      that a given run mostly never reaches should not be part of the install.
-   - **Store** (title screen): spend Pearls on permanent **Endless upgrades**
-     (Vitality, Speed, Charisma, Boost Cooldown, and Boost Duration - they seed
-     an Endless run's starting stats and stack with the Mega Shrimp picks you
-     make during the run; Campaign is unaffected) and **dolphin skins** (palette
+   - **Store** (title screen): spend Pearls on permanent **Depthless upgrades**
+     (Vitality, Speed, Charisma, Boost Cooldown, Boost Duration and the two Echo
+     ones, **six levels each**). They are the whole of a Depthless build: the
+     mode has no Mega Shrimp pick between levels, so a dolphin gets stronger by
+     farming Pearls and spending them here and in no other way. The Campaign is
+     the other way round - it has the picks and the Store does not touch it.
+     Also **dolphin skins** (palette
      recolours of the whole pod, one equipped at a time). The **Orca** skin
      can't be bought - it shows as "Share to unlock" until earned. Skins sit on
      The Store opens with a single **recommendation** - one thing to buy next and

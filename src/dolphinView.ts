@@ -103,11 +103,11 @@ export function setupDolphinView(onOpenStore: () => void): DolphinViewHandles {
     runWrapEl?.classList.toggle('hidden', !run);
     if (!run || !runEl) return;
     const campaign = run.mode === 'campaign';
-    if (runHeadingEl) runHeadingEl.textContent = campaign ? 'This Campaign run' : 'This Depthless run';
+    if (runHeadingEl) runHeadingEl.textContent = campaign ? 'This Campaign run' : 'In effect this dive';
     if (runNoteEl) {
       runNoteEl.textContent = campaign
         ? 'Mega Shrimp picks made since this run began. In the Campaign these are all you carry, and they are lost when the run ends.'
-        : 'Mega Shrimp picks made since this run began, on top of the Store upgrades below. They are lost when the run ends.';
+        : 'What your Store upgrades are worth in this dive. The Depthless Campaign has no Mega Shrimp picks - everything here was bought.';
     }
     const rows: Row[] = [
       { icon: '❤️', name: 'Vitality', desc: 'Extra lives banked this run', value: `+${run.lives}`, owned: run.lives > 0 },
@@ -170,7 +170,7 @@ export function setupDolphinView(onOpenStore: () => void): DolphinViewHandles {
     if (upgradesNoteEl) {
       upgradesNoteEl.textContent = inCampaignRun
         ? 'Bought in the Store, but they seed Depthless runs only. None of them are in effect in this Campaign run.'
-        : 'Bought in the Store. They seed a Depthless run and stack with the Mega Shrimp picks you make during it. The Campaign is untouched by them.';
+        : 'Six levels each, and the only way a Depthless dolphin gets stronger. The Campaign is untouched by them.';
     }
     // Dimmed rather than hidden during a Campaign run: the player still wants to see what they
     // own, they just need to know none of it is helping them right now.

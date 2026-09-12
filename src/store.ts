@@ -35,14 +35,25 @@ export interface UpgradeDef {
   prices: number[];
 }
 
+/**
+ * Every upgrade runs to six levels, and the Store is now the only place a Depthless dolphin gets
+ * stronger - the Mega Shrimp pick after each level is a Campaign thing. That makes the ceiling
+ * here the ceiling on a build, so they all share one, rather than Charisma stopping at three
+ * while Vitality ran to five for no reason a player could see.
+ *
+ * Prices climb steeply at the top end because the last level of anything should be a decision
+ * about a whole evening's Pearls rather than the next thing you happen to afford.
+ */
+export const MAX_UPGRADE_LEVEL = 6;
+
 export const UPGRADES: Record<UpgradeId, UpgradeDef> = {
-  vitality: { name: 'Vitality', desc: '+1 starting life', prices: [60, 120, 220, 360, 550] },
-  speed: { name: 'Speed', desc: '+5% swim speed', prices: [80, 150, 260, 400, 600] },
-  charisma: { name: 'Charisma', desc: '+1 starting pod dolphin', prices: [100, 220, 400] },
-  boost: { name: 'Boost Cooldown', desc: '-0.75s between boosts', prices: [90, 170, 300, 480] },
-  boostDuration: { name: 'Boost Duration', desc: '+0.1s per boost', prices: [100, 200, 340, 520] },
-  echoDuration: { name: 'Echo Duration', desc: '+1.5s of vision', prices: [120, 220, 360, 540] },
-  echoRadius: { name: 'Echo Range', desc: '+6 units of vision', prices: [120, 220, 360, 540] },
+  vitality: { name: 'Vitality', desc: '+1 starting life', prices: [60, 120, 220, 360, 550, 800] },
+  speed: { name: 'Speed', desc: '+5% swim speed', prices: [80, 150, 260, 400, 600, 860] },
+  charisma: { name: 'Charisma', desc: '+1 starting pod dolphin', prices: [100, 220, 400, 640, 950, 1350] },
+  boost: { name: 'Boost Cooldown', desc: '-0.75s between boosts', prices: [90, 170, 300, 480, 720, 1030] },
+  boostDuration: { name: 'Boost Duration', desc: '+0.1s per boost', prices: [100, 200, 340, 520, 760, 1080] },
+  echoDuration: { name: 'Echo Duration', desc: '+1.5s of vision', prices: [120, 220, 360, 540, 780, 1090] },
+  echoRadius: { name: 'Echo Range', desc: '+6 units of vision', prices: [120, 220, 360, 540, 780, 1090] },
 };
 
 /** Upgrades that only make sense once Echolocation has been bought. */
@@ -209,7 +220,7 @@ export function echolocationStats(): { durationMs: number; radius: number; coold
   };
 }
 
-/** Endless-run starting bonuses from the purchased upgrade levels. Stacks with in-run Mega Shrimp picks. */
+/** Depthless starting bonuses from the purchased upgrade levels - the whole of a Depthless build. */
 export function endlessStartBonuses(): {
   vitalityLives: number;
   speedBonusPct: number;
