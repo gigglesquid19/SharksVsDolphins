@@ -107,13 +107,23 @@ export function getLevelBackground(level: number, mode: 'campaign' | 'endless' =
 
 /**
  * Endless-mode scaling past the 10-level campaign: shark counts and max pod
- * size grow then cap out so late levels stay playable, while speed keeps
- * climbing indefinitely - that's what
- * eventually ends an endless run. The matriarch reappears every 10 levels
+ * size grow then cap out so late levels stay playable, and speed now caps too - see
+ * MAX_ENDLESS_SHARK_SPEED. The matriarch reappears every 10 levels
  * as a recurring boss beat; unlike the campaign, she flees wounded instead
  * of being destroyed (see Game.fleeMatriarch), so the same cycle repeats
  * indefinitely rather than ending the run.
  */
+/**
+ * Ceiling on the per-level shark speed modifier in the Depthless Campaign. Speed used to climb
+ * without limit, which is what used to end a run: past a point the sharks simply outran the pod
+ * and no amount of play could hold them off. Capped, the late game is decided by the number of
+ * sharks in the water rather than by a speed nothing can answer.
+ *
+ * This caps the level modifier, not a shark's final speed - a hammerhead still carries its 1.15
+ * and a large great white its 1.25 on top, because those are what those animals are.
+ */
+export const MAX_ENDLESS_SHARK_SPEED = 2;
+
 export function getEndlessLevelConfig(level: number): LevelConfig {
   const over = level - LEVELS.length;
   return {
@@ -122,7 +132,7 @@ export function getEndlessLevelConfig(level: number): LevelConfig {
     normalSharkCount: Math.min(9 + Math.ceil(over / 3), 16),
     largeSharkCount: Math.min(4 + Math.ceil(over / 3), 10),
     maxDolphins: Math.min(15 + Math.floor(over / 4), 20),
-    sharkSpeedMultiplier: 1.27 + over * 0.03,
+    sharkSpeedMultiplier: Math.min(1.27 + over * 0.03, MAX_ENDLESS_SHARK_SPEED),
     matriarch: over % 10 === 0,
   };
 }

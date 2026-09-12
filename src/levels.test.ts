@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DEPTH_ZONES,
   LEVELS,
+  MAX_ENDLESS_SHARK_SPEED,
   getEndlessLevelConfig,
   getLevelBackground,
   getLevelConfig,
@@ -24,10 +25,18 @@ describe('getLevelConfig', () => {
 });
 
 describe('getEndlessLevelConfig', () => {
-  it('keeps escalating shark speed indefinitely', () => {
+  it('escalates shark speed while the cap is still above it', () => {
     const near = getEndlessLevelConfig(15);
-    const far = getEndlessLevelConfig(50);
+    const far = getEndlessLevelConfig(30);
     expect(far.sharkSpeedMultiplier).toBeGreaterThan(near.sharkSpeedMultiplier);
+    expect(far.sharkSpeedMultiplier).toBeLessThan(MAX_ENDLESS_SHARK_SPEED);
+  });
+
+  it('caps shark speed rather than letting it outrun the pod forever', () => {
+    // It reaches the ceiling at level 35 and holds there however deep a run goes.
+    expect(getEndlessLevelConfig(34).sharkSpeedMultiplier).toBeLessThan(MAX_ENDLESS_SHARK_SPEED);
+    expect(getEndlessLevelConfig(35).sharkSpeedMultiplier).toBe(MAX_ENDLESS_SHARK_SPEED);
+    expect(getEndlessLevelConfig(500).sharkSpeedMultiplier).toBe(MAX_ENDLESS_SHARK_SPEED);
   });
 
   it('caps shark counts and pod size so late levels stay playable', () => {

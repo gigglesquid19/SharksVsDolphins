@@ -265,7 +265,10 @@ How to Play
    - **Depthless Campaign** (`mode: 'endless'` in the code - see the note on
      `GameMode` in `src/game.ts` for why the id keeps the old name): always
      starts at level 1 with no level picker, keeps
-     going past level 10 with escalating difficulty, and has no free resume
+     going past level 10 with escalating difficulty - shark counts, pod size and
+     shark speed all climb and then cap (speed at 2x, reached at level 35), so
+     how deep a run goes is decided by the number of sharks in the water rather
+     than by a speed nothing can answer - and has no free resume
      - a death ends the run. This is the intended hook for a future
      pay-to-continue offer (see "Ideas for Further Development").
      It runs in five **depth zones** of ten levels each - Eutrophic (0m-200m),
