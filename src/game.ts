@@ -721,12 +721,20 @@ export class Game {
    * is in progress, which is what tells the panel to leave the section out entirely rather than
    * showing a row of zeroes on the title screen.
    *
-   * These are the in-run picks only. They sit on top of the Store's permanent upgrades, which
-   * the panel reads from store.ts itself.
+   * These are the in-run picks only. They sit on top of the Store's permanent upgrades in the
+   * Depthless Campaign, and stand alone in the Campaign, which the Store does not touch at all -
+   * hence the mode, so the panel can say which it is looking at.
    */
-  runUpgrades(): { lives: number; speedBonusPct: number; podBonus: number; boostReductionMs: number } | null {
+  runUpgrades(): {
+    mode: GameMode;
+    lives: number;
+    speedBonusPct: number;
+    podBonus: number;
+    boostReductionMs: number;
+  } | null {
     if (this.sessionStartTime === 0) return null;
     return {
+      mode: this.mode,
       lives: this.vitalityLives,
       speedBonusPct: this.speedBonusPct,
       podBonus: this.charismaBonusDolphins,

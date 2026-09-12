@@ -1254,6 +1254,8 @@ button.mega-shrimp.green {
   border-color: rgba(34, 211, 238, 0.3);
 }
 .dolphin-row.locked { opacity: 0.55; }
+/* A whole list greyed back when nothing in it applies to the run being played. */
+.dolphin-list-inactive { opacity: 0.5; }
 .dolphin-row-icon { font-size: 1.15rem; }
 .dolphin-row-body { flex: 1; min-width: 0; }
 .dolphin-row-name { font-size: 0.9rem; font-weight: 700; color: var(--text); }

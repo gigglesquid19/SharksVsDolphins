@@ -21,8 +21,12 @@ import { hasClearedCampaign } from './progress';
  * be one tap from doing something about it.
  */
 
-/** The Mega Shrimp picks made during a run in progress. Null on the title screen. */
+/**
+ * The Mega Shrimp picks made during a run in progress, and which mode that run is. Null on the
+ * title screen, where there is no run to describe.
+ */
 export interface RunUpgrades {
+  mode: 'campaign' | 'endless';
   lives: number;
   speedBonusPct: number;
   podBonus: number;
@@ -68,6 +72,9 @@ export function setupDolphinView(onOpenStore: () => void): DolphinViewHandles {
   const slotsEl = document.getElementById('dolphinSlots');
   const runWrapEl = document.getElementById('dolphinRunWrap');
   const runEl = document.getElementById('dolphinRun');
+  const runHeadingEl = document.getElementById('dolphinRunHeading');
+  const runNoteEl = document.getElementById('dolphinRunNote');
+  const upgradesNoteEl = document.getElementById('dolphinUpgradesNote');
 
   function renderHero(): void {
     const skin = skinById(equippedSkinId());
@@ -84,11 +91,24 @@ export function setupDolphinView(onOpenStore: () => void): DolphinViewHandles {
     }
   }
 
-  /** The in-run picks, shown only while a run exists. Zeroes are kept in, so the player can see
-   *  what they have not taken as well as what they have. */
+  /**
+   * The in-run picks, shown only while a run exists. Zeroes are kept in, so the player can see
+   * what they have not taken as well as what they have.
+   *
+   * Named by mode, because the two are not the same thing and confusing them is easy: in the
+   * Campaign these picks are the whole of a dolphin's progress and vanish with the run, while in
+   * the Depthless Campaign they sit on top of whatever the Store has already bought.
+   */
   function renderRun(run: RunUpgrades | null | undefined): void {
     runWrapEl?.classList.toggle('hidden', !run);
     if (!run || !runEl) return;
+    const campaign = run.mode === 'campaign';
+    if (runHeadingEl) runHeadingEl.textContent = campaign ? 'This Campaign run' : 'This Depthless run';
+    if (runNoteEl) {
+      runNoteEl.textContent = campaign
+        ? 'Mega Shrimp picks made since this run began. In the Campaign these are all you carry, and they are lost when the run ends.'
+        : 'Mega Shrimp picks made since this run began, on top of the Store upgrades below. They are lost when the run ends.';
+    }
     const rows: Row[] = [
       { icon: '❤️', name: 'Vitality', desc: 'Extra lives banked this run', value: `+${run.lives}`, owned: run.lives > 0 },
       {
@@ -110,10 +130,14 @@ export function setupDolphinView(onOpenStore: () => void): DolphinViewHandles {
     runEl.innerHTML = rows.map(rowHtml).join('');
   }
 
-  function renderAbilities(): void {
+  function renderAbilities(run: RunUpgrades | null | undefined): void {
     if (!abilitiesEl) return;
     const echo = ownsEcholocation();
     const stats = echolocationStats();
+    // Echolocation is bought once but only works in the Depthless Campaign, so during a Campaign
+    // run it is owned and unusable - which the panel has to say outright, or a player who paid
+    // 200 Pearls for it will go looking for the button.
+    const inCampaignRun = run?.mode === 'campaign';
 
     const rows: Row[] = [
       {
@@ -127,19 +151,30 @@ export function setupDolphinView(onOpenStore: () => void): DolphinViewHandles {
         icon: '\u{1F50A}',
         name: 'Echolocation',
         desc: echo
-          ? `Lights up sharks within ${stats.radius} units for ${(stats.durationMs / 1000).toFixed(1)}s. Depthless Campaign only.`
+          ? inCampaignRun
+            ? 'Owned, but it only works in the Depthless Campaign. Not available in this run.'
+            : `Lights up sharks within ${stats.radius} units for ${(stats.durationMs / 1000).toFixed(1)}s. Depthless Campaign only.`
           : hasClearedCampaign()
             ? 'Unlocked by clearing the campaign. Buy it in the Store.'
             : 'Locked until you clear the campaign.',
-        value: echo ? 'Owned' : 'Locked',
-        owned: echo,
+        value: echo ? (inCampaignRun ? 'Not this run' : 'Owned') : 'Locked',
+        owned: echo && !inCampaignRun,
       },
     ];
     abilitiesEl.innerHTML = rows.map(rowHtml).join('');
   }
 
-  function renderUpgrades(): void {
+  function renderUpgrades(run: RunUpgrades | null | undefined): void {
     if (!upgradesEl) return;
+    const inCampaignRun = run?.mode === 'campaign';
+    if (upgradesNoteEl) {
+      upgradesNoteEl.textContent = inCampaignRun
+        ? 'Bought in the Store, but they seed Depthless runs only. None of them are in effect in this Campaign run.'
+        : 'Bought in the Store. They seed a Depthless run and stack with the Mega Shrimp picks you make during it. The Campaign is untouched by them.';
+    }
+    // Dimmed rather than hidden during a Campaign run: the player still wants to see what they
+    // own, they just need to know none of it is helping them right now.
+    upgradesEl.classList.toggle('dolphin-list-inactive', inCampaignRun);
     const ids = Object.keys(UPGRADES) as UpgradeId[];
     upgradesEl.innerHTML = ids
       .map((id) => {
@@ -196,8 +231,8 @@ export function setupDolphinView(onOpenStore: () => void): DolphinViewHandles {
   function refresh(run?: RunUpgrades | null): void {
     renderHero();
     renderRun(run);
-    renderAbilities();
-    renderUpgrades();
+    renderAbilities(run);
+    renderUpgrades(run);
     renderPack();
   }
 

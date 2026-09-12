@@ -39,7 +39,10 @@ Contents
   equipped skin and name, which abilities it has, how far each Store upgrade is
   levelled, the Mega Shrimp picks of a run in progress, and the three-slot pack.
   Reachable from the title screen and the pause menu; its one action is a button
-  through to the Store, where every purchase still happens.
+  through to the Store, where every purchase still happens. It is mode-aware,
+  because the Store touches only the Depthless Campaign: paused in a Campaign
+  run it heads the picks "This Campaign run", greys the Store upgrades back and
+  says none of them apply, and marks a bought Echolocation "Not this run".
 - `src/dailyReward.ts` - the daily login streak (`localStorage`): the last day
   claimed and how many days in a row. Nothing to do with the planned Daily
   Challenge, which needs a seeded generator; this needs only a date.
