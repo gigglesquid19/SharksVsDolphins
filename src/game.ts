@@ -56,6 +56,12 @@ import { isAndroid } from './platform';
 import { ads } from './ads';
 import { iap } from './iap';
 
+/**
+ * The second mode is shown to the player as the **Depthless Campaign**; the id stays 'endless'
+ * because it is written into saved leaderboard entries, the run checkpoint and the Store's
+ * persisted upgrades. Renaming it would orphan every existing player's scores and purchases for
+ * the sake of a label, so the display name lives in the markup and the code keeps the old id.
+ */
 export type GameMode = 'campaign' | 'endless';
 type LeaderboardBoard = 'campaign' | 'endless';
 
@@ -2161,7 +2167,7 @@ export class Game {
         }
       }
     } else {
-      if (this.leaderboardHeadingEl) this.leaderboardHeadingEl.textContent = 'Endless Leaderboard';
+      if (this.leaderboardHeadingEl) this.leaderboardHeadingEl.textContent = 'Depthless Leaderboard';
       this.leaderboardHeadEl.innerHTML = '<tr><th>#</th><th>Name</th><th>Level</th><th>Survived</th><th>Recruited</th><th>Sharks</th></tr>';
       const scores = loadEndlessScores();
       if (scores.length === 0) {
@@ -2238,7 +2244,7 @@ export class Game {
 
   private showLevelUpChoice(): void {
     this.awaitingLevelUpChoice = true;
-    const bannerText = this.mode === 'endless' && this.currentLevel === LEVELS.length ? 'Ocean Saved! Endless Waters Await...' : 'Level Up!';
+    const bannerText = this.mode === 'endless' && this.currentLevel === LEVELS.length ? 'Ocean Saved! The Deep Awaits...' : 'Level Up!';
     this.showBanner(bannerText, 'levelup', 2600);
     if (this.megaShrimpHintEl) {
       const firstTime = !hasSeenHint('megaShrimp');

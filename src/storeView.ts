@@ -98,7 +98,7 @@ export function setupStore(opts: { onPearlsChange: () => void }): { open: () => 
       <div class="store-item-icon" aria-hidden="true">🔊</div>
       <div class="store-item-name">Echolocation</div>
       <div class="store-item-desc">Ping the water to see cloaked tiger sharks and anything a storm is hiding.</div>
-      <div class="store-item-level">${owned ? `${seconds}s &middot; ${stats.radius} units` : 'Endless Mode only'}</div>`;
+      <div class="store-item-level">${owned ? `${seconds}s &middot; ${stats.radius} units` : 'Depthless Campaign only'}</div>`;
 
     const btn = document.createElement('button');
     btn.className = 'store-buy';

@@ -45,10 +45,10 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: 'flawlessCampaign', name: 'Flawless Campaign', description: 'Clear the whole campaign without losing a dolphin.', icon: '💎' },
 
   // Endless depth
-  { id: 'matriarchRematch', name: 'Matriarch Rematch', description: 'Beat the Matriarch a second time in Endless.', icon: '⚔️' },
-  { id: 'deepDiver', name: 'Deep Diver', description: 'Reach Endless level 15.', icon: '🤿' },
-  { id: 'abyssal', name: 'Abyssal', description: 'Reach Endless level 25.', icon: '🕳️' },
-  { id: 'intoTheTrench', name: 'Into the Trench', description: 'Reach Endless level 40.', icon: '🧭' },
+  { id: 'matriarchRematch', name: 'Matriarch Rematch', description: 'Beat the Matriarch a second time in the Depthless Campaign.', icon: '⚔️' },
+  { id: 'deepDiver', name: 'Deep Diver', description: 'Reach Depthless level 15.', icon: '🤿' },
+  { id: 'abyssal', name: 'Abyssal', description: 'Reach Depthless level 25.', icon: '🕳️' },
+  { id: 'intoTheTrench', name: 'Into the Trench', description: 'Reach Depthless level 40.', icon: '🧭' },
 
   // Pod
   { id: 'megaPod', name: 'Mega Pod', description: 'Summon the Mega Pod for the finale.', icon: '🐋' },

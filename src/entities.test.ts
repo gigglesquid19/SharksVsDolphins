@@ -305,18 +305,28 @@ describe('Shark.move search drift', () => {
 });
 
 describe('Shark.move while the pod is ghosted', () => {
-  it('does not close on a player it cannot sense, even with unlimited range', () => {
-    const p = playerAt(50, 50);
-    const s = testShark(70, 50);
-    const start = s.distanceBetween(p);
-    let closest = start;
-    for (let i = 0; i < 60; i++) {
-      s.move(1, p, [s], true, NOW, true);
-      closest = Math.min(closest, s.distanceBetween(p));
-    }
-    // A pursuing shark covers this in a handful of ticks; a searching one can still stumble
-    // nearer by chance, so the bar is that it never actually reaches the pod.
-    expect(closest).toBeGreaterThan(5);
+  it('does not home in on a player it cannot sense, even with unlimited range', () => {
+    // A hidden shark still wanders, so on any single run it can drift onto the pod by luck -
+    // measured over 600 runs the closest approach bottoms out around 0.2 units. What it must
+    // not do is CLOSE, so the assertion is on the median of many runs rather than on one:
+    // hunting reaches contact every time, hidden typically ends no nearer than it started.
+    const closestApproach = (hidden: boolean): number => {
+      const p = playerAt(50, 50);
+      const s = testShark(70, 50);
+      let closest = s.distanceBetween(p);
+      for (let i = 0; i < 60; i++) {
+        s.move(1, p, [s], true, NOW, hidden);
+        closest = Math.min(closest, s.distanceBetween(p));
+      }
+      return closest;
+    };
+    const median = (runs: number, hidden: boolean): number => {
+      const values = Array.from({ length: runs }, () => closestApproach(hidden)).sort((a, b) => a - b);
+      return values[Math.floor(runs / 2)];
+    };
+
+    expect(median(40, false)).toBeLessThan(1);
+    expect(median(40, true)).toBeGreaterThan(10);
   });
 
   it('closes on the same player once the Ghost Shrimp wears off', () => {

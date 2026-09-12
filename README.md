@@ -261,7 +261,9 @@ How to Play
      the title screen offers **Continue Campaign** to resume a run you left
      mid-way. Clearing level 10 ends the run and prompts for the Campaign
      leaderboard.
-   - **Endless Mode**: always starts at level 1 with no level picker, keeps
+   - **Depthless Campaign** (`mode: 'endless'` in the code - see the note on
+     `GameMode` in `src/game.ts` for why the id keeps the old name): always
+     starts at level 1 with no level picker, keeps
      going past level 10 with escalating difficulty, and has no free resume
      - a death ends the run. This is the intended hook for a future
      pay-to-continue offer (see "Ideas for Further Development").

@@ -16,7 +16,7 @@ export type ShareKind = 'campaign' | 'endless50';
 function messageFor(kind: ShareKind, dolphinName: string): string {
   return kind === 'campaign'
     ? `${dolphinName} just saved the ocean in Sharks vs Dolphins! 🐬🦈`
-    : `${dolphinName} reached Level 50 in Sharks vs Dolphins Endless mode! 🌊🦈`;
+    : `${dolphinName} reached Level 50 in the Sharks vs Dolphins Depthless Campaign! 🌊🦈`;
 }
 
 function isAbort(err: unknown): boolean {
