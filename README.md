@@ -79,6 +79,13 @@ Contents
   the campaign's backgrounds and `public/levels/endless/1-50.webp` are
   Endless's own set, derived from the authored art in `Images/Levels/` by
   `tools/convert_level_backgrounds.py`.
+- `tools/preflight-release.mjs` - release gate: fails if any third-party
+  identifier is still a placeholder (AdMob app id and ad units, the Play Games
+  project id and leaderboard ids) or the release keystore is missing. Run it
+  with `npm run preflight`; `npm run build:release` and
+  `npm run build:android:release` run it first and stop if it fails. Plain
+  `npm run build` and `npm run build:android` deliberately do not, because
+  day-to-day builds are supposed to carry the test identifiers.
 - `tools/` - one-off Python asset scripts (icons, store art, and
   `convert_level_backgrounds.py`, which re-derives the Endless backgrounds
   from `Images/Levels/`; run it with `--check` to list gaps without writing).

@@ -7,6 +7,9 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "build:android": "npm run build && cap sync android",
+    "preflight": "node tools/preflight-release.mjs",
+    "build:release": "npm run preflight && npm run build",
+    "build:android:release": "npm run preflight && npm run build && cap sync android",
     "preview": "vite preview",
     "test": "vitest run"
   },
