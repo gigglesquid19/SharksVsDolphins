@@ -1255,6 +1255,10 @@ button.mega-shrimp.green {
   flex-direction: column;
   gap: 12px;
   margin: 14px 0 16px;
+  /* The panel centres its children, which left the grid shrunk to its contents and the cells
+     smaller than the space allowed. Stretching it is what makes the levels full size. */
+  width: 100%;
+  align-self: stretch;
 }
 .level-zone-head {
   display: flex;
@@ -1272,17 +1276,19 @@ button.mega-shrimp.green {
   font-size: 0.7rem;
   color: var(--muted);
 }
+/* Five to a row rather than ten, so each level is a real tap target on a phone - about five
+   times the area of the old cells, and two tidy rows of five per zone. */
 .level-zone-grid {
   display: grid;
-  grid-template-columns: repeat(10, 1fr);
-  gap: 4px;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
 }
 .level-cell {
   position: relative;
   aspect-ratio: 1;
   min-width: 0;
   padding: 0;
-  border-radius: 8px;
+  border-radius: 12px;
   border: 1px solid rgba(148, 163, 184, 0.22);
   background: rgba(148, 163, 184, 0.12);
   color: var(--muted);
@@ -1294,8 +1300,8 @@ button.mega-shrimp.green {
   justify-content: center;
   line-height: 1;
 }
-.level-cell-number { font-size: 0.72rem; font-weight: 800; }
-.level-cell-state { font-size: 0.5rem; }
+.level-cell-number { font-size: 1.15rem; font-weight: 800; }
+.level-cell-state { font-size: 0.75rem; }
 .level-cell.unlocked {
   background: rgba(34, 211, 238, 0.18);
   border-color: rgba(34, 211, 238, 0.45);
@@ -1383,6 +1389,33 @@ button.mega-shrimp.green {
 .dolphin-row.locked { opacity: 0.55; }
 /* A whole list greyed back when nothing in it applies to the run being played. */
 .dolphin-list-inactive { opacity: 0.5; }
+/* The Store upgrade list only: seven rows in one column made the panel a long scroll, and each
+   row is short enough to sit two abreast. */
+.dolphin-list-pairs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.dolphin-list-pairs .dolphin-row {
+  gap: 7px;
+  padding: 7px 8px;
+}
+.dolphin-list-pairs .dolphin-row-name { font-size: 0.82rem; }
+.dolphin-list-pairs .dolphin-row-desc { font-size: 0.68rem; }
+.dolphin-list-pairs .dolphin-row-value { font-size: 0.76rem; }
+/* On a phone two columns leave about 125px a row, which wraps "+1 starting life" onto three
+   lines and undoes the point of pairing them. Below that width the row keeps its name and its
+   level and drops the rest - the descriptions are on the Store tiles where they are bought. */
+@media (max-width: 430px) {
+  .dolphin-list-pairs .dolphin-row-icon,
+  .dolphin-list-pairs .dolphin-row-desc {
+    display: none;
+  }
+  .dolphin-list-pairs .dolphin-row {
+    justify-content: space-between;
+    padding: 9px 10px;
+  }
+}
 .dolphin-row-icon { font-size: 1.15rem; }
 .dolphin-row-body { flex: 1; min-width: 0; }
 .dolphin-row-name { font-size: 0.9rem; font-weight: 700; color: var(--text); }

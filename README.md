@@ -38,12 +38,12 @@ Contents
 - `src/levelAccess.ts` - paid starting depths for the Depthless Campaign
   (`localStorage`): which levels are unlocked, what each costs, and the one rule
   the feature rests on - a dive that starts below level 1 is never ranked.
-  Also holds the **testing unlock**: seven quick taps on the "Dive Deeper"
+  Also holds the **testing unlock**: seven quick taps on the Level Select
   heading opens every depth for free, seven more puts it back. It is a separate
   flag rather than fifty fake purchases, so switching it off restores exactly
   what the player bought, and it does not make a deep dive rankable. Tell early
   testers about it; it is not a secret the code hides.
-- `src/levelSelectView.ts` - the "Dive Deeper" grid: all fifty depths by zone,
+- `src/levelSelectView.ts` - the Level Select grid: all fifty depths by zone,
   locked until bought, with one action button that either unlocks or dives.
 - `src/recommendation.ts` - what to spend Pearls on next, as one suggestion with
   a reason. Pure rules over the Store, inventory and progress state, in priority
@@ -311,7 +311,7 @@ How to Play
      be farmed for a leaderboard score, which is the opposite of what the board
      is for. This is the intended hook for a future pay-to-continue offer (see
      "Ideas for Further Development").
-     **Dive Deeper** on the title screen opens a level select: all fifty depths
+     **Level Select** on the title screen opens all fifty depths
      as a grid by zone, each locked until bought with Pearls, priced from 50 at
      level 2 up to 1,225 at level 50 - more than a full descent pays, so the
      shortcut is never the efficient way to play. A dive that starts below

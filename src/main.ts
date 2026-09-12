@@ -479,7 +479,7 @@ const inputs = {
     enterAppFromTitle();
   });
 
-  // Dive Deeper: the same entry as the button above, but starting at a bought depth. setMode is
+  // Level Select: the same entry as the button above, but starting at a bought depth. setMode is
   // called first because it resets the depth, and the chosen level is set after it.
   const depthSelect = setupLevelSelect({
     onPearlsChange: refreshTitlePearls,
