@@ -2612,14 +2612,12 @@ ${cleared.name} Zone Liberated
     }
 
     // Depthless: no pick, so head straight for the next level rather than opening the overlay.
+    // Nothing to restart here - unlike the Campaign's overlay, this path never halted the loop,
+    // which is still ticking and will carry the player east on its own.
     if (this.mode === 'endless') {
       if (!cleared) this.setStatus(`Swim east to reach Level ${this.currentLevel + 1}`);
       this.awaitingNewWaters = true;
       this.newWatersPromptEl.classList.add('visible');
-      if (this.running && !this.paused) {
-        this.lastFrameTime = 0;
-        this.step();
-      }
       return;
     }
 
@@ -3343,6 +3341,14 @@ ${cleared.name} Zone Liberated
   }
 
   private step(): void {
+    // Cancel whatever tick was already queued. step() both schedules the next tick and is called
+    // directly by anything restarting the loop, so without this a caller that restarts a loop
+    // which had never actually stopped leaves two chains running, each scheduling its own next
+    // tick - and the simulation runs at twice the speed, then three times, and so on.
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = null;
+    }
     if (!this.running || this.awaitingLevelUpChoice || this.awaitingSharkWarning || this.awaitingRunSummary || this.awaitingTutorialHint || this.awaitingMilestone || this.awaitingContinue) return;
 
     // Hit-stop: keep the loop alive but freeze the simulation for a beat after a big kill.
