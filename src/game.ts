@@ -1980,9 +1980,12 @@ export class Game {
     // Unlocks Echolocation for purchase in the Store (src/store.ts reads this).
     markCampaignCleared();
 
-    this.setStatus('You cleared the campaign! The ocean is safe.');
+    this.setStatus('You cleared the campaign! The shallows are safe.');
     this.startBtn.textContent = 'Retry';
-    this.showBanner('Ocean Saved!', 'victory');
+    // "Shallows", not "Ocean": clearing the campaign secures the top ten levels, and the
+    // Depthless Campaign below is the rest of the water. Saying the ocean was saved here left
+    // nothing for the deep to be.
+    this.showBanner('Shallows Saved!', 'victory');
     this.showRunSummary('campaign');
   }
 
@@ -1991,7 +1994,7 @@ export class Game {
     if (!this.runSummaryOverlayEl || !this.pendingScore) return;
     this.awaitingRunSummary = true;
 
-    if (this.runSummaryTitleEl) this.runSummaryTitleEl.textContent = board === 'campaign' ? 'Ocean Saved!' : 'Run Over';
+    if (this.runSummaryTitleEl) this.runSummaryTitleEl.textContent = board === 'campaign' ? 'Shallows Saved!' : 'Run Over';
     if (this.runSummaryNameEl) this.runSummaryNameEl.textContent = getDolphinName();
 
     const rows: [string, string][] =
@@ -2244,7 +2247,7 @@ export class Game {
 
   private showLevelUpChoice(): void {
     this.awaitingLevelUpChoice = true;
-    const bannerText = this.mode === 'endless' && this.currentLevel === LEVELS.length ? 'Ocean Saved! The Deep Awaits...' : 'Level Up!';
+    const bannerText = this.mode === 'endless' && this.currentLevel === LEVELS.length ? 'Shallows Saved! The Deep Awaits...' : 'Level Up!';
     this.showBanner(bannerText, 'levelup', 2600);
     if (this.megaShrimpHintEl) {
       const firstTime = !hasSeenHint('megaShrimp');
