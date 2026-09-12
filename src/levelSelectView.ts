@@ -6,6 +6,8 @@ import {
   buyLevelAccess,
   hasLevelAccess,
   levelAccessPrice,
+  setTestUnlockAll,
+  testUnlockAllActive,
 } from './levelAccess';
 
 /**
@@ -39,6 +41,36 @@ export function setupLevelSelect(opts: LevelSelectOpts): LevelSelectHandles {
 
   /** The level the player has tapped. Null until they pick one. */
   let selected: number | null = null;
+  /** Set by the testing gesture, and cleared by the next thing the player taps. */
+  let notice = '';
+
+  /**
+   * The testing shortcut: seven taps on the heading opens every depth, seven more puts it back.
+   *
+   * A tap count rather than a typed code so it works on a phone, which is where early testers
+   * will be, and on the heading rather than a level so it cannot be hit by someone browsing the
+   * grid. The count resets if the taps are slow, so idle prodding never triggers it.
+   */
+  const SECRET_TAPS = 7;
+  const SECRET_TAP_GAP_MS = 900;
+  let taps = 0;
+  let lastTapAt = 0;
+
+  function onHeadingTap(): void {
+    const now = Date.now();
+    taps = now - lastTapAt > SECRET_TAP_GAP_MS ? 1 : taps + 1;
+    lastTapAt = now;
+    if (taps < SECRET_TAPS) return;
+    taps = 0;
+
+    const turningOn = !testUnlockAllActive();
+    setTestUnlockAll(turningOn);
+    notice = turningOn
+      ? 'Testing: every depth is open. Dives from them still do not count on the leaderboard. Seven taps again to switch it off.'
+      : 'Testing unlock off. Back to the depths you have actually bought.';
+    selected = null;
+    render();
+  }
 
   function zoneOf(level: number): DepthZone {
     return DEPTH_ZONES.find((z) => level >= z.firstLevel && level <= z.lastLevel) ?? DEPTH_ZONES[0];
@@ -72,6 +104,7 @@ export function setupLevelSelect(opts: LevelSelectOpts): LevelSelectHandles {
     for (const btn of zonesEl.querySelectorAll<HTMLButtonElement>('.level-cell')) {
       btn.addEventListener('click', () => {
         selected = Number(btn.dataset.level);
+        notice = '';
         render();
       });
     }
@@ -81,6 +114,14 @@ export function setupLevelSelect(opts: LevelSelectOpts): LevelSelectHandles {
   function renderDetail(): void {
     if (pearlsEl) pearlsEl.textContent = String(getPearls());
     if (!detailEl || !actionBtn) return;
+
+    if (notice) {
+      detailEl.textContent = notice;
+      actionBtn.textContent = 'Dive from level 1';
+      actionBtn.disabled = false;
+      actionBtn.onclick = () => opts.onDive(FREE_START_LEVEL);
+      return;
+    }
 
     if (selected === null) {
       detailEl.textContent = 'Pick a depth to dive from. Level 1 is always open; the rest are bought once and yours for good.';
@@ -128,12 +169,15 @@ export function setupLevelSelect(opts: LevelSelectOpts): LevelSelectHandles {
   document.getElementById('levelSelectCloseBtn')?.addEventListener('click', () => {
     overlay?.classList.add('hidden');
   });
+  document.getElementById('levelSelectHeading')?.addEventListener('click', onHeadingTap);
 
   return {
     open(): void {
       // Deliberately forgotten between visits: reopening should present the whole map again
       // rather than whatever the player was last looking at.
       selected = null;
+      notice = '';
+      taps = 0;
       render();
       overlay?.classList.remove('hidden');
     },

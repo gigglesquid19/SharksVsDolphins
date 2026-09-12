@@ -38,6 +38,11 @@ Contents
 - `src/levelAccess.ts` - paid starting depths for the Depthless Campaign
   (`localStorage`): which levels are unlocked, what each costs, and the one rule
   the feature rests on - a dive that starts below level 1 is never ranked.
+  Also holds the **testing unlock**: seven quick taps on the "Dive Deeper"
+  heading opens every depth for free, seven more puts it back. It is a separate
+  flag rather than fifty fake purchases, so switching it off restores exactly
+  what the player bought, and it does not make a deep dive rankable. Tell early
+  testers about it; it is not a secret the code hides.
 - `src/levelSelectView.ts` - the "Dive Deeper" grid: all fifty depths by zone,
   locked until bought, with one action button that either unlocks or dives.
 - `src/recommendation.ts` - what to spend Pearls on next, as one suggestion with

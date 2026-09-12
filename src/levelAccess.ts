@@ -2,6 +2,7 @@ import { spendPearls } from './pearls';
 import { ENDLESS_BACKGROUND_COUNT } from './levels';
 
 const KEY = 'svsd-depth-access';
+const TEST_UNLOCK_KEY = 'svsd-depth-test-unlock';
 
 /**
  * Paid starting depths for the Depthless Campaign.
@@ -64,10 +65,39 @@ export function purchasedStartLevels(): number[] {
   return load();
 }
 
+/**
+ * Testing shortcut: opens every depth without spending anything, for the developer and early
+ * testers who need to reach level 41 without playing forty levels to get there.
+ *
+ * Held as its own flag rather than by writing all fifty into the purchased list, so turning it
+ * off restores exactly the levels the player actually bought and nothing is ever lost. It does
+ * not touch the leaderboard rule: a dive from a test-unlocked depth is as unranked as a dive
+ * from a bought one, because that rule keys off where the run started, not how it was opened.
+ */
+export function testUnlockAllActive(): boolean {
+  try {
+    return localStorage.getItem(TEST_UNLOCK_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+/** Turns the testing shortcut on or off, leaving real purchases untouched either way. */
+export function setTestUnlockAll(on: boolean): void {
+  try {
+    if (on) localStorage.setItem(TEST_UNLOCK_KEY, 'true');
+    else localStorage.removeItem(TEST_UNLOCK_KEY);
+  } catch (e) {
+    console.warn('Failed to set the test unlock', e);
+  }
+}
+
 /** Whether a run may begin at this level. */
 export function hasLevelAccess(level: number): boolean {
   const depth = Math.floor(level);
   if (depth === FREE_START_LEVEL) return true;
+  if (depth < FREE_START_LEVEL || depth > MAX_START_LEVEL) return false;
+  if (testUnlockAllActive()) return true;
   return load().includes(depth);
 }
 

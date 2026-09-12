@@ -7,7 +7,9 @@ import {
   hasLevelAccess,
   levelAccessPrice,
   purchasedStartLevels,
+  setTestUnlockAll,
   startLevelIsRanked,
+  testUnlockAllActive,
 } from './levelAccess';
 
 beforeEach(() => {
@@ -107,5 +109,60 @@ describe('storage', () => {
   it('discards tampered entries outside the valid range', () => {
     localStorage.setItem('svsd-depth-access', JSON.stringify([1, 21, 999, -4, 'x']));
     expect(purchasedStartLevels()).toEqual([21]);
+  });
+});
+
+describe('the testing unlock', () => {
+  it('is off until it is switched on', () => {
+    expect(testUnlockAllActive()).toBe(false);
+    expect(hasLevelAccess(41)).toBe(false);
+  });
+
+  it('opens every depth without spending anything', () => {
+    awardPearls(100);
+    const before = getPearls();
+    setTestUnlockAll(true);
+    for (const level of [2, 11, 21, 31, 41, MAX_START_LEVEL]) {
+      expect(hasLevelAccess(level)).toBe(true);
+    }
+    expect(getPearls()).toBe(before);
+  });
+
+  it('leaves real purchases alone when switched off', () => {
+    awardPearls(100_000);
+    buyLevelAccess(21);
+    setTestUnlockAll(true);
+    expect(hasLevelAccess(41)).toBe(true);
+
+    setTestUnlockAll(false);
+    // The bought level survives; the borrowed ones do not.
+    expect(purchasedStartLevels()).toEqual([21]);
+    expect(hasLevelAccess(21)).toBe(true);
+    expect(hasLevelAccess(41)).toBe(false);
+  });
+
+  it('does not record the opened levels as purchases', () => {
+    setTestUnlockAll(true);
+    expect(purchasedStartLevels()).toEqual([]);
+  });
+
+  it('does not make a deep dive rankable', () => {
+    // The point of the rule is where the run STARTED, not how that depth was opened.
+    setTestUnlockAll(true);
+    expect(startLevelIsRanked(41)).toBe(false);
+    expect(startLevelIsRanked(FREE_START_LEVEL)).toBe(true);
+  });
+
+  it('still refuses a level past the deepest zone', () => {
+    setTestUnlockAll(true);
+    expect(hasLevelAccess(MAX_START_LEVEL + 1)).toBe(false);
+  });
+
+  it('will not sell a level the testing unlock has already opened', () => {
+    awardPearls(100_000);
+    setTestUnlockAll(true);
+    const before = getPearls();
+    expect(buyLevelAccess(21)).toBe(false);
+    expect(getPearls()).toBe(before);
   });
 });
