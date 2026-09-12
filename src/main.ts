@@ -9,6 +9,7 @@ import { DAILY_REWARDS, claimDailyReward, dailyRewardAvailable, nextStreakDay } 
 import type { ConsumableId, Inventory } from './inventory';
 import { CONSUMABLE_ORDER, CONSUMABLES } from './inventory';
 import { setupStore } from './storeView';
+import { setupDolphinView } from './dolphinView';
 import { ads } from './ads';
 import { iap } from './iap';
 import { registerSW } from 'virtual:pwa-register';
@@ -305,6 +306,11 @@ refreshTitlePearls();
 const store = setupStore({ onPearlsChange: refreshTitlePearls });
 document.getElementById('titleStoreBtn')!.addEventListener('click', () => store.open());
 
+// "Your Dolphin" reads from the same storage the Store writes, so it is refreshed on every open
+// rather than cached - a skin equipped or an upgrade bought a moment ago has to be reflected.
+const dolphinView = setupDolphinView(() => store.open());
+document.getElementById('titleDolphinBtn')!.addEventListener('click', () => dolphinView.show());
+
 // --- Monetisation (Android only; both no-op on web) ---
 void ads.init();
 void iap.init();
@@ -534,6 +540,9 @@ const inputs = {
   document.getElementById('pauseBtn')!.addEventListener('click', () => game.togglePause());
   document.getElementById('pauseResumeBtn')!.addEventListener('click', () => game.togglePause());
   document.getElementById('pauseRestartBtn')!.addEventListener('click', () => game.retry());
+  // Opened over the pause overlay rather than replacing it, so closing the panel puts the player
+  // back on Paused where they were rather than dropping them into a running game.
+  document.getElementById('pauseDolphinBtn')!.addEventListener('click', () => dolphinView.show(game.runUpgrades()));
   document.getElementById('pauseResetBtn')!.addEventListener('click', () => game.reset());
   // Quitting mid-run was only reachable from the Android Game Over screen before, so a paused
   // player had no way back to the menu at all - on Android there is no browser chrome to fall

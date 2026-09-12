@@ -16,7 +16,15 @@ import {
   ownsSkin,
   upgradeLevel,
 } from './store';
-import { CONSUMABLES, CONSUMABLE_ORDER, buyConsumable, getInventory } from './inventory';
+import {
+  CONSUMABLES,
+  CONSUMABLE_ORDER,
+  MAX_CONSUMABLE_SLOTS,
+  buyConsumable,
+  getInventory,
+  packFull,
+  totalConsumablesHeld,
+} from './inventory';
 import type { DolphinSkin } from './skins';
 import { DOLPHIN_SKINS } from './skins';
 import { makeDolphinBodyCanvas } from './sprites';
@@ -32,6 +40,7 @@ export function setupStore(opts: { onPearlsChange: () => void }): { open: () => 
   const upgradesEl = document.getElementById('storeUpgrades') as HTMLDivElement;
   const abilitiesEl = document.getElementById('storeAbilities') as HTMLDivElement;
   const consumablesEl = document.getElementById('storeConsumables') as HTMLDivElement;
+  const consumablesNoteEl = document.getElementById('storeConsumablesNote') as HTMLElement | null;
   const skinsEl = document.getElementById('storeSkins') as HTMLDivElement;
   const nationSkinsEl = document.getElementById('storeNationSkins') as HTMLDivElement;
   const closeBtn = document.getElementById('storeCloseBtn') as HTMLButtonElement;
@@ -44,11 +53,21 @@ export function setupStore(opts: { onPearlsChange: () => void }): { open: () => 
   function renderConsumables(): void {
     const balance = getPearls();
     const inventory = getInventory();
+    // The pack has three slots shared across every kind, so the tiles have to speak about the
+    // pack rather than about themselves - otherwise a tile reading "Carrying 1 / 3" with a
+    // disabled buy button looks broken.
+    const slotsUsed = totalConsumablesHeld();
+    const noRoom = packFull();
+    if (consumablesNoteEl) {
+      consumablesNoteEl.textContent = noRoom
+        ? `Pack full - ${slotsUsed} of ${MAX_CONSUMABLE_SLOTS} slots. Spend one in a run to make room.`
+        : `${slotsUsed} of ${MAX_CONSUMABLE_SLOTS} slots used. Any combination of the three.`;
+    }
 
     const tiles = CONSUMABLE_ORDER.map((id) => {
       const def = CONSUMABLES[id];
       const held = inventory[id];
-      const full = held >= def.max;
+      const full = noRoom || held >= def.max;
 
       const item = document.createElement('div');
       item.className = 'store-item';
@@ -58,12 +77,12 @@ export function setupStore(opts: { onPearlsChange: () => void }): { open: () => 
         <div class="store-item-icon" aria-hidden="true">${def.icon}</div>
         <div class="store-item-name">${def.name}</div>
         <div class="store-item-desc">${def.desc} Press <b>${def.key}</b> in a run.</div>
-        <div class="store-item-level">Carrying ${held} / ${def.max}</div>`;
+        <div class="store-item-level">Carrying ${held}</div>`;
 
       const btn = document.createElement('button');
       btn.className = 'store-buy';
       if (full) {
-        btn.textContent = 'Pack full';
+        btn.textContent = noRoom ? 'Pack full' : 'Max of this kind';
         btn.disabled = true;
       } else {
         btn.innerHTML = `<img class="pearl-icon" alt="" src="${pearlIconSrc()}"> ${def.price}`;

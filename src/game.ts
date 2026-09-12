@@ -716,6 +716,24 @@ export class Game {
     this.lastKillTime = 0;
   }
 
+  /**
+   * The Mega Shrimp picks made during this run, for the "Your Dolphin" panel. Null when no run
+   * is in progress, which is what tells the panel to leave the section out entirely rather than
+   * showing a row of zeroes on the title screen.
+   *
+   * These are the in-run picks only. They sit on top of the Store's permanent upgrades, which
+   * the panel reads from store.ts itself.
+   */
+  runUpgrades(): { lives: number; speedBonusPct: number; podBonus: number; boostReductionMs: number } | null {
+    if (this.sessionStartTime === 0) return null;
+    return {
+      lives: this.vitalityLives,
+      speedBonusPct: this.speedBonusPct,
+      podBonus: this.charismaBonusDolphins,
+      boostReductionMs: this.sprintCooldownReduction,
+    };
+  }
+
   /** How many Magic Shrimp the player is carrying, for the in-run button. */
   magicShrimpCount(): number {
     return magicShrimpHeld();

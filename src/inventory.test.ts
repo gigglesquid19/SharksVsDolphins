@@ -3,6 +3,10 @@ import { awardPearls, getPearls } from './pearls';
 import {
   CONSUMABLES,
   CONSUMABLE_ORDER,
+  MAX_CONSUMABLE_SLOTS,
+  freeConsumableSlots,
+  packFull,
+  totalConsumablesHeld,
   MAGIC_SHRIMP_PRICE,
   MAX_MAGIC_SHRIMP,
   anyConsumableHeld,
@@ -116,13 +120,57 @@ describe('the other kinds of shrimp', () => {
     expect(useConsumable('ghostShrimp')).toBe(false);
   });
 
-  it('holds each kind to its own carry limit', () => {
+  it('shares three slots across every kind, not three of each', () => {
     awardPearls(100_000);
+    expect(buyConsumable('magicShrimp')).toBe(true);
+    expect(buyConsumable('ghostShrimp')).toBe(true);
+    expect(buyConsumable('pistolShrimp')).toBe(true);
+
+    expect(totalConsumablesHeld()).toBe(MAX_CONSUMABLE_SLOTS);
+    expect(packFull()).toBe(true);
+    expect(freeConsumableSlots()).toBe(0);
+    // A fourth of ANY kind is refused, even the ones only carried once.
     for (const id of CONSUMABLE_ORDER) {
-      for (let i = 0; i < CONSUMABLES[id].max; i++) expect(buyConsumable(id)).toBe(true);
       expect(consumableFull(id)).toBe(true);
       expect(buyConsumable(id)).toBe(false);
     }
+  });
+
+  it('fills the pack with three of one kind just as readily', () => {
+    awardPearls(100_000);
+    for (let i = 0; i < MAX_CONSUMABLE_SLOTS; i++) expect(buyConsumable('pistolShrimp')).toBe(true);
+    expect(packFull()).toBe(true);
+    expect(buyConsumable('ghostShrimp')).toBe(false);
+  });
+
+  it('frees a slot for a different kind when one is spent', () => {
+    awardPearls(100_000);
+    for (let i = 0; i < MAX_CONSUMABLE_SLOTS; i++) buyConsumable('magicShrimp');
+    expect(buyConsumable('ghostShrimp')).toBe(false);
+    useConsumable('magicShrimp');
+    expect(freeConsumableSlots()).toBe(1);
+    expect(buyConsumable('ghostShrimp')).toBe(true);
+    expect(totalConsumablesHeld()).toBe(MAX_CONSUMABLE_SLOTS);
+  });
+
+  it('charges nothing for a purchase the pack refuses', () => {
+    awardPearls(100_000);
+    for (let i = 0; i < MAX_CONSUMABLE_SLOTS; i++) buyConsumable('magicShrimp');
+    const before = getPearls();
+    expect(buyConsumable('ghostShrimp')).toBe(false);
+    expect(getPearls()).toBe(before);
+  });
+
+  it('trims a save written under the old three-of-each rule', () => {
+    // Nine shrimp were legal before the shared limit; they come back to three, in order.
+    localStorage.setItem('svsd-inventory', JSON.stringify({ magicShrimp: 3, ghostShrimp: 3, pistolShrimp: 3 }));
+    expect(getInventory()).toEqual({ magicShrimp: 3, ghostShrimp: 0, pistolShrimp: 0 });
+    expect(totalConsumablesHeld()).toBe(MAX_CONSUMABLE_SLOTS);
+  });
+
+  it('trims a mixed legacy pack from the end of the order', () => {
+    localStorage.setItem('svsd-inventory', JSON.stringify({ magicShrimp: 1, ghostShrimp: 3, pistolShrimp: 2 }));
+    expect(getInventory()).toEqual({ magicShrimp: 1, ghostShrimp: 2, pistolShrimp: 0 });
   });
 
   it('charges each kind its own price', () => {

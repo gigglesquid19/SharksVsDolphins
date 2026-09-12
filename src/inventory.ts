@@ -18,7 +18,7 @@ export interface ConsumableDef {
   /** Emoji shown on the store tile and the in-run button. */
   icon: string;
   price: number;
-  /** Carrying more than a few would turn a run into a sequence of guaranteed escapes. */
+  /** Per-kind ceiling. The shared pack limit below is what usually binds first. */
   max: number;
   desc: string;
   /** Keyboard shortcut for spending one mid-run, shown in the Store copy. */
@@ -57,6 +57,16 @@ export const CONSUMABLES: Record<ConsumableId, ConsumableDef> = {
 
 export const CONSUMABLE_ORDER: ConsumableId[] = ['magicShrimp', 'ghostShrimp', 'pistolShrimp'];
 
+/**
+ * Total shrimp a player can carry, of any combination. Three of one, or one of each - the pack
+ * has three slots and that is the whole of it.
+ *
+ * A shared limit rather than three of each kind: three separate pockets meant a well-off player
+ * dived with nine escapes and never had to choose between speed, stealth and the blast. The
+ * choosing is the interesting part.
+ */
+export const MAX_CONSUMABLE_SLOTS = 3;
+
 export type Inventory = Record<ConsumableId, number>;
 
 /** Kept as named exports because the Magic Shrimp price is quoted in the README and tests. */
@@ -73,6 +83,22 @@ function clampCount(value: unknown, id: ConsumableId): number {
   return Math.min(Math.max(n, 0), CONSUMABLES[id].max);
 }
 
+/**
+ * Trims a pack to the shared slot limit, in CONSUMABLE_ORDER. Saves written under the old rule
+ * of three-of-each could hold nine, and a tampered one could hold anything; both have to come
+ * back to three. Trimming from the end of the order rather than proportionally keeps it
+ * predictable - the player loses the last kind they would have reached for, not a bit of each.
+ */
+function trimToSlots(inventory: Inventory): Inventory {
+  let remaining = MAX_CONSUMABLE_SLOTS;
+  for (const id of CONSUMABLE_ORDER) {
+    const keep = Math.min(inventory[id], remaining);
+    inventory[id] = keep;
+    remaining -= keep;
+  }
+  return inventory;
+}
+
 function load(): Inventory {
   const base = empty();
   try {
@@ -82,7 +108,7 @@ function load(): Inventory {
     // Missing keys stay at 0, so a save written before the Ghost and Pistol shrimp existed loads
     // without a migration step.
     for (const id of CONSUMABLE_ORDER) base[id] = clampCount(parsed[id], id);
-    return base;
+    return trimToSlots(base);
   } catch (e) {
     console.warn('Failed to load inventory', e);
     return empty();
@@ -105,9 +131,25 @@ export function consumableHeld(id: ConsumableId): number {
   return load()[id];
 }
 
-/** True when the player is carrying the maximum of this kind and cannot buy another. */
+/** How many of the three slots are in use, across every kind. */
+export function totalConsumablesHeld(): number {
+  const inventory = load();
+  return CONSUMABLE_ORDER.reduce((sum, id) => sum + inventory[id], 0);
+}
+
+/** Free slots in the pack. */
+export function freeConsumableSlots(): number {
+  return Math.max(0, MAX_CONSUMABLE_SLOTS - totalConsumablesHeld());
+}
+
+/** True when every slot is in use, whatever it is holding. */
+export function packFull(): boolean {
+  return freeConsumableSlots() === 0;
+}
+
+/** True when no more of this kind can be bought - either the pack is full or this kind is. */
 export function consumableFull(id: ConsumableId): boolean {
-  return load()[id] >= CONSUMABLES[id].max;
+  return packFull() || load()[id] >= CONSUMABLES[id].max;
 }
 
 /** Buys one. Fails if the pack is full or the Pearls are short, spending nothing. */

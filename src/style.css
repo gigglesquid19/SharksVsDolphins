@@ -1198,6 +1198,100 @@ button.mega-shrimp.green {
 }
 #runSummaryDoubleBtn.hidden { display: none; }
 
+/* The dolphin panel: everything the player owns, on one screen, reachable from the title and
+   from the pause menu. Scrolls rather than shrinking, since the upgrade list grows. */
+.dolphin-panel {
+  max-height: 86vh;
+  overflow-y: auto;
+  text-align: left;
+}
+.dolphin-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 6px;
+}
+.dolphin-preview {
+  width: 132px;
+  height: 88px;
+  flex: none;
+}
+.dolphin-name {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--dolphin);
+}
+.dolphin-skin {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.dolphin-section {
+  margin: 16px 0 4px;
+  font-size: 0.95rem;
+  color: var(--text);
+}
+.dolphin-note {
+  margin: 0 0 10px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.dolphin-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dolphin-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(148, 163, 184, 0.1);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+}
+.dolphin-row.owned {
+  background: rgba(34, 211, 238, 0.12);
+  border-color: rgba(34, 211, 238, 0.3);
+}
+.dolphin-row.locked { opacity: 0.55; }
+.dolphin-row-icon { font-size: 1.15rem; }
+.dolphin-row-body { flex: 1; min-width: 0; }
+.dolphin-row-name { font-size: 0.9rem; font-weight: 700; color: var(--text); }
+.dolphin-row-desc { font-size: 0.75rem; color: var(--muted); }
+.dolphin-row-value {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--accent);
+  white-space: nowrap;
+}
+/* Pack slots: three boxes, filled or empty, so the shared limit is visible at a glance. */
+.dolphin-slots {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 18px;
+}
+.dolphin-slot {
+  border-radius: 12px;
+  padding: 12px 4px 10px;
+  text-align: center;
+  background: rgba(148, 163, 184, 0.1);
+  border: 1px dashed rgba(148, 163, 184, 0.3);
+}
+.dolphin-slot.filled {
+  background: rgba(251, 191, 36, 0.16);
+  border: 1px solid rgba(251, 191, 36, 0.5);
+}
+.dolphin-slot-icon { font-size: 1.5rem; line-height: 1.1; }
+.dolphin-slot-label {
+  font-size: 0.68rem;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.dolphin-slot.filled .dolphin-slot-label { color: #fde68a; }
+#dolphinOverlay { z-index: 110; }
+#dolphinOverlay.hidden { display: none; }
+
 /* Daily reward: the seven-day strip, with today's square lit and the days already taken ticked.
    Sized to fit a phone without scrolling, since it is the first thing shown on a cold launch. */
 .daily-text {

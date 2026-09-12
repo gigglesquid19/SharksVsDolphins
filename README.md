@@ -35,14 +35,20 @@ Contents
   per-level payout formula, and the spend path.
 - `src/progress.ts` - campaign milestones that gate content (`localStorage`).
   Currently just "has the campaign been cleared", which unlocks Echolocation.
+- `src/dolphinView.ts` - the read-only "Your Dolphin" panel: the dolphin in its
+  equipped skin and name, which abilities it has, how far each Store upgrade is
+  levelled, the Mega Shrimp picks of a run in progress, and the three-slot pack.
+  Reachable from the title screen and the pause menu; its one action is a button
+  through to the Store, where every purchase still happens.
 - `src/dailyReward.ts` - the daily login streak (`localStorage`): the last day
   claimed and how many days in a row. Nothing to do with the planned Daily
   Challenge, which needs a seeded generator; this needs only a date.
 - `src/inventory.ts` - consumables the player has bought and is carrying
   (`localStorage`). Unlike the Store's upgrades and abilities these are spent,
   so the shape is a count that goes down. Three kinds of shrimp, each with its
-  own price, carry limit and keyboard shortcut, defined in one table the Store
-  tiles and the in-run buttons are both generated from.
+  own price and keyboard shortcut, defined in one table the Store tiles and the
+  in-run buttons are both generated from. The pack holds three shrimp in total,
+  in any combination, rather than three of each - `MAX_CONSUMABLE_SLOTS`.
 - `src/store.ts` - the Store: persisted purchases (`localStorage`) of permanent
   Endless-mode stat upgrades, dolphin skins and one-off abilities, plus the
   derived Endless starting bonuses and Echolocation tuning.
@@ -348,8 +354,9 @@ Game Features
   Swim close to recruit it (with a chime and banner), and recruited
   dolphins flock around you in formation and follow you through the
   screen-wrap edges.
-- **Shrimp**: three consumables, bought in the Store and carried into a run,
-  three of each at most. They work in Campaign and Endless alike, and any that
+- **Shrimp**: three consumables, bought in the Store and carried into a run.
+  The pack has **three slots shared across all three kinds**, so three of one or
+  one of each, and choosing between speed, stealth and the blast is the point. They work in Campaign and Endless alike, and any that
   are left over stay in the pack for the next run.
   - **Magic Shrimp** (60 Pearls, amber button or `Q`): +50% swim speed for the
     rest of the level. They stack additively, so three spent in one level is

@@ -55,9 +55,43 @@
       <button id="titleCampaignBtn" class="school ready">Campaign Mode<span class="title-mode-sub">Levels 1-10 Classic</span></button>
       <button id="titleEndlessBtn" class="school ready">Depthless Campaign<span class="title-mode-sub">Dive as deep as you can</span></button>
     </div>
+    <button id="titleDolphinBtn" class="secondary">Your Dolphin</button>
     <button id="titleStoreBtn" class="secondary">Store</button>
     <button id="titleAboutBtn" class="secondary">About Me</button>
     <button id="titleContinueBtn" class="secondary hidden">Continue Campaign</button>
+  </div>
+
+  <div class="leaderboard-overlay hidden" id="dolphinOverlay">
+    <div class="leaderboard-panel dolphin-panel">
+      <h2>Your Dolphin</h2>
+      <div class="dolphin-hero">
+        <canvas id="dolphinPreview" class="dolphin-preview" width="176" height="118"></canvas>
+        <div class="dolphin-hero-text">
+          <div class="dolphin-name" id="dolphinPanelName"></div>
+          <div class="dolphin-skin" id="dolphinPanelSkin"></div>
+        </div>
+      </div>
+
+      <div id="dolphinRunWrap" class="hidden">
+        <h3 class="dolphin-section">This run</h3>
+        <p class="dolphin-note">Mega Shrimp picks made since this run began. They are lost when the run ends.</p>
+        <div class="dolphin-list" id="dolphinRun"></div>
+      </div>
+
+      <h3 class="dolphin-section">Abilities</h3>
+      <div class="dolphin-list" id="dolphinAbilities"></div>
+
+      <h3 class="dolphin-section">Upgrades</h3>
+      <p class="dolphin-note">Bought in the Store, and they stack with the Mega Shrimp picks you make during a run.</p>
+      <div class="dolphin-list" id="dolphinUpgrades"></div>
+
+      <h3 class="dolphin-section">Pack</h3>
+      <p class="dolphin-note" id="dolphinPackNote"></p>
+      <div class="dolphin-slots" id="dolphinSlots"></div>
+
+      <button id="dolphinStoreBtn" class="school ready">Open the Store</button>
+      <button id="dolphinCloseBtn" class="secondary">Back</button>
+    </div>
   </div>
 
   <div class="leaderboard-overlay hidden" id="dailyRewardOverlay">
@@ -97,7 +131,7 @@
       </div>
       <div class="store-section">
         <h3>Consumables</h3>
-        <p class="store-note">Carried between runs and used up during one. Works in the Campaign and the Depthless Campaign.</p>
+        <p class="store-note" id="storeConsumablesNote">Carried between runs and used up during one. Works in the Campaign and the Depthless Campaign.</p>
         <div class="store-grid" id="storeConsumables"></div>
       </div>
       <div class="store-section">
@@ -234,6 +268,7 @@
           <h2>Paused</h2>
           <button id="pauseResumeBtn" class="school ready">Resume</button>
           <button id="pauseRestartBtn" class="secondary">Restart</button>
+          <button id="pauseDolphinBtn" class="secondary">Your Dolphin</button>
           <button id="pauseResetBtn" class="secondary">Reset</button>
           <button id="pauseHomeBtn" class="secondary">Quit to Menu</button>
           <label class="pause-name">
