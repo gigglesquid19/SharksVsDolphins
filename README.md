@@ -73,7 +73,13 @@ Contents
 - `src/*.test.ts` - vitest unit tests for the modules above; run with
   `npm test`.
 - `public/` - static assets served as-is: background images (WebP), the
-  manifest, the app icon, and background music.
+  manifest, the app icon, and background music. `public/levels/1-10.webp` are
+  the campaign's backgrounds and `public/levels/endless/1-50.webp` are
+  Endless's own set, derived from the authored art in `Images/Levels/` by
+  `tools/convert_level_backgrounds.py`.
+- `tools/` - one-off Python asset scripts (icons, store art, and
+  `convert_level_backgrounds.py`, which re-derives the Endless backgrounds
+  from `Images/Levels/`; run it with `--check` to list gaps without writing).
 - `manifest.json` - PWA metadata / home screen icon config.
 - `.github/workflows/ci.yml` - runs `npm test` and `npm run build` on every
   push/PR once this repo has a GitHub remote.
@@ -258,6 +264,12 @@ How to Play
      going past level 10 with escalating difficulty, and has no free resume
      - a death ends the run. This is the intended hook for a future
      pay-to-continue offer (see "Ideas for Further Development").
+     It has its own fifty backgrounds, separate from the campaign's ten, running
+     in five depth zones of ten levels each - Eutrophic, Mesopelagic,
+     Abyssopelagic, Mythopelagic, Hadal - so the water gets visibly deeper and
+     stranger the further a run goes. Past level 50 the set cycles. They are
+     cached on first load rather than precached, because three megabytes of art
+     that a given run mostly never reaches should not be part of the install.
    - **Store** (title screen): spend Pearls on permanent **Endless upgrades**
      (Vitality, Speed, Charisma, Boost Cooldown, and Boost Duration - they seed
      an Endless run's starting stats and stack with the Mega Shrimp picks you

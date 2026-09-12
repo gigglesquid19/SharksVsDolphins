@@ -1375,7 +1375,7 @@ export class Game {
     this.startBtn.classList.remove('hidden');
     this.paused = false;
     this.pauseOverlayEl.classList.add('hidden');
-    this.loadBackground(getLevelBackground(config.level)).catch((err) => console.warn('Background load failed:', err));
+    this.loadBackground(getLevelBackground(config.level, this.mode)).catch((err) => console.warn('Background load failed:', err));
     this.updateStats();
     this.draw();
     this.checkForNewSharks(config);
@@ -2330,7 +2330,7 @@ export class Game {
     this.checkForNewSharks(config);
     if (this.mode === 'campaign') this.saveCheckpoint();
 
-    await this.loadBackground(getLevelBackground(this.currentLevel));
+    await this.loadBackground(getLevelBackground(this.currentLevel, this.mode));
   }
 
   private checkForNewSharks(config: LevelConfig): void {

@@ -34,10 +34,27 @@ export const LEVELS: LevelConfig[] = [
   { level: 10, sharkKinds: ALL_KINDS, normalSharkCount: 9, largeSharkCount: 4, maxDolphins: 15, sharkSpeedMultiplier: 1.27, matriarch: true }
 ];
 
-export function getLevelBackground(level: number): string {
-  const bgIndex = ((level - 1) % LEVELS.length) + 1;
+/**
+ * How many distinct backgrounds Endless has before it starts repeating. They run in five depth
+ * zones of ten - Eutrophic, Mesopelagic, Abyssopelagic, Mythopelagic, Hadal - so the water gets
+ * visibly deeper and stranger the further a run goes, which is the only progression Endless has
+ * past the difficulty curve.
+ */
+export const ENDLESS_BACKGROUND_COUNT = 50;
+
+/**
+ * Campaign and Endless draw from separate sets. The campaign's ten are unchanged and shared with
+ * nothing; Endless has its own fifty, and past level 50 it cycles them rather than running out.
+ */
+export function getLevelBackground(level: number, mode: 'campaign' | 'endless' = 'campaign'): string {
   // BASE_URL is '/' for the app / dev and '/SharksVsDolphins/' on GitHub Pages.
-  return `${import.meta.env.BASE_URL}levels/${bgIndex}.webp`;
+  const base = import.meta.env.BASE_URL;
+  if (mode === 'endless') {
+    const bgIndex = ((level - 1) % ENDLESS_BACKGROUND_COUNT) + 1;
+    return `${base}levels/endless/${bgIndex}.webp`;
+  }
+  const bgIndex = ((level - 1) % LEVELS.length) + 1;
+  return `${base}levels/${bgIndex}.webp`;
 }
 
 /**

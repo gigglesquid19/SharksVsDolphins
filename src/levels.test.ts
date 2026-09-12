@@ -42,8 +42,19 @@ describe('getLevelBackground', () => {
     expect(getLevelBackground(10)).toBe('/levels/10.webp');
   });
 
-  it('cycles backgrounds for endless levels beyond 10', () => {
+  it('gives Endless its own art from the very first level', () => {
+    expect(getLevelBackground(1, 'endless')).toBe('/levels/endless/1.webp');
+    expect(getLevelBackground(10, 'endless')).toBe('/levels/endless/10.webp');
+    expect(getLevelBackground(11, 'endless')).toBe('/levels/endless/11.webp');
+    expect(getLevelBackground(50, 'endless')).toBe('/levels/endless/50.webp');
+  });
+
+  it('cycles the Endless set once a run passes 50', () => {
+    expect(getLevelBackground(51, 'endless')).toBe('/levels/endless/1.webp');
+    expect(getLevelBackground(100, 'endless')).toBe('/levels/endless/50.webp');
+  });
+
+  it('defaults to the campaign set when no mode is given', () => {
     expect(getLevelBackground(11)).toBe('/levels/1.webp');
-    expect(getLevelBackground(20)).toBe('/levels/10.webp');
   });
 });

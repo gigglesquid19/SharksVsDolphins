@@ -33,6 +33,11 @@ export default defineConfig({
         // Audio is cached at runtime (first play), not precached at install - it's large
         // relative to everything else here and shouldn't block/bloat the initial install.
         globPatterns: ['**/*.{js,css,html,webp,png,svg,json}'],
+        // The fifty Endless backgrounds are ~3 MB together and a given run sees only a handful
+        // of them, so they are cached the first time a level actually loads one rather than
+        // doubling the install. The ten campaign backgrounds stay precached: the campaign is
+        // what a new player opens first, and it should work offline from the start.
+        globIgnores: ['**/levels/endless/*.webp'],
         runtimeCaching: [
           {
             urlPattern: /\.(?:mp3|ogg)$/,
@@ -40,6 +45,14 @@ export default defineConfig({
             options: {
               cacheName: 'svsd-audio',
               expiration: { maxEntries: 6 },
+            },
+          },
+          {
+            urlPattern: /levels\/endless\/.*\.webp$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'svsd-endless-backgrounds',
+              expiration: { maxEntries: 50 },
             },
           },
         ],
