@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DOLPHIN_SKINS, skinById } from './skins';
+import { DOLPHIN_SKINS, NATION_SKIN_PRICE, skinById } from './skins';
 
 const PALETTE_KEYS = ['back', 'mid', 'flank', 'belly', 'fin', 'finEdge', 'rim', 'eye'] as const;
 
@@ -38,5 +38,33 @@ describe('skinById', () => {
   it('falls back to classic for an unknown id', () => {
     expect(skinById('nope').id).toBe('classic');
     expect(skinById('orca').id).toBe('orca');
+  });
+});
+
+describe('national skins', () => {
+  const nations = DOLPHIN_SKINS.filter((s) => s.group === 'nation');
+
+  it('covers twenty countries', () => {
+    expect(nations).toHaveLength(20);
+  });
+
+  it('charges the same for every country', () => {
+    for (const skin of nations) expect(skin.price).toBe(NATION_SKIN_PRICE);
+  });
+
+  it('sells them all rather than gating any behind a reward', () => {
+    for (const skin of nations) expect(skin.source).toBe('store');
+  });
+
+  it('keeps the original skins on their own shelf', () => {
+    const ocean = DOLPHIN_SKINS.filter((s) => s.group === 'ocean');
+    expect(ocean.map((s) => s.id)).toContain('classic');
+    expect(ocean.map((s) => s.id)).toContain('voyager');
+    expect(ocean.length + nations.length).toBe(DOLPHIN_SKINS.length);
+  });
+
+  it('gives each country a distinct palette', () => {
+    const seen = new Set(nations.map((s) => JSON.stringify(s.palette)));
+    expect(seen.size).toBe(nations.length);
   });
 });

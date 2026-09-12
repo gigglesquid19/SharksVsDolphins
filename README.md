@@ -44,7 +44,8 @@ Contents
   Endless-mode stat upgrades, dolphin skins and one-off abilities, plus the
   derived Endless starting bonuses and Echolocation tuning.
 - `src/skins.ts` - the dolphin skin catalogue (palette swaps, prices; `source`
-  marks the share-only reward skin).
+  marks the share-only reward skin, and `group` splits the ocean colourways
+  from the twenty national ones).
 - `src/storeView.ts` - renders and wires the Store screen.
 - `src/share.ts` - Web Share API wrapper (clipboard fallback) for the campaign /
   Level 50 milestone Share buttons and the Voyager-skin reward.
@@ -275,7 +276,11 @@ How to Play
      an Endless run's starting stats and stack with the Mega Shrimp picks you
      make during the run; Campaign is unaffected) and **dolphin skins** (palette
      recolours of the whole pod, one equipped at a time). The **Voyager** skin
-     can't be bought - it shows as "Share to unlock" until earned.
+     can't be bought - it shows as "Share to unlock" until earned. Skins sit on
+     two shelves: the original eight ocean colourways, and **National Colours**,
+     twenty skins in the national colours of the twenty largest mobile gaming
+     markets. Every national skin costs the same 220 Pearls, because pricing
+     them apart would mean ranking the countries against each other.
    Both endings show a **run-summary card** - dolphin name, a stat breakdown,
    and any achievements unlocked that run - then let you save the score (under
    your dolphin's name) to the leaderboard, or Skip.

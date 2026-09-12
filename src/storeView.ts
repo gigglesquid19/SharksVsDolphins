@@ -17,6 +17,7 @@ import {
   upgradeLevel,
 } from './store';
 import { CONSUMABLES, CONSUMABLE_ORDER, buyConsumable, getInventory } from './inventory';
+import type { DolphinSkin } from './skins';
 import { DOLPHIN_SKINS } from './skins';
 import { makeDolphinBodyCanvas } from './sprites';
 
@@ -32,6 +33,7 @@ export function setupStore(opts: { onPearlsChange: () => void }): { open: () => 
   const abilitiesEl = document.getElementById('storeAbilities') as HTMLDivElement;
   const consumablesEl = document.getElementById('storeConsumables') as HTMLDivElement;
   const skinsEl = document.getElementById('storeSkins') as HTMLDivElement;
+  const nationSkinsEl = document.getElementById('storeNationSkins') as HTMLDivElement;
   const closeBtn = document.getElementById('storeCloseBtn') as HTMLButtonElement;
 
   /**
@@ -161,11 +163,13 @@ export function setupStore(opts: { onPearlsChange: () => void }): { open: () => 
     );
   }
 
-  function renderSkins(): void {
+  /** Renders one shelf of skins. Both shelves behave identically; they are split only so the
+   *  twenty national skins do not bury the original eight. */
+  function renderSkins(target: HTMLDivElement, group: DolphinSkin['group']): void {
     const balance = getPearls();
     const equipped = equippedSkinId();
-    skinsEl.replaceChildren(
-      ...DOLPHIN_SKINS.map((skin) => {
+    target.replaceChildren(
+      ...DOLPHIN_SKINS.filter((skin) => skin.group === group).map((skin) => {
         const owned = ownsSkin(skin.id);
         const isEquipped = skin.id === equipped;
 
@@ -224,7 +228,8 @@ export function setupStore(opts: { onPearlsChange: () => void }): { open: () => 
     renderConsumables();
     renderAbilities();
     renderUpgrades();
-    renderSkins();
+    renderSkins(skinsEl, 'ocean');
+    renderSkins(nationSkinsEl, 'nation');
     opts.onPearlsChange();
   }
 
