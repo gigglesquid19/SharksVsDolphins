@@ -27,6 +27,7 @@ import {
 } from './inventory';
 import type { DolphinSkin } from './skins';
 import { DOLPHIN_SKINS } from './skins';
+import { recommendPurchase } from './recommendation';
 import { makeDolphinBodyCanvas } from './sprites';
 
 /**
@@ -41,6 +42,10 @@ export function setupStore(opts: { onPearlsChange: () => void }): { open: () => 
   const abilitiesEl = document.getElementById('storeAbilities') as HTMLDivElement;
   const consumablesEl = document.getElementById('storeConsumables') as HTMLDivElement;
   const consumablesNoteEl = document.getElementById('storeConsumablesNote') as HTMLElement | null;
+  const recommendEl = document.getElementById('storeRecommend') as HTMLDivElement | null;
+  const recommendNameEl = document.getElementById('storeRecommendName');
+  const recommendReasonEl = document.getElementById('storeRecommendReason');
+  const recommendCostEl = document.getElementById('storeRecommendCost');
   const skinsEl = document.getElementById('storeSkins') as HTMLDivElement;
   const nationSkinsEl = document.getElementById('storeNationSkins') as HTMLDivElement;
   const closeBtn = document.getElementById('storeCloseBtn') as HTMLButtonElement;
@@ -242,8 +247,30 @@ export function setupStore(opts: { onPearlsChange: () => void }): { open: () => 
     );
   }
 
+  /**
+   * One suggestion, above everything the Store sells. Recomputed on every refresh, so buying the
+   * thing it just recommended immediately moves it on to the next - which is the only way the
+   * advice stays true while the player is spending.
+   */
+  function renderRecommendation(): void {
+    if (!recommendEl) return;
+    const rec = recommendPurchase();
+    recommendEl.classList.toggle('hidden', !rec);
+    if (!rec) return;
+
+    if (recommendNameEl) recommendNameEl.textContent = rec.name;
+    if (recommendReasonEl) recommendReasonEl.textContent = rec.reason;
+    if (recommendCostEl) {
+      recommendCostEl.classList.toggle('short', !rec.affordable);
+      recommendCostEl.innerHTML = rec.affordable
+        ? `<img class="pearl-icon" alt="" src="${pearlIconSrc()}"> ${rec.price} - you can afford this now`
+        : `<img class="pearl-icon" alt="" src="${pearlIconSrc()}"> ${rec.price} - ${rec.shortfall} more to go`;
+    }
+  }
+
   function refresh(): void {
     pearlsNumberEl.textContent = String(getPearls());
+    renderRecommendation();
     renderConsumables();
     renderAbilities();
     renderUpgrades();

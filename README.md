@@ -312,6 +312,9 @@ How to Play
      make during the run; Campaign is unaffected) and **dolphin skins** (palette
      recolours of the whole pod, one equipped at a time). The **Orca** skin
      can't be bought - it shows as "Share to unlock" until earned. Skins sit on
+     The Store opens with a single **recommendation** - one thing to buy next and
+     why, recomputed every time it refreshes, so buying it moves the advice on.
+     Skins sit on
      two shelves: the original eight ocean colourways, and **National Colours**,
      twenty skins in the national colours of the twenty largest mobile gaming
      markets. Every national skin costs the same 220 Pearls, because pricing

@@ -1198,6 +1198,44 @@ button.mega-shrimp.green {
 }
 #runSummaryDoubleBtn.hidden { display: none; }
 
+/* The Store's one piece of advice, above everything it sells. Deliberately a panel rather than a
+   highlighted tile: it has to survive the player scrolling past whichever section the suggestion
+   happens to live in, and it says why, which no tile has room for. */
+.store-recommend {
+  margin: 0 0 18px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.16), rgba(14, 165, 233, 0.1));
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  text-align: left;
+}
+.store-recommend-label {
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+.store-recommend-name {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--text);
+}
+.store-recommend-reason {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+.store-recommend-cost {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--accent);
+  margin-top: 8px;
+}
+.store-recommend-cost.short { color: #fbbf24; }
+#storeRecommend.hidden { display: none; }
+
 /* The dolphin panel: everything the player owns, on one screen, reachable from the title and
    from the pause menu. Scrolls rather than shrinking, since the upgrade list grows. */
 .dolphin-panel {
