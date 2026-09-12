@@ -1980,12 +1980,13 @@ export class Game {
     // Unlocks Echolocation for purchase in the Store (src/store.ts reads this).
     markCampaignCleared();
 
-    this.setStatus('You cleared the campaign! The shallows are safe.');
+    // The banner and the status line are read together as one sentence - "Sharks Vanquished,
+    // the Shallows are now safe.." - because the banner is a single nowrap line and the whole
+    // phrase would run off the canvas. Shallows rather than Ocean: clearing the campaign secures
+    // the top ten levels, and the Depthless Campaign below is the rest of the water.
+    this.setStatus('The Shallows are now safe..');
     this.startBtn.textContent = 'Retry';
-    // "Shallows", not "Ocean": clearing the campaign secures the top ten levels, and the
-    // Depthless Campaign below is the rest of the water. Saying the ocean was saved here left
-    // nothing for the deep to be.
-    this.showBanner('Shallows Saved!', 'victory');
+    this.showBanner('Sharks Vanquished', 'victory');
     this.showRunSummary('campaign');
   }
 
@@ -1994,7 +1995,7 @@ export class Game {
     if (!this.runSummaryOverlayEl || !this.pendingScore) return;
     this.awaitingRunSummary = true;
 
-    if (this.runSummaryTitleEl) this.runSummaryTitleEl.textContent = board === 'campaign' ? 'Shallows Saved!' : 'Run Over';
+    if (this.runSummaryTitleEl) this.runSummaryTitleEl.textContent = board === 'campaign' ? 'Sharks Vanquished' : 'Run Over';
     if (this.runSummaryNameEl) this.runSummaryNameEl.textContent = getDolphinName();
 
     const rows: [string, string][] =
@@ -2247,7 +2248,7 @@ export class Game {
 
   private showLevelUpChoice(): void {
     this.awaitingLevelUpChoice = true;
-    const bannerText = this.mode === 'endless' && this.currentLevel === LEVELS.length ? 'Shallows Saved! The Deep Awaits...' : 'Level Up!';
+    const bannerText = this.mode === 'endless' && this.currentLevel === LEVELS.length ? 'Sharks Vanquished! The Deep Awaits...' : 'Level Up!';
     this.showBanner(bannerText, 'levelup', 2600);
     if (this.megaShrimpHintEl) {
       const firstTime = !hasSeenHint('megaShrimp');

@@ -517,14 +517,24 @@ button.school.mega-pod:hover:not(:disabled) { box-shadow: 0 6px 22px rgba(168, 8
   padding: 14px 30px;
   border-radius: 16px;
   font-weight: 800;
-  font-size: 1.5rem;
+  /* Scales with the canvas rather than sitting at a fixed 1.5rem: on a 375px phone the canvas is
+     only ~330px wide, and the longer banners ("Sharks Vanquished! The Deep Awaits...") ran 109px
+     off each edge of the play area. */
+  font-size: clamp(1.05rem, 4.2vw, 1.5rem);
   text-align: center;
   letter-spacing: 0.03em;
   z-index: 20;
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.25s ease, transform 0.25s ease;
-  white-space: nowrap;
+  /* Wraps instead of overflowing, balanced so a two-line banner splits evenly. The explicit
+     max-content width is load-bearing: an absolutely positioned box at left:50% shrink-fits to
+     the space from there to the container's right edge - half the canvas - so without it even a
+     short banner wrapped to two lines. */
+  width: max-content;
+  max-width: 86%;
+  line-height: 1.25;
+  text-wrap: balance;
 }
 .game-banner.visible { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 .game-banner.gameover { background: linear-gradient(135deg, #ef4444, #7f1d1d); color: #fff; box-shadow: 0 8px 30px rgba(239, 68, 68, 0.5); }
