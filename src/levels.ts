@@ -36,7 +36,7 @@ export const LEVELS: LevelConfig[] = [
 
 /**
  * How many distinct backgrounds Endless has before it starts repeating. They run in five depth
- * zones of ten - Eutrophic, Mesopelagic, Abyssopelagic, Mythopelagic, Hadal - so the water gets
+ * zones of ten - Eutrophic, Mesopelagic, Bathypelagic, Abyssopelagic, Hadal - so the water gets
  * visibly deeper and stranger the further a run goes, which is the only progression Endless has
  * past the difficulty curve.
  */
@@ -51,8 +51,9 @@ export const ENDLESS_BACKGROUND_COUNT = 50;
  * and clearing its last one are both announced, which is what gives a run past the campaign a
  * sense of going somewhere rather than just counting upwards.
  *
- * The depths are the game's own, not a textbook's - the Mythopelagic is invented, and there is a
- * deliberate gap between 1000m and 2000m where the real Bathypelagic would sit.
+ * The names run in the real ocean's order, but the depths are the game's own: each zone is a
+ * flat 1000m band rather than the real ones, which are nothing like even, and there is a
+ * deliberate gap between 1000m and 2000m.
  */
 export interface DepthZone {
   /** Bare name, with no "Zone" on it - the announcements add that, so every zone reads the same
@@ -67,8 +68,8 @@ export interface DepthZone {
 export const DEPTH_ZONES: DepthZone[] = [
   { name: 'Eutrophic', depth: '0m - 200m', firstLevel: 1, lastLevel: 10 },
   { name: 'Mesopelagic', depth: '200m - 1000m', firstLevel: 11, lastLevel: 20 },
-  { name: 'Abyssopelagic', depth: '2000m - 3000m', firstLevel: 21, lastLevel: 30 },
-  { name: 'Mythopelagic', depth: '3000m - 4000m', firstLevel: 31, lastLevel: 40 },
+  { name: 'Bathypelagic', depth: '2000m - 3000m', firstLevel: 21, lastLevel: 30 },
+  { name: 'Abyssopelagic', depth: '3000m - 4000m', firstLevel: 31, lastLevel: 40 },
   { name: 'Hadal', depth: '4000m+', firstLevel: 41, lastLevel: 50 },
 ];
 

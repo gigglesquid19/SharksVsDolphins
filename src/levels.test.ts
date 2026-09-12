@@ -83,8 +83,8 @@ describe('depth zones', () => {
     expect(zoneForLevel(1).name).toBe('Eutrophic');
     expect(zoneForLevel(10).name).toBe('Eutrophic');
     expect(zoneForLevel(11).name).toBe('Mesopelagic');
-    expect(zoneForLevel(25).name).toBe('Abyssopelagic');
-    expect(zoneForLevel(31).name).toBe('Mythopelagic');
+    expect(zoneForLevel(25).name).toBe('Bathypelagic');
+    expect(zoneForLevel(31).name).toBe('Abyssopelagic');
     expect(zoneForLevel(50).name).toBe('Hadal');
   });
 
