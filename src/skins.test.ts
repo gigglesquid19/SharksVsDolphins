@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DOLPHIN_SKINS, NATION_SKIN_PRICE, skinById } from './skins';
+import { SHARE_REWARD_SKIN } from './share';
 
 const PALETTE_KEYS = ['back', 'mid', 'flank', 'belly', 'fin', 'finEdge', 'rim', 'eye'] as const;
 
@@ -27,10 +28,11 @@ describe('DOLPHIN_SKINS', () => {
     }
   });
 
-  it('has a share-only reward skin', () => {
-    const voyager = DOLPHIN_SKINS.find((s) => s.id === 'voyager');
-    expect(voyager?.source).toBe('reward');
-    expect(voyager?.price).toBe(0);
+  it('marks exactly one skin as the share-only reward, and it is the one share.ts grants', () => {
+    const rewards = DOLPHIN_SKINS.filter((s) => s.source === 'reward');
+    expect(rewards).toHaveLength(1);
+    expect(rewards[0].id).toBe(SHARE_REWARD_SKIN);
+    expect(rewards[0].price).toBe(0);
   });
 });
 
@@ -59,7 +61,7 @@ describe('national skins', () => {
   it('keeps the original skins on their own shelf', () => {
     const ocean = DOLPHIN_SKINS.filter((s) => s.group === 'ocean');
     expect(ocean.map((s) => s.id)).toContain('classic');
-    expect(ocean.map((s) => s.id)).toContain('voyager');
+    expect(ocean.map((s) => s.id)).toContain(SHARE_REWARD_SKIN);
     expect(ocean.length + nations.length).toBe(DOLPHIN_SKINS.length);
   });
 

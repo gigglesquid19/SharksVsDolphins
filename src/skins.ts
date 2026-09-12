@@ -64,10 +64,11 @@ export const DOLPHIN_SKINS: DolphinSkin[] = [
     },
   },
   {
+    // Not for sale - earned by sharing a milestone (see src/share.ts / SHARE_REWARD_SKIN).
     id: 'orca',
     name: 'Orca',
-    price: 240,
-    source: 'store',
+    price: 0,
+    source: 'reward',
     group: 'ocean',
     palette: {
       back: '#0e1013',
@@ -132,11 +133,10 @@ export const DOLPHIN_SKINS: DolphinSkin[] = [
     },
   },
   {
-    // Not for sale - earned by sharing a milestone (see src/share.ts / SHARE_REWARD_SKIN).
     id: 'voyager',
     name: 'Voyager',
-    price: 0,
-    source: 'reward',
+    price: 240,
+    source: 'store',
     group: 'ocean',
     palette: {
       back: '#1a2f6b',

@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { awardPearls, getPearls } from './pearls';
+import { DOLPHIN_SKINS } from './skins';
+import { SHARE_REWARD_SKIN } from './share';
 import {
   ECHOLOCATION_PRICE,
   UPGRADES,
@@ -74,14 +76,19 @@ describe('buyUpgrade', () => {
 });
 
 describe('skins', () => {
+  // Taken from the catalogue rather than named, so moving a skin between the shelf and the
+  // share reward does not break these - which is exactly what happened when Orca became the
+  // share reward and this file still bought it.
+  const SELLABLE = DOLPHIN_SKINS.find((s) => s.source === 'store' && s.price > 0)!.id;
+
   it('buys and equips, but will not equip an unowned skin', () => {
     awardPearls(1000);
-    expect(equipSkin('orca')).toBe(false);
-    expect(buySkin('orca')).toBe(true);
-    expect(ownsSkin('orca')).toBe(true);
-    expect(buySkin('orca')).toBe(false); // already owned
-    expect(equipSkin('orca')).toBe(true);
-    expect(equippedSkinId()).toBe('orca');
+    expect(equipSkin(SELLABLE)).toBe(false);
+    expect(buySkin(SELLABLE)).toBe(true);
+    expect(ownsSkin(SELLABLE)).toBe(true);
+    expect(buySkin(SELLABLE)).toBe(false); // already owned
+    expect(equipSkin(SELLABLE)).toBe(true);
+    expect(equippedSkinId()).toBe(SELLABLE);
   });
 
   it('will not buy a skin you cannot afford', () => {
@@ -92,16 +99,16 @@ describe('skins', () => {
 
   it('grants a reward skin with no Pearl cost, and only once', () => {
     awardPearls(50);
-    expect(grantSkin('voyager')).toBe(true);
-    expect(ownsSkin('voyager')).toBe(true);
+    expect(grantSkin(SHARE_REWARD_SKIN)).toBe(true);
+    expect(ownsSkin(SHARE_REWARD_SKIN)).toBe(true);
     expect(getPearls()).toBe(50);
-    expect(grantSkin('voyager')).toBe(false); // already owned
+    expect(grantSkin(SHARE_REWARD_SKIN)).toBe(false); // already owned
   });
 
   it('will not sell the reward skin', () => {
     awardPearls(1000);
-    expect(buySkin('voyager')).toBe(false);
-    expect(ownsSkin('voyager')).toBe(false);
+    expect(buySkin(SHARE_REWARD_SKIN)).toBe(false);
+    expect(ownsSkin(SHARE_REWARD_SKIN)).toBe(false);
   });
 });
 

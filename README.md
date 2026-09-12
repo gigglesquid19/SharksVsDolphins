@@ -48,7 +48,8 @@ Contents
   from the twenty national ones).
 - `src/storeView.ts` - renders and wires the Store screen.
 - `src/share.ts` - Web Share API wrapper (clipboard fallback) for the campaign /
-  Level 50 milestone Share buttons and the Voyager-skin reward.
+  Level 50 milestone Share buttons and the Orca-skin reward (`SHARE_REWARD_SKIN`,
+  the single source of truth for which skin the share unlocks).
 - `src/platform.ts` - the `isAndroid` flag that gates all monetisation.
 - `src/ads.ts` / `src/iap.ts` - AdMob and Play Billing wrappers (Android only;
   every method is a no-op on web). Back the paid/rewarded Continue - see
@@ -277,7 +278,7 @@ How to Play
      (Vitality, Speed, Charisma, Boost Cooldown, and Boost Duration - they seed
      an Endless run's starting stats and stack with the Mega Shrimp picks you
      make during the run; Campaign is unaffected) and **dolphin skins** (palette
-     recolours of the whole pod, one equipped at a time). The **Voyager** skin
+     recolours of the whole pod, one equipped at a time). The **Orca** skin
      can't be bought - it shows as "Share to unlock" until earned. Skins sit on
      two shelves: the original eight ocean colourways, and **National Colours**,
      twenty skins in the national colours of the twenty largest mobile gaming
@@ -288,7 +289,7 @@ How to Play
    your dolphin's name) to the leaderboard, or Skip.
    - **Share**: clearing the Campaign, and clearing **Level 50** in Endless
      (a milestone card that pauses the run), each offer a **Share** button. The
-     first successful share unlocks the exclusive **Voyager** skin. A real
+     first successful share unlocks the exclusive **Orca** skin. A real
      social post can't be detected, so the reward fires whenever the OS share
      sheet completes without being cancelled (or a clipboard-copy fallback
      succeeds).
@@ -400,7 +401,9 @@ Game Features
 - **Milestone sharing** (`src/share.ts`): a Share button on the campaign-clear
   run-summary card and on a "Level 50!" milestone card in Endless (which pauses
   the run until you Share or Keep Diving). The first successful share grants the
-  exclusive **Voyager** skin - shown as "Share to unlock" in the Store until then.
+  exclusive **Orca** skin - shown as "Share to unlock" in the Store until then.
+  Voyager, which used to be the share reward, is now an ordinary 240-Pearl
+  purchase on the ocean shelf.
 - **Sound**: dynamic background music (see Music below) with a mute toggle
   and volume slider, plus procedurally synthesized sound effects (bite,
   recruit chime, shrimp pickup, storm rumble) via the Web Audio API.

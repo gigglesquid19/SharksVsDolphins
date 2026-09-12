@@ -9,7 +9,7 @@
 export const SHARE_URL = 'https://gigglesquid19.github.io/SharksVsDolphins/';
 
 /** The skin granted the first time a player shares a milestone (see src/skins.ts). */
-export const SHARE_REWARD_SKIN = 'voyager';
+export const SHARE_REWARD_SKIN = 'orca';
 
 export type ShareKind = 'campaign' | 'endless50';
 

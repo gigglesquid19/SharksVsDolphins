@@ -2033,7 +2033,7 @@ export class Game {
         .join('');
     }
 
-    // The Share button (and its Voyager-skin reward) is a campaign-clear thing only.
+    // The Share button (and its Orca-skin reward) is a campaign-clear thing only.
     if (this.runSummaryShareBtnEl) {
       this.runSummaryShareBtnEl.classList.toggle('hidden', board !== 'campaign');
       this.runSummaryShareBtnEl.textContent = 'Share';
@@ -2045,7 +2045,7 @@ export class Game {
     this.runSummaryOverlayEl.classList.remove('hidden');
   }
 
-  /** Campaign-clear Share button: opens the share sheet and, on success, grants the Voyager skin once. */
+  /** Campaign-clear Share button: opens the share sheet and, on success, grants the reward skin once. */
   async shareCampaign(): Promise<void> {
     if (this.runSummaryShareBtnEl) this.runSummaryShareBtnEl.disabled = true;
     const shared = await shareMilestone('campaign', getDolphinName());
@@ -2084,8 +2084,11 @@ export class Game {
   /** Grants the share-reward skin the first time a milestone is shared. Idempotent. */
   private claimShareReward(): void {
     if (grantSkin(SHARE_REWARD_SKIN)) {
-      this.setStatus('Voyager skin unlocked!');
-      this.showBanner('Voyager Skin Unlocked!', 'statup', 2600);
+      // Named from the catalogue rather than written out, so changing which skin the share
+      // unlocks is a one-line edit in share.ts instead of a hunt through the copy.
+      const name = skinById(SHARE_REWARD_SKIN).name;
+      this.setStatus(`${name} skin unlocked!`);
+      this.showBanner(`${name} Skin Unlocked!`, 'statup', 2600);
     }
   }
 
@@ -2109,7 +2112,7 @@ export class Game {
 
     const caption = document.createElement('div');
     caption.className = 'milestone-reward-caption';
-    caption.textContent = owned ? 'Voyager skin unlocked ✓' : `Share to unlock the ${skin.name} skin`;
+    caption.textContent = owned ? `${skin.name} skin unlocked ✓` : `Share to unlock the ${skin.name} skin`;
     this.milestoneRewardEl.appendChild(caption);
   }
 
