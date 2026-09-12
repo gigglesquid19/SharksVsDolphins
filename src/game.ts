@@ -117,6 +117,21 @@ const BG_PARALLAX_PX = CANVAS_SIZE * 0.045;
 /** How much further the near plane travels than the background. This ratio is the parallax. */
 const NEAR_PARALLAX_FACTOR = 2.4;
 const MOTE_COUNT = 30;
+/**
+ * Slow push-in: the background creeps toward the camera for the whole level, easing off as it
+ * goes, so the scene is never quite still without ever visibly zooming. Eight percent over a
+ * couple of minutes is far below the 14% overscan, so it only ever crops tighter and can never
+ * drag an edge into view.
+ */
+const BG_PUSH_IN = 0.08;
+/** Seconds to reach ~63% of the push-in. Long, because a push-in you can notice is too fast. */
+const BG_PUSH_IN_TAU = 45;
+/** Light shafts: their own plane between the background and the motes. */
+const SHAFT_COUNT = 5;
+const SHAFT_PARALLAX_FACTOR = 1.5;
+/** Bubbles sit nearest the camera, so they travel furthest as the view leans. */
+const BUBBLE_COUNT = 14;
+const BUBBLE_PARALLAX_FACTOR = 3.2;
 // Each Magic Shrimp spent adds this much swim speed for the rest of the level, and they
 // stack additively - three of them is +150%, not 3.4x, which keeps the maths legible to a
 // player deciding whether to spend a second one.
@@ -416,6 +431,15 @@ export class Game {
   private bgContainer!: Container;
   private fxContainer!: Container;
   private echoRing!: Graphics;
+  private shaftContainer!: Container;
+  private bubbleContainer!: Container;
+  /** The level's background sprite and the scale it was laid out at, for the push-in. */
+  private bgSprite: Sprite | null = null;
+  private bgBaseScale = 1;
+  /** performance.now() when the current background was placed - the push-in runs from here. */
+  private bgPlacedAt = 0;
+  private shafts: { gfx: Graphics; sway: number; phase: number; baseX: number; alpha: number }[] = [];
+  private bubbles: { gfx: Graphics; speed: number; sway: number; phase: number; radius: number }[] = [];
   /** Near parallax plane: slow motes of drifting matter in front of the background. */
   private driftContainer!: Container;
   private motes: { gfx: Graphics; speed: number; sway: number; phase: number }[] = [];
@@ -561,8 +585,14 @@ export class Game {
     this.entityContainer.sortableChildren = true;
     this.jellyfishContainer = new Container();
     this.driftContainer = new Container();
+    this.shaftContainer = new Container();
+    this.bubbleContainer = new Container();
     this.stage.addChild(this.bgContainer);
+    // Back to front: background, light shafts, motes, bubbles. Each plane leans further than the
+    // one behind it, which is the whole of the parallax.
+    this.stage.addChild(this.shaftContainer);
     this.stage.addChild(this.driftContainer);
+    this.stage.addChild(this.bubbleContainer);
     this.stage.addChild(this.jellyfishContainer);
     this.stage.addChild(this.fxContainer);
     this.stage.addChild(this.entityContainer);
@@ -588,6 +618,8 @@ export class Game {
     });
 
     this.buildMotes();
+    this.buildShafts();
+    this.buildBubbles();
     this.particles = new ParticleSystem(this.fxContainer);
     this.echoRing = new Graphics();
     this.fxContainer.addChild(this.echoRing);
@@ -1141,7 +1173,10 @@ export class Game {
 
     if (this.reducedMotion) {
       this.bgContainer.position.set(0, 0);
+      this.shaftContainer.position.set(0, 0);
       this.driftContainer.position.set(0, 0);
+      this.bubbleContainer.position.set(0, 0);
+      if (this.bgSprite) this.bgSprite.scale.set(this.bgBaseScale);
       return;
     }
 
@@ -1158,10 +1193,26 @@ export class Game {
     this.parallaxY += (targetY - this.parallaxY) * ease;
 
     this.bgContainer.position.set(this.parallaxX, this.parallaxY);
+    this.shaftContainer.position.set(
+      this.parallaxX * SHAFT_PARALLAX_FACTOR,
+      this.parallaxY * SHAFT_PARALLAX_FACTOR,
+    );
     this.driftContainer.position.set(
       this.parallaxX * NEAR_PARALLAX_FACTOR,
       this.parallaxY * NEAR_PARALLAX_FACTOR,
     );
+    this.bubbleContainer.position.set(
+      this.parallaxX * BUBBLE_PARALLAX_FACTOR,
+      this.parallaxY * BUBBLE_PARALLAX_FACTOR,
+    );
+
+    // Push-in. Exponential ease, so it moves most in the opening seconds of a level and then
+    // keeps creeping without ever arriving.
+    if (this.bgSprite) {
+      const elapsed = (performance.now() - this.bgPlacedAt) / 1000;
+      const progress = 1 - Math.exp(-elapsed / BG_PUSH_IN_TAU);
+      this.bgSprite.scale.set(this.bgBaseScale * (1 + BG_PUSH_IN * progress));
+    }
 
     const wrapSpan = CANVAS_SIZE * NEAR_PARALLAX_FACTOR * 0.14;
     for (const mote of this.motes) {
@@ -1170,6 +1221,22 @@ export class Game {
       if (mote.gfx.y < -wrapSpan) {
         mote.gfx.y = CANVAS_SIZE + wrapSpan;
         mote.gfx.x = -wrapSpan + Math.random() * (CANVAS_SIZE + wrapSpan * 2);
+      }
+    }
+
+    // Shafts slide and breathe rather than travelling, so the light stays where the surface is.
+    for (const shaft of this.shafts) {
+      shaft.gfx.x = shaft.baseX + Math.sin(t * 0.07 + shaft.phase) * shaft.sway;
+      shaft.gfx.alpha = 0.65 + Math.sin(t * 0.11 + shaft.phase * 1.7) * 0.35;
+    }
+
+    const bubbleSpan = CANVAS_SIZE * BUBBLE_PARALLAX_FACTOR * 0.14;
+    for (const bubble of this.bubbles) {
+      bubble.gfx.y -= bubble.speed * seconds;
+      bubble.gfx.x += Math.sin(t * 1.1 + bubble.phase) * bubble.sway * seconds;
+      if (bubble.gfx.y < -bubbleSpan - bubble.radius) {
+        bubble.gfx.y = CANVAS_SIZE + bubbleSpan + bubble.radius;
+        bubble.gfx.x = -bubbleSpan + Math.random() * (CANVAS_SIZE + bubbleSpan * 2);
       }
     }
   }
@@ -1194,6 +1261,63 @@ export class Game {
     }
   }
 
+  /**
+   * Shafts of light angled down from the surface. Built once and reused for every level rather
+   * than per background, because they are a property of water rather than of any one scene -
+   * which is also what makes them apply to every level of both modes without any per-level work.
+   */
+  private buildShafts(): void {
+    this.shaftContainer.removeChildren();
+    this.shafts = [];
+    const overhang = 140;
+    for (let i = 0; i < SHAFT_COUNT; i++) {
+      const gfx = new Graphics();
+      const topWidth = 26 + Math.random() * 44;
+      const spread = 30 + Math.random() * 70;
+      // Leaning the same way for all of them reads as one sun overhead, rather than as several.
+      const drop = CANVAS_SIZE + overhang * 2;
+      const lean = drop * (0.22 + Math.random() * 0.16);
+      const alpha = 0.05 + Math.random() * 0.06;
+      gfx
+        .poly([0, -overhang, topWidth, -overhang, lean + topWidth + spread, drop - overhang, lean - spread, drop - overhang])
+        .fill({ color: 0xcdefff, alpha });
+      gfx.blendMode = 'add';
+      const baseX = -120 + (i + Math.random() * 0.6) * ((CANVAS_SIZE + 240) / SHAFT_COUNT);
+      gfx.x = baseX;
+      this.shaftContainer.addChild(gfx);
+      this.shafts.push({ gfx, baseX, sway: 10 + Math.random() * 26, phase: Math.random() * Math.PI * 2, alpha });
+    }
+  }
+
+  /**
+   * Bubbles rising on the nearest plane. Bigger and faster than the motes and drawn as rings with
+   * a highlight, so the two fields read as different things at different distances instead of one
+   * speckled sheet.
+   */
+  private buildBubbles(): void {
+    this.bubbleContainer.removeChildren();
+    this.bubbles = [];
+    const spread = CANVAS_SIZE * BUBBLE_PARALLAX_FACTOR * 0.14;
+    for (let i = 0; i < BUBBLE_COUNT; i++) {
+      const radius = 1.6 + Math.random() * 4.4;
+      const gfx = new Graphics();
+      gfx.circle(0, 0, radius).fill({ color: 0xd8f4ff, alpha: 0.1 + Math.random() * 0.12 });
+      gfx.circle(0, 0, radius).stroke({ width: 1, color: 0xeafaff, alpha: 0.3 + Math.random() * 0.25 });
+      gfx.circle(-radius * 0.3, -radius * 0.35, Math.max(0.5, radius * 0.28)).fill({ color: 0xffffff, alpha: 0.5 });
+      gfx.x = -spread + Math.random() * (CANVAS_SIZE + spread * 2);
+      gfx.y = -spread + Math.random() * (CANVAS_SIZE + spread * 2);
+      this.bubbleContainer.addChild(gfx);
+      this.bubbles.push({
+        gfx,
+        radius,
+        // Bigger bubbles rise faster, the way they actually do.
+        speed: 14 + radius * 5 + Math.random() * 12,
+        sway: 5 + Math.random() * 14,
+        phase: Math.random() * Math.PI * 2,
+      });
+    }
+  }
+
   private async loadBackground(url: string): Promise<void> {
     const texture = await Assets.load(url);
     const bg = new Sprite(texture);
@@ -1206,6 +1330,10 @@ export class Game {
 
     this.bgContainer.removeChildren();
     this.bgContainer.addChild(bg);
+    // The push-in restarts with each background, so every level opens wide and closes in.
+    this.bgSprite = bg;
+    this.bgBaseScale = scale;
+    this.bgPlacedAt = performance.now();
   }
 
   private createEnvironment(): void {

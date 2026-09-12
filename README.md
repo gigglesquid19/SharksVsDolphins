@@ -386,6 +386,14 @@ Game Features
   spend 20 visible seconds recharging. Taking a dolphin gives it away
   immediately - it surfaces and starts the recharge early. Watch for the puff of
   water it leaves as it goes.
+- **Living water**: every level in both modes runs the same four-plane parallax
+  off the one background still, since the art is flat and the depth comes from
+  the camera. Back to front: the background, angled **light shafts** that sway
+  and breathe, a field of drifting **motes**, and **rising bubbles** on the
+  nearest plane, each leaning further than the one behind it as you swim. The
+  background also holds a slow **push-in** that restarts with every level, so a
+  level opens wide and closes in over its first couple of minutes without ever
+  visibly zooming. All of it is suppressed under `prefers-reduced-motion`.
 - **Procedural events**: roughly every minute of play there's a chance of a
   30-second **storm** that dims the screen and limits how far you can see
   sharks, or a **jellyfish swarm** - a wall of jellyfish drifting across the
