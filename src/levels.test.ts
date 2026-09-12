@@ -3,6 +3,7 @@ import {
   DEPTH_ZONES,
   LEVELS,
   MAX_ENDLESS_SHARK_SPEED,
+  SHARK_SPEED_CAP_LEVEL,
   getEndlessLevelConfig,
   getLevelBackground,
   getLevelConfig,
@@ -32,11 +33,36 @@ describe('getEndlessLevelConfig', () => {
     expect(far.sharkSpeedMultiplier).toBeLessThan(MAX_ENDLESS_SHARK_SPEED);
   });
 
-  it('caps shark speed rather than letting it outrun the pod forever', () => {
-    // It reaches the ceiling at level 35 and holds there however deep a run goes.
-    expect(getEndlessLevelConfig(34).sharkSpeedMultiplier).toBeLessThan(MAX_ENDLESS_SHARK_SPEED);
-    expect(getEndlessLevelConfig(35).sharkSpeedMultiplier).toBe(MAX_ENDLESS_SHARK_SPEED);
+  it('reaches the speed ceiling exactly at the end of the last zone', () => {
+    expect(getEndlessLevelConfig(SHARK_SPEED_CAP_LEVEL - 1).sharkSpeedMultiplier).toBeLessThan(
+      MAX_ENDLESS_SHARK_SPEED,
+    );
+    expect(getEndlessLevelConfig(SHARK_SPEED_CAP_LEVEL).sharkSpeedMultiplier).toBeCloseTo(
+      MAX_ENDLESS_SHARK_SPEED,
+      6,
+    );
+  });
+
+  it('holds at the ceiling however deep a run goes', () => {
+    expect(getEndlessLevelConfig(SHARK_SPEED_CAP_LEVEL + 1).sharkSpeedMultiplier).toBe(
+      MAX_ENDLESS_SHARK_SPEED,
+    );
     expect(getEndlessLevelConfig(500).sharkSpeedMultiplier).toBe(MAX_ENDLESS_SHARK_SPEED);
+  });
+
+  it('climbs evenly through every zone rather than topping out early', () => {
+    // The point of moving the cap to level 50: each zone should still be faster than the last.
+    const atZoneEnds = [20, 30, 40, 50].map((lv) => getEndlessLevelConfig(lv).sharkSpeedMultiplier);
+    for (let i = 1; i < atZoneEnds.length; i++) {
+      expect(atZoneEnds[i]).toBeGreaterThan(atZoneEnds[i - 1]);
+    }
+  });
+
+  it('starts the climb from where the campaign left off', () => {
+    const first = getEndlessLevelConfig(LEVELS.length + 1).sharkSpeedMultiplier;
+    expect(first).toBeGreaterThan(LEVELS[LEVELS.length - 1].sharkSpeedMultiplier);
+    // Slowly: a single level must not move it by more than a fiftieth.
+    expect(first - LEVELS[LEVELS.length - 1].sharkSpeedMultiplier).toBeLessThan(0.02);
   });
 
   it('caps shark counts and pod size so late levels stay playable', () => {

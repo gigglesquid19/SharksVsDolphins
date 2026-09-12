@@ -129,6 +129,24 @@ export function getLevelBackground(level: number, mode: 'campaign' | 'endless' =
  */
 export const MAX_ENDLESS_SHARK_SPEED = 2;
 
+/**
+ * The level the speed ceiling is reached at: the last of the five depth zones, so the climb runs
+ * the whole length of the authored descent and tops out exactly as the Hadal ends. Reaching the
+ * cap earlier left the back half of the zones playing identically to each other.
+ */
+export const SHARK_SPEED_CAP_LEVEL = ENDLESS_BACKGROUND_COUNT;
+
+/** Where the climb starts: whatever the campaign's last level runs at. */
+const ENDLESS_BASE_SHARK_SPEED = LEVELS[LEVELS.length - 1].sharkSpeedMultiplier;
+
+/**
+ * Per-level speed increase, derived rather than written down, so the ceiling and the level it is
+ * reached at stay the two numbers that decide the curve. Currently 0.018 a level, against the
+ * 0.03 it used to climb at.
+ */
+const SHARK_SPEED_PER_LEVEL =
+  (MAX_ENDLESS_SHARK_SPEED - ENDLESS_BASE_SHARK_SPEED) / (SHARK_SPEED_CAP_LEVEL - LEVELS.length);
+
 export function getEndlessLevelConfig(level: number): LevelConfig {
   const over = level - LEVELS.length;
   return {
@@ -137,7 +155,10 @@ export function getEndlessLevelConfig(level: number): LevelConfig {
     normalSharkCount: Math.min(9 + Math.ceil(over / 3), 16),
     largeSharkCount: Math.min(4 + Math.ceil(over / 3), 10),
     maxDolphins: Math.min(15 + Math.floor(over / 4), 20),
-    sharkSpeedMultiplier: Math.min(1.27 + over * 0.03, MAX_ENDLESS_SHARK_SPEED),
+    sharkSpeedMultiplier: Math.min(
+      ENDLESS_BASE_SHARK_SPEED + over * SHARK_SPEED_PER_LEVEL,
+      MAX_ENDLESS_SHARK_SPEED,
+    ),
     matriarch: over % 10 === 0,
   };
 }

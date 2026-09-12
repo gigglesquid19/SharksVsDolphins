@@ -299,9 +299,11 @@ How to Play
      `GameMode` in `src/game.ts` for why the id keeps the old name): always
      starts at level 1 with no level picker, keeps
      going past level 10 with escalating difficulty - shark counts, pod size and
-     shark speed all climb and then cap (speed at 2x, reached at level 35), so
-     how deep a run goes is decided by the number of sharks in the water rather
-     than by a speed nothing can answer - and has no free resume
+     shark speed all climb and then cap. Speed rises about 0.018 a level from
+     where the campaign left off and reaches its 2x ceiling exactly at level 50,
+     the end of the last depth zone, so every zone is faster than the one above
+     it and no stretch of the descent plays identically to another - and has no
+     free resume
      - a death ends the run. This is the intended hook for a future
      pay-to-continue offer (see "Ideas for Further Development").
      **Dive Deeper** on the title screen opens a level select: all fifty depths
