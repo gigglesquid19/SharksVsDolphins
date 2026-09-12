@@ -46,6 +46,52 @@ export const ENDLESS_BACKGROUND_COUNT = 50;
  * Campaign and Endless draw from separate sets. The campaign's ten are unchanged and shared with
  * nothing; Endless has its own fifty, and past level 50 it cycles them rather than running out.
  */
+/**
+ * The Depthless Campaign's five depth zones, ten levels each. Entering the first level of a zone
+ * and clearing its last one are both announced, which is what gives a run past the campaign a
+ * sense of going somewhere rather than just counting upwards.
+ *
+ * The depths are the game's own, not a textbook's - the Mythopelagic is invented, and there is a
+ * deliberate gap between 1000m and 2000m where the real Bathypelagic would sit.
+ */
+export interface DepthZone {
+  /** Bare name, with no "Zone" on it - the announcements add that, so every zone reads the same
+   *  way ("Entered the Hadal Zone", "Hadal Zone Liberated") whatever it is called. */
+  name: string;
+  /** Depth range, shown under the zone name on entry. */
+  depth: string;
+  firstLevel: number;
+  lastLevel: number;
+}
+
+export const DEPTH_ZONES: DepthZone[] = [
+  { name: 'Eutrophic', depth: '0m - 200m', firstLevel: 1, lastLevel: 10 },
+  { name: 'Mesopelagic', depth: '200m - 1000m', firstLevel: 11, lastLevel: 20 },
+  { name: 'Abyssopelagic', depth: '2000m - 3000m', firstLevel: 21, lastLevel: 30 },
+  { name: 'Mythopelagic', depth: '3000m - 4000m', firstLevel: 31, lastLevel: 40 },
+  { name: 'Hadal', depth: '4000m+', firstLevel: 41, lastLevel: 50 },
+];
+
+/**
+ * The zone a level sits in. Past level 50 a run stays in the Hadal: the backgrounds cycle, but
+ * announcing a return to the sunlit shallows at level 51 would undo the whole descent.
+ */
+export function zoneForLevel(level: number): DepthZone {
+  const last = DEPTH_ZONES[DEPTH_ZONES.length - 1];
+  if (level >= last.firstLevel) return last;
+  return DEPTH_ZONES.find((z) => level >= z.firstLevel && level <= z.lastLevel) ?? DEPTH_ZONES[0];
+}
+
+/** The zone this level opens, if it is the first of one. Null past level 50 - no new zones there. */
+export function zoneEnteredAt(level: number): DepthZone | null {
+  return DEPTH_ZONES.find((z) => z.firstLevel === level) ?? null;
+}
+
+/** The zone this level completes, if it is the last of one. Null past level 50. */
+export function zoneClearedAt(level: number): DepthZone | null {
+  return DEPTH_ZONES.find((z) => z.lastLevel === level) ?? null;
+}
+
 export function getLevelBackground(level: number, mode: 'campaign' | 'endless' = 'campaign'): string {
   // BASE_URL is '/' for the app / dev and '/SharksVsDolphins/' on GitHub Pages.
   const base = import.meta.env.BASE_URL;

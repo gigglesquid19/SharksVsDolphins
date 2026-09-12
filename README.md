@@ -268,10 +268,17 @@ How to Play
      going past level 10 with escalating difficulty, and has no free resume
      - a death ends the run. This is the intended hook for a future
      pay-to-continue offer (see "Ideas for Further Development").
-     It has its own fifty backgrounds, separate from the campaign's ten, running
-     in five depth zones of ten levels each - Eutrophic, Mesopelagic,
-     Abyssopelagic, Mythopelagic, Hadal - so the water gets visibly deeper and
-     stranger the further a run goes. Past level 50 the set cycles. They are
+     It runs in five **depth zones** of ten levels each - Eutrophic (0m-200m),
+     Mesopelagic (200m-1000m), Abyssopelagic (2000m-3000m), Mythopelagic
+     (3000m-4000m) and Hadal (4000m+), defined in `DEPTH_ZONES` in
+     `src/levels.ts`. Entering the first level of a zone announces "Entered the
+     X Zone" with its depth range, and clearing the last announces "Sharks
+     Vanquished / X Zone Liberated" in place of the usual "Level Up!". Each zone
+     has its own ten backgrounds, so the water gets visibly deeper and stranger
+     the further a run goes. Past level 50 the backgrounds cycle and the run
+     stays in the Hadal - announcing a return to the shallows at level 51 would
+     undo the whole descent. The campaign is one zone end to end and is not
+     announced this way. They are
      cached on first load rather than precached, because three megabytes of art
      that a given run mostly never reaches should not be part of the install.
    - **Store** (title screen): spend Pearls on permanent **Endless upgrades**

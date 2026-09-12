@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { LEVELS, getEndlessLevelConfig, getLevelBackground, getLevelConfig } from './levels';
+import {
+  DEPTH_ZONES,
+  LEVELS,
+  getEndlessLevelConfig,
+  getLevelBackground,
+  getLevelConfig,
+  zoneClearedAt,
+  zoneEnteredAt,
+  zoneForLevel,
+} from './levels';
 
 describe('getLevelConfig', () => {
   it('returns the authored campaign config for levels 1-10', () => {
@@ -56,5 +65,49 @@ describe('getLevelBackground', () => {
 
   it('defaults to the campaign set when no mode is given', () => {
     expect(getLevelBackground(11)).toBe('/levels/1.webp');
+  });
+});
+
+describe('depth zones', () => {
+  it('covers levels 1-50 in five zones of ten, with no gaps or overlaps', () => {
+    expect(DEPTH_ZONES).toHaveLength(5);
+    DEPTH_ZONES.forEach((zone, i) => {
+      expect(zone.lastLevel - zone.firstLevel).toBe(9);
+      if (i > 0) expect(zone.firstLevel).toBe(DEPTH_ZONES[i - 1].lastLevel + 1);
+    });
+    expect(DEPTH_ZONES[0].firstLevel).toBe(1);
+    expect(DEPTH_ZONES[4].lastLevel).toBe(50);
+  });
+
+  it('places each level in its zone', () => {
+    expect(zoneForLevel(1).name).toBe('Eutrophic');
+    expect(zoneForLevel(10).name).toBe('Eutrophic');
+    expect(zoneForLevel(11).name).toBe('Mesopelagic');
+    expect(zoneForLevel(25).name).toBe('Abyssopelagic');
+    expect(zoneForLevel(31).name).toBe('Mythopelagic');
+    expect(zoneForLevel(50).name).toBe('Hadal');
+  });
+
+  it('keeps a run past level 50 in the Hadal rather than resurfacing', () => {
+    expect(zoneForLevel(51).name).toBe('Hadal');
+    expect(zoneForLevel(120).name).toBe('Hadal');
+  });
+
+  it('announces a zone only on the level that opens it', () => {
+    expect(zoneEnteredAt(11)?.name).toBe('Mesopelagic');
+    expect(zoneEnteredAt(41)?.name).toBe('Hadal');
+    expect(zoneEnteredAt(12)).toBeNull();
+    expect(zoneEnteredAt(51)).toBeNull();
+  });
+
+  it('announces a liberation only on the level that closes a zone', () => {
+    expect(zoneClearedAt(20)?.name).toBe('Mesopelagic');
+    expect(zoneClearedAt(50)?.name).toBe('Hadal');
+    expect(zoneClearedAt(19)).toBeNull();
+    expect(zoneClearedAt(60)).toBeNull();
+  });
+
+  it('gives every zone a depth range to show under its name', () => {
+    for (const zone of DEPTH_ZONES) expect(zone.depth).toMatch(/m/);
   });
 });

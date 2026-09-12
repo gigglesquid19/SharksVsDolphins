@@ -533,6 +533,9 @@ button.school.mega-pod:hover:not(:disabled) { box-shadow: 0 6px 22px rgba(168, 8
      short banner wrapped to two lines. */
   width: max-content;
   max-width: 86%;
+  /* pre-line, so the zone cards can break their own lines ("Entered the Mesopelagic" above the
+     depth range) while everything else still wraps normally when the canvas is narrow. */
+  white-space: pre-line;
   line-height: 1.25;
   text-wrap: balance;
 }

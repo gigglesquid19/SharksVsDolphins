@@ -20,7 +20,7 @@ import {
   SharkTextureSet,
 } from './sprites';
 import { sfx } from './sfx';
-import { LEVELS, LevelConfig, getLevelBackground, getLevelConfig } from './levels';
+import { LEVELS, LevelConfig, getLevelBackground, getLevelConfig, zoneClearedAt, zoneEnteredAt } from './levels';
 import { CANVAS_SIZE, SIZE } from './constants';
 import { clampEntityY, directionDelta, sweptDistance, wrapX } from './utils';
 import { Dolphin, Shark, Jellyfish } from './entities';
@@ -1402,6 +1402,17 @@ export class Game {
 
   private announceLevel(duration = 2200): void {
     this.updateLevelBadge();
+
+    // Depthless only: the first level of a depth zone announces the zone instead of the number,
+    // which the HUD badge is already showing anyway. The campaign is one zone from end to end,
+    // so a card on level 1 there would announce nothing the player is about to leave.
+    const zone = this.mode === 'endless' ? zoneEnteredAt(this.currentLevel) : null;
+    if (zone) {
+      this.showBanner(`Entered the ${zone.name} Zone
+${zone.depth}`, 'levelup', duration + 1400);
+      this.setStatus(`${zone.name} Zone - ${zone.depth}`);
+      return;
+    }
     this.showBanner(`Level ${this.currentLevel}`, 'victory', duration);
   }
 
@@ -2324,8 +2335,14 @@ export class Game {
 
   private showLevelUpChoice(): void {
     this.awaitingLevelUpChoice = true;
-    const bannerText = this.mode === 'endless' && this.currentLevel === LEVELS.length ? 'Sharks Vanquished! The Deep Awaits...' : 'Level Up!';
-    this.showBanner(bannerText, 'levelup', 2600);
+    // Clearing the last level of a depth zone is the run's milestone beat - it replaces the
+    // generic "Level Up!" rather than being queued behind it, since both would land on the same
+    // banner within a second of each other.
+    const cleared = this.mode === 'endless' ? zoneClearedAt(this.currentLevel) : null;
+    const bannerText = cleared ? `Sharks Vanquished
+${cleared.name} Zone Liberated` : 'Level Up!';
+    this.showBanner(bannerText, 'levelup', cleared ? 3400 : 2600);
+    if (cleared) this.setStatus(`${cleared.name} Zone liberated!`);
     if (this.megaShrimpHintEl) {
       const firstTime = !hasSeenHint('megaShrimp');
       this.megaShrimpHintEl.classList.toggle('hidden', !firstTime);
