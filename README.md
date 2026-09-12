@@ -286,7 +286,12 @@ How to Play
      them apart would mean ranking the countries against each other.
    Both endings show a **run-summary card** - dolphin name, a stat breakdown,
    and any achievements unlocked that run - then let you save the score (under
-   your dolphin's name) to the leaderboard, or Skip.
+   your dolphin's name) to the leaderboard, or Skip. On a **campaign clear** the
+   card also offers **"Watch an ad to double your N Pearls"** (Android only, one
+   per run, with the actual number on the button before the ad plays). The
+   Pearls are already banked when it appears, so declining costs nothing and
+   the payout lands only if the ad reports the reward earned - a cancelled ad
+   leaves the offer on the table.
    - **Share**: clearing the Campaign, and clearing **Level 50** in Endless
      (a milestone card that pauses the run), each offer a **Share** button. The
      first successful share unlocks the exclusive **Orca** skin. A real

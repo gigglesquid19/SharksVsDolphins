@@ -367,6 +367,12 @@ export class Game {
   private runSummaryStatsEl: HTMLElement | null = null;
   private runSummaryAchievementsEl: HTMLElement | null = null;
   private runSummaryShareBtnEl: HTMLButtonElement | null = null;
+  private runSummaryDoubleBtnEl: HTMLButtonElement | null = null;
+  /** One rewarded double per run, whether or not the player took it. */
+  private pearlsDoubledThisRun = false;
+  /** Bumped on every render of the offer, so a slow preload from an earlier one cannot
+   *  re-disable a button a later render has already enabled. */
+  private doubleOfferToken = 0;
   private runSummaryHomeBtnEl: HTMLButtonElement | null = null;
   private milestoneOverlayEl: HTMLDivElement | null = null;
   private milestoneTextEl: HTMLElement | null = null;
@@ -484,6 +490,7 @@ export class Game {
     this.runSummaryStatsEl = document.getElementById('runSummaryStats');
     this.runSummaryAchievementsEl = document.getElementById('runSummaryAchievements');
     this.runSummaryShareBtnEl = document.getElementById('runSummaryShareBtn') as HTMLButtonElement | null;
+    this.runSummaryDoubleBtnEl = document.getElementById('runSummaryDoubleBtn') as HTMLButtonElement | null;
     this.runSummaryHomeBtnEl = document.getElementById('runSummaryHomeBtn') as HTMLButtonElement | null;
     this.milestoneOverlayEl = document.getElementById('milestoneOverlay') as HTMLDivElement | null;
     this.milestoneTextEl = document.getElementById('milestoneText');
@@ -1284,6 +1291,7 @@ export class Game {
       this.syncedSharkKills = 0;
       this.lastBoostNudgeTime = 0;
       this.pearlsThisRun = 0;
+      this.pearlsDoubledThisRun = false;
       this.achievementsThisRun = [];
       this.unsyncedPlaySeconds = 0;
       this.lifetimeFlushAt = 20;
@@ -1998,31 +2006,8 @@ export class Game {
     if (this.runSummaryTitleEl) this.runSummaryTitleEl.textContent = board === 'campaign' ? 'Sharks Vanquished' : 'Run Over';
     if (this.runSummaryNameEl) this.runSummaryNameEl.textContent = getDolphinName();
 
-    const rows: [string, string][] =
-      this.pendingScore.board === 'campaign'
-        ? [
-            ['Time', `${this.pendingScore.score.timeToSaveOcean.toFixed(1)}s`],
-            ['Retries', String(this.pendingScore.score.retries)],
-            ['Dolphins recruited', String(this.pendingScore.score.recruited)],
-            ['Dolphins lost', String(this.pendingScore.score.lost)],
-            ['Dolphins saved', String(this.totalDolphinsSaved)],
-            ['Sharks destroyed', String(this.pendingScore.score.sharksKilled)],
-            ['Pearls earned', String(this.pearlsThisRun)],
-            ['Pearl balance', String(getPearls())],
-          ]
-        : [
-            ['Depth', `Level ${this.pendingScore.score.levelReached}`],
-            ['Survived', `${this.pendingScore.score.timeSurvived.toFixed(1)}s`],
-            ['Dolphins recruited', String(this.pendingScore.score.recruited)],
-            ['Sharks destroyed', String(this.pendingScore.score.sharksKilled)],
-            ['Pearls earned', String(this.pearlsThisRun)],
-            ['Pearl balance', String(getPearls())],
-          ];
-    if (this.runSummaryStatsEl) {
-      this.runSummaryStatsEl.innerHTML = rows
-        .map(([label, value]) => `<span class="label">${label}</span><span class="value">${value}</span>`)
-        .join('');
-    }
+    this.renderRunSummaryStats();
+    this.renderDoublePearlsOffer(board);
 
     if (this.runSummaryAchievementsEl) {
       const unlocked = [...new Set(this.achievementsThisRun)]
@@ -2043,6 +2028,94 @@ export class Game {
     this.runSummaryHomeBtnEl?.classList.toggle('hidden', !isAndroid);
 
     this.runSummaryOverlayEl.classList.remove('hidden');
+  }
+
+  /**
+   * Paints the stat grid. Split out of showRunSummary because doubling the Pearls has to redraw
+   * it - the earned and balance rows are the whole point of the offer, and leaving them showing
+   * the pre-ad numbers would read as the reward not having landed.
+   */
+  private renderRunSummaryStats(): void {
+    if (!this.runSummaryStatsEl || !this.pendingScore) return;
+    const rows: [string, string][] =
+      this.pendingScore.board === 'campaign'
+        ? [
+            ['Time', `${this.pendingScore.score.timeToSaveOcean.toFixed(1)}s`],
+            ['Retries', String(this.pendingScore.score.retries)],
+            ['Dolphins recruited', String(this.pendingScore.score.recruited)],
+            ['Dolphins lost', String(this.pendingScore.score.lost)],
+            ['Dolphins saved', String(this.totalDolphinsSaved)],
+            ['Sharks destroyed', String(this.pendingScore.score.sharksKilled)],
+            ['Pearls earned', String(this.pearlsThisRun)],
+            ['Pearl balance', String(getPearls())],
+          ]
+        : [
+            ['Depth', `Level ${this.pendingScore.score.levelReached}`],
+            ['Survived', `${this.pendingScore.score.timeSurvived.toFixed(1)}s`],
+            ['Dolphins recruited', String(this.pendingScore.score.recruited)],
+            ['Sharks destroyed', String(this.pendingScore.score.sharksKilled)],
+            ['Pearls earned', String(this.pearlsThisRun)],
+            ['Pearl balance', String(getPearls())],
+          ];
+    this.runSummaryStatsEl.innerHTML = rows
+      .map(([label, value]) => `<span class="label">${label}</span><span class="value">${value}</span>`)
+      .join('');
+  }
+
+  /**
+   * The one rewarded-ad offer in the campaign: double the Pearls just earned, opt-in, with the
+   * exact number on the button before the ad plays. It only appears on a campaign clear, which
+   * is the run's high point and the only moment the player is looking at a Pearl total they are
+   * pleased with - and it is never the way forward, since the Pearls are already banked and
+   * ignoring it costs nothing.
+   */
+  private renderDoublePearlsOffer(board: LeaderboardBoard): void {
+    const btn = this.runSummaryDoubleBtnEl;
+    if (!btn) return;
+
+    const offerable = board === 'campaign' && ads.available && this.pearlsThisRun > 0 && !this.pearlsDoubledThisRun;
+    btn.classList.toggle('hidden', !offerable);
+    if (!offerable) return;
+
+    const token = ++this.doubleOfferToken;
+    btn.textContent = `▶ Watch an ad to double your ${this.pearlsThisRun} Pearls`;
+    btn.disabled = !ads.rewardedReady;
+    if (!ads.rewardedReady) {
+      // Same as the Continue offer: show it straight away and enable it when the fill arrives,
+      // rather than hiding an offer that is about to become available.
+      void ads.preloadRewarded().then((ready) => {
+        if (token !== this.doubleOfferToken) return;
+        if (this.runSummaryDoubleBtnEl && this.awaitingRunSummary && !this.pearlsDoubledThisRun) {
+          this.runSummaryDoubleBtnEl.disabled = !ready;
+        }
+      });
+    }
+  }
+
+  /** Run-summary "double your Pearls" button: pays out only if the ad reports the reward earned. */
+  async doublePearlsViaAd(): Promise<void> {
+    const btn = this.runSummaryDoubleBtnEl;
+    if (!btn || this.pearlsDoubledThisRun || this.pearlsThisRun <= 0) return;
+    btn.disabled = true;
+
+    const rewarded = await ads.showRewarded();
+    if (!rewarded) {
+      // Cancelled, or no fill. Nothing is taken away - the offer simply stays on the table.
+      btn.disabled = !ads.rewardedReady;
+      return;
+    }
+
+    // Captured first: awardRunPearls adds to pearlsThisRun, so reading it afterwards would
+    // double the doubled figure.
+    const bonus = this.pearlsThisRun;
+    this.pearlsDoubledThisRun = true;
+    this.awardRunPearls(bonus);
+    this.renderRunSummaryStats();
+
+    btn.textContent = `Pearls doubled ✓  +${bonus}`;
+    btn.disabled = true;
+    sfx.playAchievement();
+    this.setStatus(`+${bonus} Pearls!`);
   }
 
   /** Campaign-clear Share button: opens the share sheet and, on success, grants the reward skin once. */

@@ -1181,6 +1181,20 @@ button.mega-shrimp.green {
 .store-item.locked .store-skin-preview { opacity: 0.75; }
 
 /* --- Continue offer (Android Game Over) --- */
+/* The rewarded-ad offer on the run-summary card. Styled apart from the Save button so the
+   opt-in reads as an extra rather than as the way forward - the run is already banked, and
+   declining costs the player nothing. */
+.double-pearls-btn {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  color: #1c1204;
+  font-weight: 800;
+}
+.double-pearls-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+#runSummaryDoubleBtn.hidden { display: none; }
+
 .continue-panel { text-align: center; }
 .continue-panel p {
   color: var(--text);
