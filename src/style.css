@@ -1283,15 +1283,22 @@ button.mega-shrimp.green {
   grid-template-columns: repeat(5, 1fr);
   gap: 6px;
 }
+/* One colour per depth zone, held as RGB components so the same hue can be used at several
+   strengths - a faint fill, a firmer border and a solid number - without repeating it. */
+.level-cell.zone-1 { --zone-rgb: 253 224 71; }
+.level-cell.zone-2 { --zone-rgb: 96 165 250; }
+.level-cell.zone-3 { --zone-rgb: 74 222 128; }
+.level-cell.zone-4 { --zone-rgb: 192 132 252; }
+.level-cell.zone-5 { --zone-rgb: 248 113 113; }
+
 .level-cell {
   position: relative;
   aspect-ratio: 1;
   min-width: 0;
   padding: 0;
-  border-radius: 12px;
-  border: 1px solid rgba(148, 163, 184, 0.22);
-  background: rgba(148, 163, 184, 0.12);
-  color: var(--muted);
+  border-radius: 50%;
+  border: 1px solid rgb(var(--zone-rgb, 148 163 184) / 0.35);
+  background: rgb(var(--zone-rgb, 148 163 184) / 0.1);
   font: inherit;
   cursor: pointer;
   display: flex;
@@ -1300,27 +1307,23 @@ button.mega-shrimp.green {
   justify-content: center;
   line-height: 1;
 }
-.level-cell-number { font-size: 1.15rem; font-weight: 800; }
-.level-cell-state { font-size: 0.75rem; }
-.level-cell.unlocked {
-  background: rgba(34, 211, 238, 0.18);
-  border-color: rgba(34, 211, 238, 0.45);
-  color: #a5f3fc;
+.level-cell-number {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: rgb(var(--zone-rgb, 148 163 184));
 }
+.level-cell-state { font-size: 0.7rem; }
+/* Unlocked is the same hue turned up rather than a colour of its own, so the zone still reads
+   at a glance and the padlock plus the weight of the fill carry the locked state. */
+.level-cell.unlocked {
+  background: rgb(var(--zone-rgb, 148 163 184) / 0.3);
+  border-color: rgb(var(--zone-rgb, 148 163 184) / 0.9);
+}
+.level-cell:not(.unlocked) { opacity: 0.68; }
 .level-cell.selected {
   outline: 2px solid var(--accent);
-  outline-offset: 1px;
-  color: var(--text);
+  outline-offset: 2px;
 }
-/* One colour per depth zone, carried by the number. Set on the number rather than the whole
-   button so the cyan fill can go on saying "unlocked" independently of how deep the level is. */
-.level-cell.zone-1 .level-cell-number { color: #fde047; }
-.level-cell.zone-2 .level-cell-number { color: #60a5fa; }
-.level-cell.zone-3 .level-cell-number { color: #4ade80; }
-.level-cell.zone-4 .level-cell-number { color: #c084fc; }
-.level-cell.zone-5 .level-cell-number { color: #f87171; }
-/* Locked levels keep their zone's colour but sit back, so the padlock is not the only cue. */
-.level-cell:not(.unlocked) .level-cell-number { opacity: 0.62; }
 .level-select-detail {
   font-size: 0.85rem;
   color: var(--muted);
@@ -1330,13 +1333,19 @@ button.mega-shrimp.green {
 }
 /* The level preview: the depth's own artwork, what is swimming in it, and one button to dive.
    Shown in place of the grid inside the same panel, so the overlay never stacks two deep. */
+/* Capped rather than a fixed ratio: the art is a banner, and the stats under it are the reason
+   the preview exists, so they have to be on screen without a scroll. */
 .level-preview-art {
   position: relative;
   border-radius: 14px;
   overflow: hidden;
-  aspect-ratio: 16 / 9;
+  /* A fixed height rather than an aspect ratio: capping the height of a 16:9 box shrinks its
+     width to match, which left the art a small square in the middle of the panel. Full width at
+     a banner height, cropped by object-fit, keeps the stats on screen without a scroll. */
+  width: 100%;
+  height: clamp(108px, 20vh, 146px);
   background: rgba(2, 8, 20, 0.6);
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 .level-preview-art img {
   width: 100%;
