@@ -1,4 +1,4 @@
-import { DEPTH_ZONES, DepthZone } from './levels';
+import { DEPTH_ZONES, DepthZone, zoneNumber } from './levels';
 import { getPearls } from './pearls';
 import {
   FREE_START_LEVEL,
@@ -80,9 +80,12 @@ export function setupLevelSelect(opts: LevelSelectOpts): LevelSelectHandles {
     if (!zonesEl) return;
     zonesEl.innerHTML = DEPTH_ZONES.map((zone) => {
       const cells: string[] = [];
+      // The zone's own colour, so a glance at the grid reads as five bands rather than fifty
+      // identical buttons. The number carries it; the background still carries locked/unlocked.
+      const zoneClass = `zone-${zoneNumber(zone)}`;
       for (let level = zone.firstLevel; level <= zone.lastLevel; level++) {
         const unlocked = hasLevelAccess(level);
-        const classes = ['level-cell'];
+        const classes = ['level-cell', zoneClass];
         if (unlocked) classes.push('unlocked');
         if (level === selected) classes.push('selected');
         cells.push(

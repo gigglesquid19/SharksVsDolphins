@@ -1312,6 +1312,15 @@ button.mega-shrimp.green {
   outline-offset: 1px;
   color: var(--text);
 }
+/* One colour per depth zone, carried by the number. Set on the number rather than the whole
+   button so the cyan fill can go on saying "unlocked" independently of how deep the level is. */
+.level-cell.zone-1 .level-cell-number { color: #fde047; }
+.level-cell.zone-2 .level-cell-number { color: #60a5fa; }
+.level-cell.zone-3 .level-cell-number { color: #4ade80; }
+.level-cell.zone-4 .level-cell-number { color: #c084fc; }
+.level-cell.zone-5 .level-cell-number { color: #f87171; }
+/* Locked levels keep their zone's colour but sit back, so the padlock is not the only cue. */
+.level-cell:not(.unlocked) .level-cell-number { opacity: 0.62; }
 .level-select-detail {
   font-size: 0.85rem;
   color: var(--muted);
