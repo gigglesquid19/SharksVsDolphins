@@ -56,6 +56,37 @@ export const UPGRADES: Record<UpgradeId, UpgradeDef> = {
   echoRadius: { name: 'Echo Range', desc: '+6 units of vision', prices: [120, 220, 360, 540, 780, 1090] },
 };
 
+/**
+ * Testing shortcut: brings every upgrade up to half its ceiling, free.
+ *
+ * A Depthless build is the whole of what a dolphin is down there, so testing anything past the
+ * first few levels meant either grinding a build or playing one that nothing had been spent on -
+ * neither of which is the state the deep levels were tuned against. Half is deliberately not
+ * full: a maxed build hides exactly the problems worth finding, and the point is to arrive in
+ * the same shape a player who has been at it a while would.
+ *
+ * It raises, never lowers, so running it on a build that is already past halfway leaves that
+ * build alone. Echolocation is not part of this - it is a one-off purchase rather than a rung on
+ * the tree, and it gates depths of its own, so handing it over here would quietly undo that.
+ */
+export function grantHalfUpgrades(): number {
+  const half = Math.floor(MAX_UPGRADE_LEVEL / 2);
+  const state = load();
+  let raised = 0;
+  for (const id of UPGRADE_IDS) {
+    if (state.upgrades[id] >= half) continue;
+    raised += half - state.upgrades[id];
+    state.upgrades[id] = half;
+  }
+  if (raised > 0) save(state);
+  return raised;
+}
+
+/** The level grantHalfUpgrades brings everything to, for anything that wants to say so. */
+export function halfUpgradeLevel(): number {
+  return Math.floor(MAX_UPGRADE_LEVEL / 2);
+}
+
 /** Upgrades that only make sense once Echolocation has been bought. */
 const ECHO_UPGRADES: UpgradeId[] = ['echoDuration', 'echoRadius'];
 

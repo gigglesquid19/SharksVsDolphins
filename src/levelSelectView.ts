@@ -9,6 +9,7 @@ import {
 } from './levels';
 import type { SharkKind } from './sprites';
 import { getPearls } from './pearls';
+import { grantHalfUpgrades, halfUpgradeLevel } from './store';
 import {
   FREE_START_LEVEL,
   MAX_START_LEVEL,
@@ -116,6 +117,32 @@ export function setupLevelSelect(opts: LevelSelectOpts): LevelSelectHandles {
     notice = turningOn
       ? 'Testing: every depth is open. Dives from them still do not count on the leaderboard. Seven taps again to switch it off.'
       : 'Testing unlock off. Back to the depths you have actually bought.';
+    selected = null;
+    showGrid();
+  }
+
+  /**
+   * The second testing gesture, on the Pearls readout rather than the heading: seven taps hand
+   * over half of every upgrade. Same shape as the depth unlock above so there is one thing to
+   * remember, and on the Pearls because that is what upgrades are bought with.
+   */
+  let upgradeTaps = 0;
+  let lastUpgradeTapAt = 0;
+
+  function onPearlsTap(): void {
+    const now = Date.now();
+    upgradeTaps = now - lastUpgradeTapAt > SECRET_TAP_GAP_MS ? 1 : upgradeTaps + 1;
+    lastUpgradeTapAt = now;
+    if (upgradeTaps < SECRET_TAPS) return;
+    upgradeTaps = 0;
+
+    const raised = grantHalfUpgrades();
+    const half = halfUpgradeLevel();
+    notice =
+      raised > 0
+        ? `Testing: every upgrade taken to level ${half}. ${raised} level${raised === 1 ? '' : 's'} granted, and nothing was spent.`
+        : `Testing: every upgrade was already at level ${half} or better, so nothing changed.`;
+    opts.onPearlsChange?.();
     selected = null;
     showGrid();
   }
@@ -290,6 +317,7 @@ export function setupLevelSelect(opts: LevelSelectOpts): LevelSelectHandles {
     showGrid();
   });
   document.getElementById('levelSelectHeading')?.addEventListener('click', onHeadingTap);
+  pearlsEl?.addEventListener('click', onPearlsTap);
 
   return {
     open(): void {

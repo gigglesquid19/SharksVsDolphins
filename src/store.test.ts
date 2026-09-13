@@ -2,8 +2,10 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { awardPearls, getPearls } from './pearls';
 import { DOLPHIN_SKINS } from './skins';
 import { SHARE_REWARD_SKIN } from './share';
+import type { UpgradeId } from './store';
 import {
   ECHOLOCATION_PRICE,
+  MAX_UPGRADE_LEVEL,
   UPGRADES,
   buyEcholocation,
   buySkin,
@@ -11,6 +13,8 @@ import {
   canBuyUpgrade,
   baseEcholocationStats,
   echolocationStats,
+  grantHalfUpgrades,
+  halfUpgradeLevel,
   echolocationUnlocked,
   endlessStartBonuses,
   equipSkin,
@@ -129,6 +133,50 @@ describe('endlessStartBonuses', () => {
       sprintCooldownReduction: 750,
       sprintDurationBonus: 200,
     });
+  });
+});
+
+describe('grantHalfUpgrades', () => {
+  it('takes every upgrade to half the ceiling', () => {
+    const half = halfUpgradeLevel();
+    expect(half).toBe(MAX_UPGRADE_LEVEL / 2);
+    grantHalfUpgrades();
+    for (const id of Object.keys(UPGRADES) as UpgradeId[]) {
+      expect(upgradeLevel(id)).toBe(half);
+    }
+  });
+
+  it('spends nothing', () => {
+    const before = getPearls();
+    grantHalfUpgrades();
+    expect(getPearls()).toBe(before);
+  });
+
+  it('reports how many levels it handed over', () => {
+    const ids = Object.keys(UPGRADES) as UpgradeId[];
+    expect(grantHalfUpgrades()).toBe(ids.length * halfUpgradeLevel());
+  });
+
+  it('raises but never lowers, so a build past halfway is left alone', () => {
+    markCampaignCleared();
+    awardPearls(100_000);
+    // Take one upgrade well past the halfway mark the cheat grants.
+    for (let i = 0; i < MAX_UPGRADE_LEVEL; i++) buyUpgrade('speed');
+    expect(upgradeLevel('speed')).toBe(MAX_UPGRADE_LEVEL);
+
+    grantHalfUpgrades();
+    expect(upgradeLevel('speed')).toBe(MAX_UPGRADE_LEVEL);
+    expect(upgradeLevel('vitality')).toBe(halfUpgradeLevel());
+  });
+
+  it('does nothing, and says so, when everything is already there', () => {
+    grantHalfUpgrades();
+    expect(grantHalfUpgrades()).toBe(0);
+  });
+
+  it('leaves Echolocation alone - it is a purchase, not a rung on the tree', () => {
+    grantHalfUpgrades();
+    expect(ownsEcholocation()).toBe(false);
   });
 });
 
