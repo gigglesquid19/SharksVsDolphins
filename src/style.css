@@ -1013,9 +1013,9 @@ button.mega-shrimp.green {
   right: 10px;
   z-index: 20;
   display: flex;
-  align-items: baseline;
-  gap: 10px;
-  padding: 12px 22px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
   background: rgba(2, 6, 23, 0.75);
   border: 1px solid rgba(56, 189, 248, 0.4);
   border-radius: 999px;
@@ -1023,14 +1023,16 @@ button.mega-shrimp.green {
   pointer-events: none;
   backdrop-filter: blur(3px);
 }
+/* Sized to the dolphin counter across from it: the pair read as one HUD rather than as a big
+   badge and a small one, and the level is reference, not something watched shot to shot. */
 .level-badge-label {
-  font-size: 1.1rem;
+  font-size: 0.85rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   color: var(--muted);
 }
 .level-badge #levelBadgeNumber {
-  font-size: 2.6rem;
+  font-size: 1.4rem;
   font-weight: 800;
   color: #22d3ee;
   text-shadow: 0 0 10px rgba(34, 211, 238, 0.6);
@@ -1060,24 +1062,19 @@ button.mega-shrimp.green {
   text-shadow: 0 0 10px rgba(250, 204, 21, 0.6);
 }
 
-/* Persisted Pearl balance - shown in both modes, tucked under the level badge. */
-.pearls-badge {
-  position: absolute;
-  top: calc(var(--stage-top, 0px) + 76px);
-  right: 10px;
-  z-index: 20;
+/* Persisted Pearl balance. It used to ride the HUD under the level badge, which spent a corner
+   of the water on a number that changes between runs rather than during one - nothing you act on
+   mid-dive. It reads in the pause panel instead, where the rest of the between-runs state is. */
+.pause-pearls {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  padding: 8px 16px;
-  background: rgba(2, 6, 23, 0.75);
-  border: 1px solid rgba(226, 232, 240, 0.35);
-  border-radius: 999px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-  pointer-events: none;
-  backdrop-filter: blur(3px);
+  margin: 0 0 4px;
+  font-weight: 700;
+  color: var(--muted);
 }
-.pearls-badge #pearlsNumber {
+.pause-pearls #pearlsNumber {
   font-size: 1.4rem;
   font-weight: 800;
   color: #e2e8f0;

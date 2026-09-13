@@ -770,35 +770,56 @@ const inputs = {
     joystickActive = false;
     joystickBase.classList.remove('active');
     moveJoystickThumb(0, 0);
-    game.setPointer(false);
+    // Mirror of the water's release: hand steering back rather than cancelling it outright, in
+    // case a finger is still holding a direction on the water itself.
+    if (waterSteerTouchId === null) game.setPointer(false);
+  }
+
+  /**
+   * The touch driving the stick, by identifier.
+   *
+   * These handlers used to read `e.touches[0]`, which is not this element's touch - it is the
+   * first touch anywhere on the document. With a thumb on the stick and a second thumb tapping
+   * the water, both handlers were reading whichever finger happened to land first, so the stick
+   * followed the tap and the tap was measured at the stick. Tracking the identifier is what lets
+   * the two work at once.
+   */
+  let joystickTouchId: number | null = null;
+
+  function findTouch(list: TouchList, id: number): Touch | null {
+    for (let i = 0; i < list.length; i++) if (list[i].identifier === id) return list[i];
+    return null;
   }
 
   joystickBase.addEventListener('touchstart', (e) => {
     e.preventDefault();
-    const touch = e.touches[0];
+    if (joystickTouchId !== null) return; // already steering; ignore a second finger on the stick
+    const touch = e.changedTouches[0];
     if (!touch) return;
+    joystickTouchId = touch.identifier;
     joystickActive = true;
     joystickBase.classList.add('active');
     handleJoystickMove(touch.clientX, touch.clientY);
   }, { passive: false });
 
   joystickBase.addEventListener('touchmove', (e) => {
-    if (!joystickActive) return;
-    e.preventDefault();
-    const touch = e.touches[0];
+    if (joystickTouchId === null) return;
+    const touch = findTouch(e.changedTouches, joystickTouchId);
     if (!touch) return;
+    e.preventDefault();
     handleJoystickMove(touch.clientX, touch.clientY);
   }, { passive: false });
 
-  joystickBase.addEventListener('touchend', (e) => {
+  function releaseJoystickTouch(e: TouchEvent): void {
+    if (joystickTouchId === null) return;
+    if (!findTouch(e.changedTouches, joystickTouchId)) return; // some other finger lifted
     e.preventDefault();
+    joystickTouchId = null;
     endJoystick();
-  }, { passive: false });
+  }
 
-  joystickBase.addEventListener('touchcancel', (e) => {
-    e.preventDefault();
-    endJoystick();
-  }, { passive: false });
+  joystickBase.addEventListener('touchend', releaseJoystickTouch, { passive: false });
+  joystickBase.addEventListener('touchcancel', releaseJoystickTouch, { passive: false });
 
   joystickBase.addEventListener('mousedown', (e) => {
     joystickActive = true;
@@ -976,46 +997,74 @@ const inputs = {
     game.boostNow();
   }
 
+  /**
+   * The water's two touches, kept apart by identifier: one holding a direction, one being judged
+   * as an ability tap. They used to be the same `e.touches[0]` read, which is why an ability only
+   * fired with every other finger off the glass - steering with the stick or the water put a
+   * different finger first, and the tap was then measured wherever that finger happened to be.
+   * Held separately, a thumb can steer while the other hand taps for Boost or Echolocation.
+   */
+  let waterSteerTouchId: number | null = null;
+  let tapTouchId: number | null = null;
+
   gameCanvas.addEventListener('touchstart', (e) => {
     e.preventDefault();
-    const touch = e.touches[0];
-    if (!touch) return;
-    beginTap(touch.clientX, touch.clientY);
-    updatePointerDirection(touch.clientX, touch.clientY);
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const touch = e.changedTouches[i];
+      // A press in the middle asks for no direction, so it is free to be an ability tap - and it
+      // can be one while another finger steers.
+      if (tapTouchId === null && inTapZone(touch.clientX, touch.clientY)) {
+        tapTouchId = touch.identifier;
+        beginTap(touch.clientX, touch.clientY);
+      }
+      // The stick wins if it is already held: the water must not pull steering off it.
+      if (waterSteerTouchId === null && !joystickActive) {
+        waterSteerTouchId = touch.identifier;
+        updatePointerDirection(touch.clientX, touch.clientY);
+      }
+    }
   }, { passive: false });
 
   gameCanvas.addEventListener('touchmove', (e) => {
     e.preventDefault();
-    const touch = e.touches[0];
-    if (!touch) return;
-    trackTap(touch.clientX, touch.clientY);
-    updatePointerDirection(touch.clientX, touch.clientY);
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const touch = e.changedTouches[i];
+      if (touch.identifier === tapTouchId) trackTap(touch.clientX, touch.clientY);
+      if (touch.identifier === waterSteerTouchId) updatePointerDirection(touch.clientX, touch.clientY);
+    }
   }, { passive: false });
 
-  gameCanvas.addEventListener('touchend', (e) => {
+  function releaseWaterTouch(e: TouchEvent, cancelled: boolean): void {
     e.preventDefault();
-    game.setPointer(false);
-    endTap();
-  }, { passive: false });
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const touch = e.changedTouches[i];
+      if (touch.identifier === tapTouchId) {
+        tapTouchId = null;
+        if (cancelled) tapStartAt = 0;
+        else endTap();
+      }
+      if (touch.identifier === waterSteerTouchId) {
+        waterSteerTouchId = null;
+        // Only stop swimming if nothing else is still asking for a direction.
+        if (!joystickActive) game.setPointer(false);
+      }
+    }
+  }
 
-  gameCanvas.addEventListener('touchcancel', (e) => {
-    e.preventDefault();
-    game.setPointer(false);
-    tapStartAt = 0;
-  }, { passive: false });
+  gameCanvas.addEventListener('touchend', (e) => releaseWaterTouch(e, false), { passive: false });
+  gameCanvas.addEventListener('touchcancel', (e) => releaseWaterTouch(e, true), { passive: false });
 
   gameCanvas.addEventListener('mousedown', (e) => {
-    game.setPointer(true);
     beginTap(e.clientX, e.clientY);
-    updatePointerDirection(e.clientX, e.clientY);
+    if (!joystickActive) updatePointerDirection(e.clientX, e.clientY);
   });
   gameCanvas.addEventListener('mousemove', (e) => {
     if (!e.buttons) return;
     trackTap(e.clientX, e.clientY);
-    updatePointerDirection(e.clientX, e.clientY);
+    if (!joystickActive) updatePointerDirection(e.clientX, e.clientY);
   });
   window.addEventListener('mouseup', () => {
-    game.setPointer(false);
+    if (!joystickActive) game.setPointer(false);
     endTap();
   });
 })().catch((e) => showFatal('[main init]', e));

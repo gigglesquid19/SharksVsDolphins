@@ -295,8 +295,15 @@ export interface Photophore {
  */
 const PHOTOPHORE_PULSE_PERIOD_MS = 2600;
 const PHOTOPHORE_PULSE_FLARE_SHARE = 0.28;
-/** The glow held between flares, and the top of the flare itself. */
-export const PHOTOPHORE_ALPHA_REST = 0.45;
+/**
+ * The glow held between flares, and the top of the flare itself.
+ *
+ * The resting floor is high deliberately. A flare that is the only time a shark can be seen makes
+ * the rest of the cycle a blind spot, which is worse than no light at all: the point is to be able
+ * to follow one across dark water, with the flare drawing the eye back to it rather than being the
+ * only chance to find it.
+ */
+export const PHOTOPHORE_ALPHA_REST = 0.6;
 export const PHOTOPHORE_ALPHA_PEAK = 1;
 
 /**
@@ -319,9 +326,13 @@ export function createPhotophores(spots: Photophore[], color: number): Container
   const group = new Container();
   for (let i = 0; i < spots.length; i++) {
     const dot = new Graphics();
-    dot.circle(0, 0, 8).fill({ color, alpha: 0.16 });
-    dot.circle(0, 0, 4).fill({ color, alpha: 0.42 });
-    dot.circle(0, 0, 1.8).fill({ color, alpha: 1 });
+    // Bigger than a light this bright needs to be, because at distance it is competing with a
+    // whole screen: a 2px point is lost among the drifting motes, while a soft disc this size
+    // reads as a light source from across the arena. The halo does most of that work - the core
+    // only has to keep it from looking like a smudge.
+    dot.circle(0, 0, 12).fill({ color, alpha: 0.2 });
+    dot.circle(0, 0, 6).fill({ color, alpha: 0.5 });
+    dot.circle(0, 0, 2.6).fill({ color, alpha: 1 });
     dot.blendMode = 'add';
     group.addChild(dot);
   }

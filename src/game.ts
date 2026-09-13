@@ -589,6 +589,10 @@ export class Game {
   private stormOverlay!: Graphics;
   /** The darkness at depth, parked on the pod. Hidden entirely in water with no gloom. */
   private gloomOverlay!: Sprite;
+  /** Photophores, drawn above the gloom so distance never dims them. See init(). */
+  private lightsContainer!: Container;
+  /** Each shark sprite's photophore group, which lives in lightsContainer rather than on it. */
+  private sharkLights = new Map<Container, Container>();
   /** This level's darkness, 0 to 1, from its config. */
   private levelGloom = 0;
   private particles!: ParticleSystem;
@@ -750,6 +754,19 @@ export class Game {
     this.gloomOverlay.anchor.set(0.5);
     this.gloomOverlay.visible = false;
     this.stage.addChild(this.gloomOverlay);
+
+    /**
+     * A shark's own lights, lifted out of the entity layer and placed above the gloom.
+     *
+     * They used to be children of the shark's sprite, which put them under the vignette - so the
+     * darkness that hides the body was painted over the lights too, at the level's own gloom
+     * (0.62 in the Mesopelagic). The further a shark was from the pod, the more of its light the
+     * overlay ate, which is the exact opposite of what carrying lights is for. Above the gloom
+     * they read at full strength wherever the shark is, and the body stays hidden because that is
+     * still drawn below.
+     */
+    this.lightsContainer = new Container();
+    this.stage.addChild(this.lightsContainer);
 
     this.stormOverlay = new Graphics();
     this.stage.addChild(this.stormOverlay);
@@ -1674,8 +1691,10 @@ export class Game {
    */
   private initModel(config = LEVELS[0], keepUpgrades = false, silent = false): boolean {
     this.entityContainer.removeChildren();
+    this.lightsContainer.removeChildren();
     this.dolphinSprites.clear();
     this.sharkSprites.clear();
+    this.sharkLights.clear();
     this.particles.clear();
 
     this.dolphins = [];
@@ -2037,9 +2056,23 @@ ${zone.depth}`, 'levelup', duration + 1400);
     requestAnimationFrame(animate);
   }
 
+  /**
+   * Drops a shark's lights. They are parented to lightsContainer rather than to the sprite, so
+   * destroying the sprite does not take them with it - without this they would hang in the water
+   * where the shark died.
+   */
+  private disposeSharkLights(sprite: Container): void {
+    const lights = this.sharkLights.get(sprite);
+    if (!lights) return;
+    this.lightsContainer.removeChild(lights);
+    lights.destroy({ children: true });
+    this.sharkLights.delete(sprite);
+  }
+
   private removeSharkSprite(shark: Shark): void {
     const sprite = this.sharkSprites.get(shark);
     if (sprite) {
+      this.disposeSharkLights(sprite);
       this.entityContainer.removeChild(sprite);
       sprite.destroy();
       this.sharkSprites.delete(shark);
@@ -2051,6 +2084,7 @@ ${zone.depth}`, 'levelup', duration + 1400);
   private playSharkDeathAnimation(shark: Shark): void {
     const sprite = this.sharkSprites.get(shark);
     if (!sprite) return;
+    this.disposeSharkLights(sprite);
     this.sharkSprites.delete(shark);
     // A cloaked tiger killed mid-cloak still gets its send-off: the draw loop no longer owns
     // this sprite, so nothing would turn it back on.
@@ -2096,6 +2130,7 @@ ${zone.depth}`, 'levelup', duration + 1400);
     if (this.currentLevel >= 20) this.tryUnlock('matriarchRematch');
     const sprite = this.sharkSprites.get(shark);
     if (sprite) {
+      this.disposeSharkLights(sprite);
       this.sharkSprites.delete(shark);
       const fish = sprite.getChildByName('fish');
       if (fish) (fish as unknown as { tint: number }).tint = 0xff4444;
@@ -2159,7 +2194,10 @@ ${zone.depth}`, 'levelup', duration + 1400);
     if (look.photophores) {
       const lights = createPhotophores(look.photophores, look.photophoreColor ?? 0x4ade80);
       lights.name = 'photo';
-      container.addChild(lights);
+      // Parented to the lights layer, not to the shark, so the gloom cannot cover it. It is
+      // positioned from the shark each frame in drawSharks, and removed with it in removeShark.
+      this.lightsContainer.addChild(lights);
+      this.sharkLights.set(container, lights);
     }
 
     const reqText = new Text({
@@ -4098,8 +4136,11 @@ ${cleared.name} Zone Liberated
       // however the species has been reshaped, while the light itself keeps a near-constant size
       // on screen - a shark drawn small still has to be findable by its lights. They hold a low
       // glow and flare periodically, each shark seeded by its id so a shoal never flares in unison.
-      const lights = sprite.getChildByName('photo') as Container | null;
+      const lights = this.sharkLights.get(sprite) ?? null;
       if (lights) {
+        // The group is a sibling of the gloom rather than a child of the shark, so it is placed
+        // at the shark's own position here instead of inheriting it.
+        lights.position.set(sprite.x, sprite.y);
         const spots = look.photophores ?? [];
         const dotScale = Math.min(1.5, Math.max(1.1, baseScale));
         for (let i = 0; i < lights.children.length; i++) {
@@ -4161,7 +4202,8 @@ ${cleared.name} Zone Liberated
       // light that survived it would leave nothing for cloaking to do.
       const lightsSeen = !!lights && this.levelGloom > 0 && !shark.cloaked;
 
-      sprite.visible = bodySeen || lightsSeen;
+      sprite.visible = bodySeen;
+      if (lights) lights.visible = lightsSeen || bodySeen;
       fish.visible = bodySeen;
       glow.visible = bodySeen;
       if (reqText) reqText.visible = bodySeen;
