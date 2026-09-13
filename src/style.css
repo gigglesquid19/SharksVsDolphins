@@ -1074,6 +1074,15 @@ button.mega-shrimp.green {
   font-weight: 700;
   color: var(--muted);
 }
+/* The testing cheat's confirmation, shown beside the Pearl row rather than replacing it. */
+.pause-cheat-note {
+  margin: 0 0 4px;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  text-align: center;
+  color: #facc15;
+}
+
 .pause-pearls #pearlsNumber {
   font-size: 1.4rem;
   font-weight: 800;

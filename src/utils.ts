@@ -51,3 +51,23 @@ export function sweptDistance(a: Swept, b: Swept): number {
   const t = vv < 1e-9 ? 0 : Math.max(0, Math.min(1, -(ox * vx + oy * vy) / vv));
   return Math.hypot(ox + vx * t, oy + vy * t);
 }
+
+/**
+ * A "tap this several times quickly" gesture, for the testing shortcuts.
+ *
+ * Shared rather than written out at each site so the two cheats cannot drift into needing
+ * different numbers of taps or different patience, and so the counter resets the same way: a gap
+ * longer than `gapMs` starts again, which is what stops idle prodding ever reaching the count.
+ */
+export function secretTapGesture(taps: number, gapMs: number, onFire: () => void): () => void {
+  let count = 0;
+  let lastAt = 0;
+  return () => {
+    const now = Date.now();
+    count = now - lastAt > gapMs ? 1 : count + 1;
+    lastAt = now;
+    if (count < taps) return;
+    count = 0;
+    onFire();
+  };
+}

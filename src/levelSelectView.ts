@@ -9,6 +9,7 @@ import {
 } from './levels';
 import type { SharkKind } from './sprites';
 import { getPearls } from './pearls';
+import { secretTapGesture } from './utils';
 import { grantHalfUpgrades, halfUpgradeLevel } from './store';
 import {
   FREE_START_LEVEL,
@@ -126,16 +127,7 @@ export function setupLevelSelect(opts: LevelSelectOpts): LevelSelectHandles {
    * over half of every upgrade. Same shape as the depth unlock above so there is one thing to
    * remember, and on the Pearls because that is what upgrades are bought with.
    */
-  let upgradeTaps = 0;
-  let lastUpgradeTapAt = 0;
-
-  function onPearlsTap(): void {
-    const now = Date.now();
-    upgradeTaps = now - lastUpgradeTapAt > SECRET_TAP_GAP_MS ? 1 : upgradeTaps + 1;
-    lastUpgradeTapAt = now;
-    if (upgradeTaps < SECRET_TAPS) return;
-    upgradeTaps = 0;
-
+  const onPearlsTap = secretTapGesture(SECRET_TAPS, SECRET_TAP_GAP_MS, () => {
     const raised = grantHalfUpgrades();
     const half = halfUpgradeLevel();
     notice =
@@ -145,7 +137,7 @@ export function setupLevelSelect(opts: LevelSelectOpts): LevelSelectHandles {
     opts.onPearlsChange?.();
     selected = null;
     showGrid();
-  }
+  });
 
   function zoneOf(level: number): DepthZone {
     return DEPTH_ZONES.find((z) => level >= z.firstLevel && level <= z.lastLevel) ?? DEPTH_ZONES[0];
@@ -317,7 +309,9 @@ export function setupLevelSelect(opts: LevelSelectOpts): LevelSelectHandles {
     showGrid();
   });
   document.getElementById('levelSelectHeading')?.addEventListener('click', onHeadingTap);
-  pearlsEl?.addEventListener('click', onPearlsTap);
+  // The whole Pearls block, icon included - the number on its own is about 12px wide, and a
+  // gesture that resets on a miss cannot be built on a target that small.
+  (pearlsEl?.closest('.store-pearls') ?? pearlsEl)?.addEventListener('click', onPearlsTap);
 
   return {
     open(): void {

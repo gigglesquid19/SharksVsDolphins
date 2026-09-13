@@ -6,6 +6,8 @@ import { getDolphinName, hasNamedDolphin, setDolphinName } from './profile';
 import { nextTrackIn, trackTitle } from './music';
 import { CANVAS_H, CANVAS_W } from './constants';
 import { getPearls } from './pearls';
+import { grantHalfUpgrades, halfUpgradeLevel } from './store';
+import { secretTapGesture } from './utils';
 import { DAILY_REWARDS, claimDailyReward, dailyRewardAvailable, nextStreakDay } from './dailyReward';
 import type { ConsumableId, Inventory } from './inventory';
 import { CONSUMABLE_ORDER, CONSUMABLES } from './inventory';
@@ -562,6 +564,44 @@ const inputs = {
   document.getElementById('leaderboardCloseBtn')!.addEventListener('click', () => game.hideLeaderboard());
   document.getElementById('resetBtn')!.addEventListener('click', () => game.reset());
   document.getElementById('fullscreenBtn')!.addEventListener('click', toggleFullscreen);
+
+  /**
+   * The same seven-tap testing gesture as the one on Level Select, on the pause panel's Pearl
+   * balance. Two places because those are the two screens showing a Pearl count, and a cheat is
+   * no use if it has to be remembered which of them carries it - the pause panel is the one
+   * reachable mid-run, which is where the want for a stronger build actually comes up.
+   *
+   * Bound to the whole row rather than the number, which is a few pixels wide on a phone.
+   */
+  const pausePearlsRow = document.querySelector('.pause-pearls') as HTMLElement | null;
+  if (pausePearlsRow) {
+    // The message goes in a line of its own beside the row, never inside it. Rewriting the row
+    // would replace #pearlsNumber, and game.ts looks that element up once at startup - the
+    // balance would have quietly stopped updating from the first time the cheat was used.
+    let note: HTMLParagraphElement | null = null;
+    let noteTimer = 0;
+    pausePearlsRow.addEventListener(
+      'click',
+      secretTapGesture(7, 900, () => {
+        const raised = grantHalfUpgrades();
+        const half = halfUpgradeLevel();
+        if (!note) {
+          note = document.createElement('p');
+          note.className = 'pause-cheat-note';
+          pausePearlsRow.insertAdjacentElement('afterend', note);
+        }
+        note.textContent =
+          raised > 0
+            ? `Testing: every upgrade to level ${half} - ${raised} granted, nothing spent.`
+            : `Testing: every upgrade was already at level ${half} or better.`;
+        window.clearTimeout(noteTimer);
+        noteTimer = window.setTimeout(() => {
+          note?.remove();
+          note = null;
+        }, 3000);
+      }),
+    );
+  }
 
   document.getElementById('pauseBtn')!.addEventListener('click', () => game.togglePause());
   document.getElementById('pauseResumeBtn')!.addEventListener('click', () => game.togglePause());
