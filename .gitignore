@@ -7,3 +7,6 @@ dist/
 
 # Packaged Android release artifacts (tens of MB each) - kept locally, uploaded to Play
 /Release Builds/
+
+# Python bytecode from the tools/ scripts
+__pycache__/

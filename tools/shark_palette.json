@@ -1,0 +1,149 @@
+{
+  "sources": [
+    "public/sharks/spr_hammerhead_shark_attack_strip9.png",
+    "public/sharks/spr_hammerhead_shark_move_strip9.png",
+    "public/sharks/spr_shark_attack_strip9.png",
+    "public/sharks/spr_shark_move_strip9.png",
+    "public/sharks/spr_tiger_shark_attack_strip9.png",
+    "public/sharks/spr_tiger_shark_move_strip9.png"
+  ],
+  "threshold": 28.0,
+  "min_share": 0.004,
+  "colours": [
+    {
+      "hex": "#586e79",
+      "rgb": [
+        88,
+        110,
+        121
+      ],
+      "share": 0.19819
+    },
+    {
+      "hex": "#000000",
+      "rgb": [
+        0,
+        0,
+        0
+      ],
+      "share": 0.15432
+    },
+    {
+      "hex": "#84a2ab",
+      "rgb": [
+        132,
+        162,
+        171
+      ],
+      "share": 0.10258
+    },
+    {
+      "hex": "#0c0623",
+      "rgb": [
+        12,
+        6,
+        35
+      ],
+      "share": 0.094
+    },
+    {
+      "hex": "#f6f3e9",
+      "rgb": [
+        246,
+        243,
+        233
+      ],
+      "share": 0.09299
+    },
+    {
+      "hex": "#6d889c",
+      "rgb": [
+        109,
+        136,
+        156
+      ],
+      "share": 0.07846
+    },
+    {
+      "hex": "#434e68",
+      "rgb": [
+        67,
+        78,
+        104
+      ],
+      "share": 0.07307
+    },
+    {
+      "hex": "#c3c2c2",
+      "rgb": [
+        195,
+        194,
+        194
+      ],
+      "share": 0.05489
+    },
+    {
+      "hex": "#333a54",
+      "rgb": [
+        51,
+        58,
+        84
+      ],
+      "share": 0.05035
+    },
+    {
+      "hex": "#d9d8ca",
+      "rgb": [
+        217,
+        216,
+        202
+      ],
+      "share": 0.03422
+    },
+    {
+      "hex": "#bad4dd",
+      "rgb": [
+        186,
+        212,
+        221
+      ],
+      "share": 0.01849
+    },
+    {
+      "hex": "#1f2b33",
+      "rgb": [
+        31,
+        43,
+        51
+      ],
+      "share": 0.01642
+    },
+    {
+      "hex": "#9bc9d1",
+      "rgb": [
+        155,
+        201,
+        209
+      ],
+      "share": 0.01093
+    },
+    {
+      "hex": "#918f91",
+      "rgb": [
+        145,
+        143,
+        145
+      ],
+      "share": 0.01025
+    },
+    {
+      "hex": "#a4a5a2",
+      "rgb": [
+        164,
+        165,
+        162
+      ],
+      "share": 0.00811
+    }
+  ]
+}
