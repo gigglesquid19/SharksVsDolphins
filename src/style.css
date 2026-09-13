@@ -495,9 +495,11 @@ button.school.mega-pod:hover:not(:disabled) { box-shadow: 0 6px 22px rgba(168, 8
   padding: 0;
   border-radius: 0;
 }
+/* Only a fallback: applyFullscreenCanvasSize sets both dimensions in pixels as soon as it runs,
+   measuring the control bar first. Whichever of the two budgets binds, the ratio is kept. */
 .canvas-wrap:fullscreen canvas, .canvas-wrap.compact canvas {
-  width: 100vmin;
-  height: 100vmin;
+  width: min(100vw, calc(100vh * 0.75));
+  height: auto;
   max-width: none;
   border-radius: 0;
 }
@@ -1879,10 +1881,14 @@ button.mega-shrimp.green {
   display: none;
 }
 
+/* The arena is 3:4, so the canvas is too. The width is capped by what the height budget allows
+   rather than letting max-height clamp a full-width box, which would squash the picture. */
 canvas {
   display: block;
-  width: 100%;
+  aspect-ratio: 3 / 4;
+  width: min(100%, calc(74vh * 0.75));
   height: auto;
+  margin: 0 auto;
   border-radius: 14px;
   background: #020617;
   box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.6);

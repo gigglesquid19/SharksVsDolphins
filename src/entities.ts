@@ -1,4 +1,4 @@
-import { CANVAS_SIZE, SIZE } from './constants';
+import { SIZE_X, SIZE_Y, WORLD_SCALE } from './constants';
 import { clampEntityY, clampX, directionDelta, wrapX } from './utils';
 import type { SharkKind } from './sprites';
 
@@ -185,7 +185,7 @@ export class Shark {
     if (!player) return;
     const huntRadius = this.large ? LARGE_HUNT_RADIUS : HUNT_RADIUS;
     const distToPlayer = this.distanceBetween(player);
-    const margin = Math.ceil((24 * this.sizeMultiplier) / (CANVAS_SIZE / SIZE));
+    const margin = Math.ceil((24 * this.sizeMultiplier) / WORLD_SCALE);
     const keepX = this.kind === 'tiger' || this.matriarch ? clampX : wrapX;
 
     // Blasted by a Pistol Shrimp: tumbling away and no threat to anyone until it rights itself.
@@ -350,7 +350,7 @@ export class Shark {
       // heading pointed straight out of bounds, so the shark ran along the edge instead.
       const edge = 12;
       const EDGE_PUSH = 2.5;
-      const floor = SIZE - 1 - margin;
+      const floor = SIZE_Y - 1 - margin;
       if (this._y < margin + edge) desY += (EDGE_PUSH * (margin + edge - this._y)) / edge;
       else if (this._y > floor - edge) desY -= (EDGE_PUSH * (this._y - (floor - edge))) / edge;
 
@@ -375,7 +375,7 @@ export class Jellyfish {
 
   constructor(id: number, y: number) {
     this.id = id;
-    this._x = SIZE + Math.random() * 20;
+    this._x = SIZE_X + Math.random() * 20;
     this._y = y;
     this.speed = 0.2 + Math.random() * 0.3;
   }

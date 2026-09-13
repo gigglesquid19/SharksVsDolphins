@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { SIZE_X, SIZE_Y } from './constants';
 import { Dolphin, Jellyfish, Shark } from './entities';
 
 describe('Dolphin', () => {
@@ -68,8 +69,8 @@ describe('Jellyfish', () => {
   it('spawns off the right edge at the given height, drifting left', () => {
     const jelly = new Jellyfish(0, 42);
     expect(jelly._y).toBe(42);
-    expect(jelly._x).toBeGreaterThanOrEqual(100);
-    expect(jelly._x).toBeLessThan(120);
+    expect(jelly._x).toBeGreaterThanOrEqual(SIZE_X);
+    expect(jelly._x).toBeLessThan(SIZE_X + 20);
     expect(jelly.speed).toBeGreaterThanOrEqual(0.2);
     expect(jelly.speed).toBeLessThan(0.5);
   });
@@ -152,12 +153,12 @@ describe('Shark.move idle search', () => {
   });
 
   it('stays within the vertical bounds while searching', () => {
-    const p = playerAt(95, 95);
+    const p = playerAt(85, 110);
     const s = testShark(20, 50);
     for (let i = 0; i < 400; i++) {
       s.move(1, p, [s], false, NOW);
       expect(s._y).toBeGreaterThanOrEqual(0);
-      expect(s._y).toBeLessThanOrEqual(100);
+      expect(s._y).toBeLessThanOrEqual(SIZE_Y);
     }
   });
 });
@@ -174,7 +175,7 @@ describe('Shark.move hunt radius', () => {
   function step(shark: Shark, player: Dolphin): number {
     const bx = shark._x;
     const by = shark._y;
-    shark.move(1, player, [shark, testShark(95, 95)], false, NOW);
+    shark.move(1, player, [shark, testShark(80, 110)], false, NOW);
     return Math.hypot(shark._x - bx, shark._y - by);
   }
 
@@ -192,8 +193,10 @@ describe('Shark.move hunt radius', () => {
   });
 
   it('a large shark still loses track past its wider radius', () => {
-    const p = playerAt(50, 50);
-    const big = testShark(95, 50, { large: true });
+    // Measured vertically: the world wraps horizontally over SIZE_X, so no two points can be more
+    // than half of it apart across the x axis - which is less than a large shark's own radius.
+    const p = playerAt(50, 20);
+    const big = testShark(50, 65, { large: true });
     expect(step(big, p)).toBeCloseTo(CRUISE_STEP, 5);
   });
 });

@@ -34,7 +34,7 @@ import {
   zoneEnteredAt,
   zoneNumber,
 } from './levels';
-import { CANVAS_SIZE, SIZE } from './constants';
+import { CANVAS_H, CANVAS_W, SIZE_X, SIZE_Y, WORLD_SCALE } from './constants';
 import { clampEntityY, directionDelta, sweptDistance, wrapX } from './utils';
 import { Dolphin, Shark, Jellyfish } from './entities';
 import type { ConsumableId, Inventory } from './inventory';
@@ -136,7 +136,7 @@ const LEVEL_START_INVULNERABILITY_MS = 5000;
 // the canvas and leans against the player's movement, while a field of drifting motes sits in
 // front of it and leans further, so the two planes separate as you swim.
 const BG_OVERSCAN = 1.14;
-const BG_PARALLAX_PX = CANVAS_SIZE * 0.045;
+const BG_PARALLAX_PX = CANVAS_W * 0.045;
 /** How much further the near plane travels than the background. This ratio is the parallax. */
 const NEAR_PARALLAX_FACTOR = 2.4;
 const MOTE_COUNT = 30;
@@ -716,8 +716,8 @@ export class Game {
   async init(): Promise<void> {
     this.app = new Application();
     await this.app.init({
-      width: CANVAS_SIZE,
-      height: CANVAS_SIZE,
+      width: CANVAS_W,
+      height: CANVAS_H,
       background: '#020617',
       antialias: true,
       resolution: window.devicePixelRatio || 1,
@@ -995,7 +995,7 @@ export class Game {
     // from shrimpSpeedBonus rather than from this being a yes/no.
     this.player.speedBoostUntil = Number.MAX_SAFE_INTEGER;
 
-    const scale = CANVAS_SIZE / SIZE;
+    const scale = WORLD_SCALE;
     this.particles.emit('sparkle', this.player._x * scale + scale / 2, this.player._y * scale + scale / 2, 18, {
       speed: 2,
       life: 0.8,
@@ -1034,7 +1034,7 @@ export class Game {
       shark.stalking = false;
     }
 
-    const scale = CANVAS_SIZE / SIZE;
+    const scale = WORLD_SCALE;
     this.particles.emit('bubble', this.player._x * scale + scale / 2, this.player._y * scale + scale / 2, 24, {
       speed: 2.4,
       life: 1.1,
@@ -1081,7 +1081,7 @@ export class Game {
       this.revealShark(shark, now);
     }
 
-    const scale = CANVAS_SIZE / SIZE;
+    const scale = WORLD_SCALE;
     this.particles.emit('sparkle', this.player._x * scale + scale / 2, this.player._y * scale + scale / 2, 30, {
       speed: 5,
       life: 0.7,
@@ -1366,7 +1366,7 @@ export class Game {
   private finishMatriarchWithMegaPod(): void {
     if (!this.matriarch) return;
     this.megaPodActive = false;
-    const scale = CANVAS_SIZE / SIZE;
+    const scale = WORLD_SCALE;
     this.particles.emit('hit', this.matriarch._x * scale + scale / 2, this.matriarch._y * scale + scale / 2, 24, {
       speed: 4,
       life: 0.8,
@@ -1493,13 +1493,13 @@ export class Game {
       this.bgSprite.scale.set(this.bgBaseScale * (1 + BG_PUSH_IN * progress));
     }
 
-    const wrapSpan = CANVAS_SIZE * NEAR_PARALLAX_FACTOR * 0.14;
+    const wrapSpan = CANVAS_W * NEAR_PARALLAX_FACTOR * 0.14;
     for (const mote of this.motes) {
       mote.gfx.y -= mote.speed * seconds;
       mote.gfx.x += Math.sin(t * 0.3 + mote.phase) * mote.sway * seconds;
       if (mote.gfx.y < -wrapSpan) {
-        mote.gfx.y = CANVAS_SIZE + wrapSpan;
-        mote.gfx.x = -wrapSpan + Math.random() * (CANVAS_SIZE + wrapSpan * 2);
+        mote.gfx.y = CANVAS_H + wrapSpan;
+        mote.gfx.x = -wrapSpan + Math.random() * (CANVAS_W + wrapSpan * 2);
       }
     }
 
@@ -1509,13 +1509,13 @@ export class Game {
       shaft.gfx.alpha = 0.65 + Math.sin(t * 0.11 + shaft.phase * 1.7) * 0.35;
     }
 
-    const bubbleSpan = CANVAS_SIZE * BUBBLE_PARALLAX_FACTOR * 0.14;
+    const bubbleSpan = CANVAS_W * BUBBLE_PARALLAX_FACTOR * 0.14;
     for (const bubble of this.bubbles) {
       bubble.gfx.y -= bubble.speed * seconds;
       bubble.gfx.x += Math.sin(t * 1.1 + bubble.phase) * bubble.sway * seconds;
       if (bubble.gfx.y < -bubbleSpan - bubble.radius) {
-        bubble.gfx.y = CANVAS_SIZE + bubbleSpan + bubble.radius;
-        bubble.gfx.x = -bubbleSpan + Math.random() * (CANVAS_SIZE + bubbleSpan * 2);
+        bubble.gfx.y = CANVAS_H + bubbleSpan + bubble.radius;
+        bubble.gfx.x = -bubbleSpan + Math.random() * (CANVAS_W + bubbleSpan * 2);
       }
     }
   }
@@ -1523,13 +1523,13 @@ export class Game {
   private buildMotes(): void {
     this.driftContainer.removeChildren();
     this.motes = [];
-    const spread = CANVAS_SIZE * NEAR_PARALLAX_FACTOR * 0.14;
+    const spread = CANVAS_W * NEAR_PARALLAX_FACTOR * 0.14;
     for (let i = 0; i < MOTE_COUNT; i++) {
       const gfx = new Graphics();
       const radius = 0.8 + Math.random() * 2.2;
       gfx.circle(0, 0, radius).fill({ color: 0xdff3ff, alpha: 0.1 + Math.random() * 0.22 });
-      gfx.x = -spread + Math.random() * (CANVAS_SIZE + spread * 2);
-      gfx.y = -spread + Math.random() * (CANVAS_SIZE + spread * 2);
+      gfx.x = -spread + Math.random() * (CANVAS_W + spread * 2);
+      gfx.y = -spread + Math.random() * (CANVAS_H + spread * 2);
       this.driftContainer.addChild(gfx);
       this.motes.push({
         gfx,
@@ -1554,14 +1554,14 @@ export class Game {
       const topWidth = 26 + Math.random() * 44;
       const spread = 30 + Math.random() * 70;
       // Leaning the same way for all of them reads as one sun overhead, rather than as several.
-      const drop = CANVAS_SIZE + overhang * 2;
+      const drop = CANVAS_H + overhang * 2;
       const lean = drop * (0.22 + Math.random() * 0.16);
       const alpha = 0.05 + Math.random() * 0.06;
       gfx
         .poly([0, -overhang, topWidth, -overhang, lean + topWidth + spread, drop - overhang, lean - spread, drop - overhang])
         .fill({ color: 0xcdefff, alpha });
       gfx.blendMode = 'add';
-      const baseX = -120 + (i + Math.random() * 0.6) * ((CANVAS_SIZE + 240) / SHAFT_COUNT);
+      const baseX = -120 + (i + Math.random() * 0.6) * ((CANVAS_W + 240) / SHAFT_COUNT);
       gfx.x = baseX;
       this.shaftContainer.addChild(gfx);
       this.shafts.push({ gfx, baseX, sway: 10 + Math.random() * 26, phase: Math.random() * Math.PI * 2, alpha });
@@ -1576,15 +1576,15 @@ export class Game {
   private buildBubbles(): void {
     this.bubbleContainer.removeChildren();
     this.bubbles = [];
-    const spread = CANVAS_SIZE * BUBBLE_PARALLAX_FACTOR * 0.14;
+    const spread = CANVAS_W * BUBBLE_PARALLAX_FACTOR * 0.14;
     for (let i = 0; i < BUBBLE_COUNT; i++) {
       const radius = 1.6 + Math.random() * 4.4;
       const gfx = new Graphics();
       gfx.circle(0, 0, radius).fill({ color: 0xd8f4ff, alpha: 0.1 + Math.random() * 0.12 });
       gfx.circle(0, 0, radius).stroke({ width: 1, color: 0xeafaff, alpha: 0.3 + Math.random() * 0.25 });
       gfx.circle(-radius * 0.3, -radius * 0.35, Math.max(0.5, radius * 0.28)).fill({ color: 0xffffff, alpha: 0.5 });
-      gfx.x = -spread + Math.random() * (CANVAS_SIZE + spread * 2);
-      gfx.y = -spread + Math.random() * (CANVAS_SIZE + spread * 2);
+      gfx.x = -spread + Math.random() * (CANVAS_W + spread * 2);
+      gfx.y = -spread + Math.random() * (CANVAS_H + spread * 2);
       this.bubbleContainer.addChild(gfx);
       this.bubbles.push({
         gfx,
@@ -1602,10 +1602,10 @@ export class Game {
     const bg = new Sprite(texture);
 
     // Overscanned, so the parallax lean never drags an edge into view.
-    const scale = Math.max(CANVAS_SIZE / bg.width, CANVAS_SIZE / bg.height) * BG_OVERSCAN;
+    const scale = Math.max(CANVAS_W / bg.width, CANVAS_H / bg.height) * BG_OVERSCAN;
     bg.anchor.set(0.5);
     bg.scale.set(scale);
-    bg.position.set(CANVAS_SIZE / 2, CANVAS_SIZE / 2);
+    bg.position.set(CANVAS_W / 2, CANVAS_H / 2);
 
     this.bgContainer.removeChildren();
     this.bgContainer.addChild(bg);
@@ -1617,9 +1617,9 @@ export class Game {
 
   private createEnvironment(): void {
     this.environment = [];
-    for (let y = 0; y < SIZE; y++) {
+    for (let y = 0; y < SIZE_Y; y++) {
       const row: number[] = [];
-      for (let x = 0; x < SIZE; x++) {
+      for (let x = 0; x < SIZE_X; x++) {
         row.push(Math.floor(Math.random() * 100));
       }
       this.environment.push(row);
@@ -1632,8 +1632,8 @@ export class Game {
     const candidates: { x: number; y: number }[] = [];
     for (let i = 0; i < 12; i++) {
       candidates.push({
-        x: Math.floor(margin + Math.random() * (SIZE - margin * 2)),
-        y: Math.floor(yMin + Math.random() * (SIZE - yMin - margin)),
+        x: Math.floor(margin + Math.random() * (SIZE_X - margin * 2)),
+        y: Math.floor(yMin + Math.random() * (SIZE_Y - yMin - margin)),
       });
     }
     let best = candidates[0];
@@ -1684,8 +1684,8 @@ export class Game {
     this.particles.clear();
 
     this.dolphins = [];
-    const px = Math.floor(SIZE / 2);
-    const py = Math.floor(SIZE / 2);
+    const px = Math.floor(SIZE_X / 2);
+    const py = Math.floor(SIZE_Y / 2);
     this.player = new Dolphin(0, py, px);
     this.player.isPlayer = true;
     this.player.invulnerableUntil = Date.now() + LEVEL_START_INVULNERABILITY_MS;
@@ -2397,8 +2397,8 @@ ${zone.depth}`, 'levelup', duration + 1400);
     this.onMusicResume?.();
 
     this.player.invulnerableUntil = Date.now() + 4000;
-    this.player._x = Math.floor(SIZE / 2);
-    this.player._y = Math.floor(SIZE / 2);
+    this.player._x = Math.floor(SIZE_X / 2);
+    this.player._y = Math.floor(SIZE_Y / 2);
     for (let i = 0; i < 3; i++) this.spawnRecruitedDolphin(this.player._x, this.player._y);
 
     this.playerHitCooldownUntil = Date.now() + 4000;
@@ -3240,7 +3240,7 @@ ${cleared.name} Zone Liberated
   }
 
   private emitCloakBurst(shark: Shark): void {
-    const scale = CANVAS_SIZE / SIZE;
+    const scale = WORLD_SCALE;
     this.particles.emit('hit', shark._x * scale + scale / 2, shark._y * scale + scale / 2, 12, {
       speed: 1.8,
       life: 0.7,
@@ -3283,8 +3283,8 @@ ${cleared.name} Zone Liberated
     if (!this.player) return;
     let tries = 0;
     do {
-      shark._x = Math.floor(Math.random() * SIZE);
-      shark._y = Math.floor(Math.random() * SIZE);
+      shark._x = Math.floor(Math.random() * SIZE_X);
+      shark._y = Math.floor(Math.random() * SIZE_Y);
       tries += 1;
     } while (this.distanceToPlayer(shark) < SHARK_SPAWN_CLEARANCE && tries < 40);
     shark.lastX = shark._x;
@@ -3339,7 +3339,7 @@ ${cleared.name} Zone Liberated
         SHARK_KIND_LOOK[shark.kind].speed *
         (shark.kind === 'greatWhite' ? GREAT_WHITE_LARGE_SPEED_BONUS : 1);
       this.randomizeSharkSpawnPosition(shark);
-      const margin = Math.ceil((24 * shark.sizeMultiplier) / (CANVAS_SIZE / SIZE));
+      const margin = Math.ceil((24 * shark.sizeMultiplier) / WORLD_SCALE);
       shark._y = clampEntityY(shark._y, margin);
       this.sharks.push(shark);
       this.addSharkSprite(shark);
@@ -3382,8 +3382,8 @@ ${cleared.name} Zone Liberated
     shark.matriarch = true;
     shark.sizeMultiplier = LARGE_SHARK_SIZE_MULTIPLIER * 2;
     shark.speedMultiplier = 0.5;
-    shark._x = SIZE + 15;
-    shark._y = Math.floor(Math.random() * (SIZE - 8)) + 4;
+    shark._x = SIZE_X + 15;
+    shark._y = Math.floor(Math.random() * (SIZE_Y - 8)) + 4;
     shark.lastX = shark._x;
     shark.lastY = shark._y;
     this.matriarch = shark;
@@ -3399,8 +3399,8 @@ ${cleared.name} Zone Liberated
     shark.large = true;
     shark.sizeMultiplier = LARGE_SHARK_SIZE_MULTIPLIER;
     shark.speedMultiplier = 1.25;
-    shark._x = SIZE + 15;
-    shark._y = Math.floor(Math.random() * (SIZE - 8)) + 4;
+    shark._x = SIZE_X + 15;
+    shark._y = Math.floor(Math.random() * (SIZE_Y - 8)) + 4;
     shark.lastX = shark._x;
     shark.lastY = shark._y;
     this.sharks.push(shark);
@@ -3430,7 +3430,7 @@ ${cleared.name} Zone Liberated
     this.lostAtSwarmStart = this.totalLost;
     this.clearJellyfish();
     for (let i = 0; i < JELLYFISH_COUNT; i++) {
-      const y = 2 + Math.random() * (SIZE - 4);
+      const y = 2 + Math.random() * (SIZE_Y - 4);
       const jelly = new Jellyfish(i, y);
       this.jellyfish.push(jelly);
       const sprite = createJellyfishSprite();
@@ -3469,7 +3469,7 @@ ${cleared.name} Zone Liberated
   }
 
   private drawJellyfish(): void {
-    const scale = CANVAS_SIZE / SIZE;
+    const scale = WORLD_SCALE;
     for (const [jelly, sprite] of this.jellyfishSprites) {
       sprite.x = jelly._x * scale + scale / 2;
       sprite.y = jelly._y * scale + scale / 2;
@@ -3621,7 +3621,7 @@ ${cleared.name} Zone Liberated
     if (dx !== 0 || dy !== 0) {
       const step = maxSpeed * throttle;
       const rawX = this.player._x + dx * step;
-      if (this.awaitingNewWaters && dx > 0 && rawX >= SIZE) {
+      if (this.awaitingNewWaters && dx > 0 && rawX >= SIZE_X) {
         this.player._x = 2;
         this.player.lastX = 2;
         this.advanceLevel().catch((err) => console.warn('Level transition failed:', err));
@@ -3714,7 +3714,7 @@ ${cleared.name} Zone Liberated
       }
     }
 
-    const scale = CANVAS_SIZE / SIZE;
+    const scale = WORLD_SCALE;
 
     const canSchool = this.getPodSize() >= HUNTING_MODE_POD_SIZE;
 
@@ -3955,8 +3955,8 @@ ${cleared.name} Zone Liberated
     this.bubbleTimer += dt;
     if (this.bubbleTimer > 0.25) {
       this.bubbleTimer = 0;
-      const bx = Math.random() * CANVAS_SIZE;
-      this.particles.emitDirected('bubble', bx, CANVAS_SIZE, 1, 0, -1, { speed: 0.8 + Math.random() * 1.2, life: 2 + Math.random() * 2 });
+      const bx = Math.random() * CANVAS_W;
+      this.particles.emitDirected('bubble', bx, CANVAS_H, 1, 0, -1, { speed: 0.8 + Math.random() * 1.2, life: 2 + Math.random() * 2 });
     }
 
     if (this.player && dt > 0) {
@@ -4025,7 +4025,7 @@ ${cleared.name} Zone Liberated
   }
 
   private draw(): void {
-    const scale = CANVAS_SIZE / SIZE;
+    const scale = WORLD_SCALE;
     const t = this.gameTime || 0;
 
     const now = Date.now();
@@ -4176,7 +4176,7 @@ ${cleared.name} Zone Liberated
 
     this.stormOverlay.clear();
     if (this.activeEvent?.type === 'storm') {
-      this.stormOverlay.rect(0, 0, CANVAS_SIZE, CANVAS_SIZE).fill({ color: 0x0b1225, alpha: 0.5 });
+      this.stormOverlay.rect(0, 0, CANVAS_W, CANVAS_H).fill({ color: 0x0b1225, alpha: 0.5 });
     }
 
     this.drawGloom(scale);

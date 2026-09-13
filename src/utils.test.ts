@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { SIZE_X, SIZE_Y } from './constants';
 import { clampEntityY, clampX, directionDelta, sweptDistance, wrapX } from './utils';
 
 describe('wrapX', () => {
@@ -8,12 +9,12 @@ describe('wrapX', () => {
   });
 
   it('wraps values past the right edge', () => {
-    expect(wrapX(150)).toBe(50);
-    expect(wrapX(100)).toBe(0);
+    expect(wrapX(SIZE_X + 50)).toBe(50);
+    expect(wrapX(SIZE_X)).toBe(0);
   });
 
   it('wraps negative values from the left edge', () => {
-    expect(wrapX(-10)).toBe(90);
+    expect(wrapX(-10)).toBe(SIZE_X - 10);
   });
 });
 
@@ -23,7 +24,7 @@ describe('clampX', () => {
   });
 
   it('clamps above the upper bound', () => {
-    expect(clampX(150)).toBe(100);
+    expect(clampX(SIZE_X + 50)).toBe(SIZE_X);
   });
 
   it('clamps below the lower bound', () => {
@@ -37,7 +38,7 @@ describe('clampEntityY', () => {
   });
 
   it('clamps above the upper margin', () => {
-    expect(clampEntityY(150, 2)).toBe(97);
+    expect(clampEntityY(SIZE_Y + 30, 2)).toBe(SIZE_Y - 3);
   });
 
   it('clamps below the lower margin', () => {
@@ -52,11 +53,11 @@ describe('directionDelta', () => {
   });
 
   it('takes the shorter wrapped path across the right edge', () => {
-    expect(directionDelta(10, 90)).toBe(20);
+    expect(directionDelta(10, SIZE_X - 10)).toBe(20);
   });
 
   it('takes the shorter wrapped path across the left edge', () => {
-    expect(directionDelta(90, 10)).toBe(-20);
+    expect(directionDelta(SIZE_X - 10, 10)).toBe(-20);
   });
 });
 
@@ -89,7 +90,7 @@ describe('sweptDistance', () => {
 
   it('measures across the horizontal seam rather than around the world', () => {
     // Shark stepping off the right edge onto the left one, dolphin waiting just inside it.
-    expect(sweptDistance(at(99, 50, 1, 50), at(2, 50, 2, 50))).toBeCloseTo(1);
+    expect(sweptDistance(at(SIZE_X - 1, 50, 1, 50), at(2, 50, 2, 50))).toBeCloseTo(1);
   });
 
   it('is symmetric in its arguments', () => {

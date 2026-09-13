@@ -4,6 +4,7 @@ import { sfx } from './sfx';
 import { clearRunCheckpoint, loadRunCheckpoint } from './runState';
 import { getDolphinName, hasNamedDolphin, setDolphinName } from './profile';
 import { nextTrackIn, trackTitle } from './music';
+import { CANVAS_H, CANVAS_W } from './constants';
 import { getPearls } from './pearls';
 import { DAILY_REWARDS, claimDailyReward, dailyRewardAvailable, nextStreakDay } from './dailyReward';
 import type { ConsumableId, Inventory } from './inventory';
@@ -638,18 +639,20 @@ const inputs = {
       const reservedTop = controlsEl ? controlsEl.getBoundingClientRect().bottom + gap : 0;
       canvasWrap.style.paddingTop = `${reservedTop}px`;
 
-      // The world grid is a fixed 1:1 square, so the canvas is sized as a square: the largest
-      // one that fits both budgets. Filling width and height independently did cover more of a
-      // tall phone screen, but it stretched the world - on a wide window it came out over 3:1,
-      // with circular things drawn as ellipses and vertical distances reading differently from
-      // horizontal ones. WIDTH_FILL/HEIGHT_FILL leave breathing room rather than going fully
-      // edge-to-edge; the height budget also keeps the fixed d-pad row clear of the play area.
-      const WIDTH_FILL = 0.98;
-      const HEIGHT_FILL = 0.86;
+      // The largest box of the arena's own shape that fits both budgets. The proportions are never
+      // touched - filling width and height independently would stretch the world, drawing circular
+      // things as ellipses and making vertical distances read differently from horizontal ones.
+      // WIDTH_FILL/HEIGHT_FILL leave breathing room rather than going fully edge to edge; the
+      // height budget is what keeps the fixed d-pad row clear of the play area.
+      const WIDTH_FILL = 0.99;
+      const HEIGHT_FILL = 0.88;
+      const ratio = CANVAS_W / CANVAS_H;
       const availableHeight = window.innerHeight - reservedTop;
-      const side = Math.max(1, Math.min(window.innerWidth * WIDTH_FILL, availableHeight * HEIGHT_FILL));
-      gameCanvas.style.width = `${side}px`;
-      gameCanvas.style.height = `${side}px`;
+      let width = Math.max(1, window.innerWidth * WIDTH_FILL);
+      const maxHeight = Math.max(1, availableHeight * HEIGHT_FILL);
+      if (width / ratio > maxHeight) width = maxHeight * ratio;
+      gameCanvas.style.width = `${width}px`;
+      gameCanvas.style.height = `${width / ratio}px`;
       // The badges hang off the canvas's top edge in this layout, which has just moved.
       syncStageTop();
     } else {
