@@ -3348,12 +3348,14 @@ ${cleared.name} Zone Liberated
     this.sharks = [];
 
     let id = 0;
-    // A sandbox deals its species in turn rather than at random: with only a handful of sharks in
-    // the water, a random draw can easily put none of one kind in front of you, which is the one
-    // thing a test bench must not do. Every real level still draws at random.
-    const bench = isSandboxLevel(config.level);
+    // Some levels deal their species in turn rather than drawing each kind at random: with only a
+    // handful of sharks over a short pool, a random draw can easily put none of one kind in front
+    // of you. That is the one thing a test bench must not do, and equally the one thing a level
+    // introducing a species must not do - see dealKindsInTurn in levels.ts. Levels with a deep
+    // enough pool still draw at random.
+    const dealInTurn = config.dealKindsInTurn === true;
     const pickKind = (i: number) =>
-      bench
+      dealInTurn
         ? config.sharkKinds[i % config.sharkKinds.length]
         : config.sharkKinds[Math.floor(Math.random() * config.sharkKinds.length)];
 

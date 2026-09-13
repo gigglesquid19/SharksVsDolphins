@@ -21,6 +21,15 @@ export interface LevelConfig {
    * at depth Echolocation stops being a convenience and becomes the only way to find anything.
    */
   gloom?: number;
+  /**
+   * Deal the level's species in turn rather than drawing each shark's kind at random.
+   *
+   * A random draw over a short pool can put none of one kind in front of you, which is fine on a
+   * level whose pool is five deep and wrong on one whose whole point is introducing two species.
+   * Note that the large sharks restart the deal, so the pool's order decides which kind the first
+   * large is - see MESOPELAGIC_LEVELS.
+   */
+  dealKindsInTurn?: boolean;
 }
 
 const TIGER: SharkKind[] = ['tiger'];
@@ -154,9 +163,9 @@ const SHARK_SPEED_PER_LEVEL =
   (MAX_ENDLESS_SHARK_SPEED - ENDLESS_BASE_SHARK_SPEED) / (SHARK_SPEED_CAP_LEVEL - LEVELS.length);
 
 /**
- * Test sandboxes: the level that opens the Mesopelagic, the Bathypelagic and the Abyssopelagic is
- * stripped back to one species at a time, so a new shark can be watched on its own instead of
- * being picked out of water already full of tigers.
+ * Test sandboxes: the level that opens the Bathypelagic and the Abyssopelagic is stripped back to
+ * one species at a time, so a new shark can be watched on its own instead of being picked out of
+ * water already full of tigers.
  *
  * Everything else about the level is untouched - the depth, the artwork, the pod limit and the
  * speed modifier all stay - so a shark put in here moves exactly as it would in a real descent.
@@ -167,12 +176,73 @@ const SHARK_SPEED_PER_LEVEL =
  * Each one is dark, as its depth really would be. Level 31 is still empty, ready for the next
  * design; a level holding no sharks cannot be cleared, because the level-complete check only
  * runs when a shark dies, so a run that reaches it stays there until the player quits.
+ *
+ * Level 11 used to be one of these. It is an authored level now - see MESOPELAGIC_LEVELS - so the
+ * bench for whatever comes next is 21, and 31 after it.
  */
 export const SANDBOX_LEVELS: Record<number, Partial<LevelConfig>> = {
-  11: { sharkKinds: ['frilled', 'cookiecutter'], normalSharkCount: 4, largeSharkCount: 0, matriarch: false, gloom: 0.62 },
-  21: { sharkKinds: ['cookiecutter'], normalSharkCount: 4, largeSharkCount: 0, matriarch: false, gloom: 0.8 },
-  31: { sharkKinds: [], normalSharkCount: 0, largeSharkCount: 0, matriarch: false, gloom: 0.9 },
+  21: { sharkKinds: ['cookiecutter'], normalSharkCount: 4, largeSharkCount: 0, matriarch: false, gloom: 0.8, dealKindsInTurn: true },
+  31: { sharkKinds: [], normalSharkCount: 0, largeSharkCount: 0, matriarch: false, gloom: 0.9, dealKindsInTurn: true },
 };
+
+/**
+ * The Mesopelagic, levels 11-20, authored rather than scaled.
+ *
+ * Past the campaign every level was the same three shallow-water species in slowly growing
+ * numbers, so the two deep-water sharks existed only on a test bench and the zone that should
+ * have introduced them never did. These ten run the curve levels 1-10 run - the same counts
+ * (4,5,5,6,6,7,7,8,8,9 small against 0,0,1,1,2,2,3,3,4,4 large), a new species folded in twice
+ * along the way, and a Matriarch at the end - but starting from the frilled shark and the
+ * cookiecutter rather than from tigers.
+ *
+ * 11-15 are those two alone, dealt in turn so both are always in the water: a random draw over a
+ * two-deep pool can hand you four of one kind, which is no way to introduce either. From 16 the
+ * shallow-water sharks come back a species at a time and the pool is deep enough that a random
+ * draw stays varied on its own.
+ *
+ * The pool's order carries weight. Large sharks restart the deal at the first entry, so listing
+ * the cookiecutter first means the single large at 13 and 14 is a large cookiecutter at 8 pod,
+ * and the large frilled - 12 pod, against a cap of 15 - only arrives at 15, where there are two
+ * larges and the player has had two levels of warning.
+ *
+ * These are partial configs merged over the endless curve, like the sandboxes, so speed keeps
+ * climbing on the same derived line as every level past them rather than forking its own.
+ */
+const MESO_CC_FRILLED: SharkKind[] = ['cookiecutter', 'frilled'];
+const MESO_PLUS_TIGER: SharkKind[] = ['cookiecutter', 'frilled', 'tiger'];
+const MESO_PLUS_HAMMER: SharkKind[] = ['cookiecutter', 'frilled', 'tiger', 'hammerhead'];
+const MESO_ALL: SharkKind[] = ['cookiecutter', 'frilled', 'tiger', 'hammerhead', 'greatWhite'];
+
+/**
+ * Gloom climbs 0.35 -> 0.62 across the zone, a step of 0.03 a level. Level 10 ends in daylight,
+ * so opening at the 0.62 the bench used to sit at was a wall; eased in, the water closes over the
+ * descent, and the photophores go from a curiosity to the only way to track what is hunting you.
+ */
+const MESO_GLOOM_AT_11 = 0.35;
+const MESO_GLOOM_PER_LEVEL = 0.03;
+const mesoGloom = (level: number): number =>
+  Math.round((MESO_GLOOM_AT_11 + (level - 11) * MESO_GLOOM_PER_LEVEL) * 100) / 100;
+
+/** Held flat across the zone, so the curve is shark counts and darkness rather than pod growth. */
+const MESO_POD_LIMIT = 15;
+
+export const MESOPELAGIC_LEVELS: Record<number, Partial<LevelConfig>> = {
+  11: { sharkKinds: MESO_CC_FRILLED, normalSharkCount: 4, largeSharkCount: 0, dealKindsInTurn: true },
+  12: { sharkKinds: MESO_CC_FRILLED, normalSharkCount: 5, largeSharkCount: 0, dealKindsInTurn: true },
+  13: { sharkKinds: MESO_CC_FRILLED, normalSharkCount: 5, largeSharkCount: 1, dealKindsInTurn: true },
+  14: { sharkKinds: MESO_CC_FRILLED, normalSharkCount: 6, largeSharkCount: 1, dealKindsInTurn: true },
+  15: { sharkKinds: MESO_CC_FRILLED, normalSharkCount: 6, largeSharkCount: 2, dealKindsInTurn: true },
+  16: { sharkKinds: MESO_PLUS_TIGER, normalSharkCount: 7, largeSharkCount: 2 },
+  17: { sharkKinds: MESO_PLUS_HAMMER, normalSharkCount: 7, largeSharkCount: 3 },
+  18: { sharkKinds: MESO_PLUS_HAMMER, normalSharkCount: 8, largeSharkCount: 3 },
+  19: { sharkKinds: MESO_ALL, normalSharkCount: 8, largeSharkCount: 4 },
+  20: { sharkKinds: MESO_ALL, normalSharkCount: 9, largeSharkCount: 4 },
+};
+
+/** Whether this depth is one of the ten authored Mesopelagic levels. */
+export function isMesopelagicLevel(level: number): boolean {
+  return Math.floor(level) in MESOPELAGIC_LEVELS;
+}
 
 /** Whether this depth is a bench for trying sharks out rather than a level meant to be fought through. */
 export function isSandboxLevel(level: number): boolean {
@@ -193,7 +263,14 @@ export function getEndlessLevelConfig(level: number): LevelConfig {
     ),
     matriarch: over % 10 === 0,
   };
-  return isSandboxLevel(level) ? { ...base, ...SANDBOX_LEVELS[Math.floor(level)] } : base;
+  const depth = Math.floor(level);
+  if (isSandboxLevel(level)) return { ...base, ...SANDBOX_LEVELS[depth] };
+  if (isMesopelagicLevel(level)) {
+    // matriarch and sharkSpeedMultiplier are left to the endless curve: level 20 is every tenth
+    // level, so it gets its boss from the same rule that gives 30 and 40 theirs.
+    return { ...base, ...MESOPELAGIC_LEVELS[depth], maxDolphins: MESO_POD_LIMIT, gloom: mesoGloom(depth) };
+  }
+  return base;
 }
 
 /** Resolves the config for any level: campaign levels 1-10 as authored, beyond that endless scaling. */

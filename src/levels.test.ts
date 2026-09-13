@@ -7,7 +7,9 @@ import {
   getEndlessLevelConfig,
   getLevelBackground,
   getLevelConfig,
+  isMesopelagicLevel,
   isSandboxLevel,
+  MESOPELAGIC_LEVELS,
   SANDBOX_LEVELS,
   zoneClearedAt,
   zoneEnteredAt,
@@ -161,10 +163,9 @@ describe('depth zones', () => {
 
 describe('the shark sandboxes', () => {
   it('gives each test depth one species at a time, or nothing at all', () => {
-    expect(getLevelConfig(11).sharkKinds).toEqual(['frilled', 'cookiecutter']);
     expect(getLevelConfig(21).sharkKinds).toEqual(['cookiecutter']);
     expect(getLevelConfig(31).sharkKinds).toEqual([]);
-    for (const level of [11, 21, 31]) {
+    for (const level of [21, 31]) {
       const config = getLevelConfig(level);
       expect(config.largeSharkCount).toBe(0);
       expect(config.matriarch).toBe(false);
@@ -173,16 +174,15 @@ describe('the shark sandboxes', () => {
   });
 
   it('keeps every sandbox dark, and darker the deeper it is', () => {
-    const gloom = [11, 21, 31].map((level) => getLevelConfig(level).gloom ?? 0);
+    const gloom = [21, 31].map((level) => getLevelConfig(level).gloom ?? 0);
     expect(gloom.every((g) => g > 0 && g <= 1)).toBe(true);
     expect(gloom[0]).toBeLessThan(gloom[1]);
-    expect(gloom[1]).toBeLessThan(gloom[2]);
   });
 
   it('changes nothing else about them, so a shark put in one behaves as it would anywhere', () => {
     // Everything but the shark list still sits on the curve the surrounding levels are on, so a
     // shark dropped in here is as fast, and faces as big a pod, as it would one level either side.
-    for (const level of [11, 21, 31]) {
+    for (const level of [21, 31]) {
       const before = getLevelConfig(level - 1);
       const sandbox = getLevelConfig(level);
       const after = getLevelConfig(level + 1);
@@ -196,15 +196,92 @@ describe('the shark sandboxes', () => {
 
   it('touches no other depth', () => {
     for (let level = 1; level <= 50; level++) {
-      if (isSandboxLevel(level)) continue;
+      if (isSandboxLevel(level) || isMesopelagicLevel(level)) continue;
       const config = getLevelConfig(level);
       expect(config.normalSharkCount).toBeGreaterThan(0);
       expect(config.gloom).toBeUndefined();
     }
-    expect(Object.keys(SANDBOX_LEVELS).map(Number)).toEqual([11, 21, 31]);
+    expect(Object.keys(SANDBOX_LEVELS).map(Number)).toEqual([21, 31]);
   });
 
   it('opens a zone with each sandbox, so they are easy to find', () => {
-    for (const level of [11, 21, 31]) expect(zoneEnteredAt(level)).not.toBeNull();
+    for (const level of [21, 31]) expect(zoneEnteredAt(level)).not.toBeNull();
+  });
+});
+
+describe('the authored Mesopelagic, levels 11-20', () => {
+  const zone = () => Array.from({ length: 10 }, (_, i) => getLevelConfig(11 + i));
+
+  it('covers exactly 11 to 20', () => {
+    expect(Object.keys(MESOPELAGIC_LEVELS).map(Number)).toEqual([11, 12, 13, 14, 15, 16, 17, 18, 19, 20]);
+    expect(isMesopelagicLevel(10)).toBe(false);
+    expect(isMesopelagicLevel(21)).toBe(false);
+  });
+
+  it('runs the same shark curve levels 1-10 run', () => {
+    expect(zone().map((c) => c.normalSharkCount)).toEqual(LEVELS.map((c) => c.normalSharkCount));
+    expect(zone().map((c) => c.largeSharkCount)).toEqual(LEVELS.map((c) => c.largeSharkCount));
+  });
+
+  it('opens on the two deep-water species alone, and deals them in turn', () => {
+    for (const level of [11, 12, 13, 14, 15]) {
+      const config = getLevelConfig(level);
+      expect(config.sharkKinds).toEqual(['cookiecutter', 'frilled']);
+      expect(config.dealKindsInTurn).toBe(true);
+    }
+  });
+
+  it('folds the shallow-water sharks back in from 16, and stops dealing in turn', () => {
+    expect(getLevelConfig(16).sharkKinds).toContain('tiger');
+    expect(getLevelConfig(17).sharkKinds).toContain('hammerhead');
+    expect(getLevelConfig(19).sharkKinds).toContain('greatWhite');
+    for (const level of [16, 17, 18, 19, 20]) {
+      expect(getLevelConfig(level).dealKindsInTurn).toBeUndefined();
+    }
+  });
+
+  it('never drops a species once it has been introduced', () => {
+    for (let level = 12; level <= 20; level++) {
+      const before = getLevelConfig(level - 1).sharkKinds;
+      const now = getLevelConfig(level).sharkKinds;
+      for (const kind of before) expect(now).toContain(kind);
+    }
+  });
+
+  it('holds the first large to the cheaper species, so 12 pod is never the only option', () => {
+    // Large sharks restart the deal at the pool's first entry, so the single large on 13 and 14
+    // is a cookiecutter at 8 pod; the large frilled at 12 waits for 15, where there are two.
+    for (const level of [13, 14]) {
+      const config = getLevelConfig(level);
+      expect(config.largeSharkCount).toBe(1);
+      expect(config.sharkKinds[0]).toBe('cookiecutter');
+    }
+    expect(getLevelConfig(15).largeSharkCount).toBe(2);
+  });
+
+  it('darkens steadily from level 10s daylight to the zone floor', () => {
+    const gloom = zone().map((c) => c.gloom ?? 0);
+    expect(getLevelConfig(10).gloom ?? 0).toBe(0);
+    expect(gloom[0]).toBeCloseTo(0.35, 5);
+    expect(gloom[9]).toBeCloseTo(0.62, 5);
+    for (let i = 1; i < gloom.length; i++) expect(gloom[i]).toBeGreaterThan(gloom[i - 1]);
+    expect(gloom.every((g) => g > 0 && g < 1)).toBe(true);
+  });
+
+  it('holds the pod limit flat, so the curve is sharks and darkness rather than pod growth', () => {
+    expect(zone().map((c) => c.maxDolphins)).toEqual(Array(10).fill(15));
+  });
+
+  it('keeps the speed climbing on the endless line rather than forking its own', () => {
+    for (let level = 12; level <= 20; level++) {
+      expect(getLevelConfig(level).sharkSpeedMultiplier).toBeGreaterThan(
+        getLevelConfig(level - 1).sharkSpeedMultiplier,
+      );
+    }
+  });
+
+  it('ends the zone on a Matriarch, the way level 10 ends the campaign', () => {
+    expect(getLevelConfig(20).matriarch).toBe(true);
+    for (let level = 11; level <= 19; level++) expect(getLevelConfig(level).matriarch).toBe(false);
   });
 });
