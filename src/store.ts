@@ -56,6 +56,33 @@ export const UPGRADES: Record<UpgradeId, UpgradeDef> = {
   echoRadius: { name: 'Echo Range', desc: '+6 units of vision', prices: [120, 220, 360, 540, 780, 1090] },
 };
 
+const DEVELOPER_MODE_KEY = 'svsd-developer-mode';
+
+/**
+ * Whether the testing build is switched on.
+ *
+ * A flag rather than a one-off action because some of what it does has to hold for the whole of
+ * a run - the dolphin spawn interval is read when a level starts, so something that only fired
+ * on the tap would be forgotten by the time it mattered. Kept out of the store's own state so
+ * clearing a build never silently leaves testing on, or the reverse.
+ */
+export function developerModeActive(): boolean {
+  try {
+    return localStorage.getItem(DEVELOPER_MODE_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export function setDeveloperMode(on: boolean): void {
+  try {
+    if (on) localStorage.setItem(DEVELOPER_MODE_KEY, 'true');
+    else localStorage.removeItem(DEVELOPER_MODE_KEY);
+  } catch (e) {
+    console.warn('Failed to set developer mode', e);
+  }
+}
+
 /**
  * Testing shortcut: brings every upgrade up to half its ceiling, free.
  *

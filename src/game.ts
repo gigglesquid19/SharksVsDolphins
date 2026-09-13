@@ -62,7 +62,7 @@ import {
   PEARLS_FLAWLESS_CAMPAIGN_BONUS,
 } from './pearls';
 import { getDolphinName } from './profile';
-import { baseEcholocationStats, echolocationStats, endlessStartBonuses, equippedSkinId, grantSkin, ownsEcholocation, ownsSkin } from './store';
+import { baseEcholocationStats, developerModeActive, echolocationStats, endlessStartBonuses, equippedSkinId, grantSkin, ownsEcholocation, ownsSkin } from './store';
 import { markCampaignCleared } from './progress';
 import { hasLevelAccess, startLevelIsRanked } from './levelAccess';
 import { skinById } from './skins';
@@ -90,6 +90,16 @@ function escapeHtml(s: string): string {
 }
 
 const DOLPHIN_SPAWN_INTERVAL = 15;
+/**
+ * What that interval becomes with developer mode on: a third off the ordinary 15, so a pod comes
+ * together fast enough to actually get at the deep levels' sharks.
+ *
+ * A frilled shark asks for eight dolphins and a large one twelve, against a cap of fifteen, so
+ * at the stock rate most of a testing run is spent waiting for a pod rather than using it. It
+ * also pins the number: level 10 otherwise halves the interval on its own, which would leave the
+ * one level most worth testing spawning on a different clock from every other.
+ */
+const DEV_DOLPHIN_SPAWN_INTERVAL = 10;
 const EVENT_CHECK_INTERVAL = 60;
 const EVENT_CHANCE = 0.1;
 const EVENT_DURATION = 30;
@@ -3647,7 +3657,11 @@ ${cleared.name} Zone Liberated
 
     this.levelGloom = Math.max(0, Math.min(1, config.gloom ?? 0));
     this.maxDolphins = config.maxDolphins;
-    this.dolphinSpawnInterval = config.level === 10 ? DOLPHIN_SPAWN_INTERVAL / 2 : DOLPHIN_SPAWN_INTERVAL;
+    this.dolphinSpawnInterval = developerModeActive()
+      ? DEV_DOLPHIN_SPAWN_INTERVAL
+      : config.level === 10
+        ? DOLPHIN_SPAWN_INTERVAL / 2
+        : DOLPHIN_SPAWN_INTERVAL;
 
     this.matriarch = null;
     this.matriarchWarningShown = false;

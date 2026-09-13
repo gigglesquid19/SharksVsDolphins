@@ -10,7 +10,7 @@ import {
 import type { SharkKind } from './sprites';
 import { getPearls } from './pearls';
 import { secretTapGesture } from './utils';
-import { grantHalfUpgrades, halfUpgradeLevel } from './store';
+import { developerModeActive, grantHalfUpgrades, halfUpgradeLevel, setDeveloperMode } from './store';
 import {
   FREE_START_LEVEL,
   MAX_START_LEVEL,
@@ -128,12 +128,21 @@ export function setupLevelSelect(opts: LevelSelectOpts): LevelSelectHandles {
    * remember, and on the Pearls because that is what upgrades are bought with.
    */
   const onPearlsTap = secretTapGesture(SECRET_TAPS, SECRET_TAP_GAP_MS, () => {
-    const raised = grantHalfUpgrades();
-    const half = halfUpgradeLevel();
-    notice =
-      raised > 0
-        ? `Testing: every upgrade taken to level ${half}. ${raised} level${raised === 1 ? '' : 's'} granted, and nothing was spent.`
-        : `Testing: every upgrade was already at level ${half} or better, so nothing changed.`;
+    // Toggles, like the depth unlock does, so there is a way back to an ordinary run. Turning it
+    // off leaves the upgrades granted: they are indistinguishable from bought ones by then, and
+    // taking them away could quietly gut a real build.
+    const turningOn = !developerModeActive();
+    setDeveloperMode(turningOn);
+    if (turningOn) {
+      const raised = grantHalfUpgrades();
+      const half = halfUpgradeLevel();
+      notice =
+        `Developer mode on. Every upgrade at level ${half}` +
+        (raised > 0 ? ` (${raised} granted, nothing spent)` : ' already') +
+        ', and a dolphin every 10s instead of 15. Seven taps again to switch it off.';
+    } else {
+      notice = 'Developer mode off. Dolphins are back to their usual pace; the upgrades granted are yours to keep.';
+    }
     opts.onPearlsChange?.();
     selected = null;
     showGrid();

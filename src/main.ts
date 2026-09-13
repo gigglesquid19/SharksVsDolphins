@@ -6,7 +6,7 @@ import { getDolphinName, hasNamedDolphin, setDolphinName } from './profile';
 import { nextTrackIn, trackTitle } from './music';
 import { CANVAS_H, CANVAS_W } from './constants';
 import { getPearls } from './pearls';
-import { grantHalfUpgrades, halfUpgradeLevel } from './store';
+import { developerModeActive, grantHalfUpgrades, halfUpgradeLevel, setDeveloperMode } from './store';
 import { secretTapGesture } from './utils';
 import { DAILY_REWARDS, claimDailyReward, dailyRewardAvailable, nextStreakDay } from './dailyReward';
 import type { ConsumableId, Inventory } from './inventory';
@@ -583,17 +583,20 @@ const inputs = {
     pausePearlsRow.addEventListener(
       'click',
       secretTapGesture(7, 900, () => {
-        const raised = grantHalfUpgrades();
+        const turningOn = !developerModeActive();
+        setDeveloperMode(turningOn);
+        const raised = turningOn ? grantHalfUpgrades() : 0;
         const half = halfUpgradeLevel();
         if (!note) {
           note = document.createElement('p');
           note.className = 'pause-cheat-note';
           pausePearlsRow.insertAdjacentElement('afterend', note);
         }
-        note.textContent =
-          raised > 0
-            ? `Testing: every upgrade to level ${half} - ${raised} granted, nothing spent.`
-            : `Testing: every upgrade was already at level ${half} or better.`;
+        note.textContent = turningOn
+          ? `Developer mode on: every upgrade at level ${half}` +
+            (raised > 0 ? ` (${raised} granted)` : ' already') +
+            ', a dolphin every 10s. Restart the level to feel the new pace.'
+          : 'Developer mode off. Dolphins back to their usual pace; the upgrades are yours to keep.';
         window.clearTimeout(noteTimer);
         noteTimer = window.setTimeout(() => {
           note?.remove();

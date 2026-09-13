@@ -13,8 +13,10 @@ import {
   canBuyUpgrade,
   baseEcholocationStats,
   echolocationStats,
+  developerModeActive,
   grantHalfUpgrades,
   halfUpgradeLevel,
+  setDeveloperMode,
   echolocationUnlocked,
   endlessStartBonuses,
   equipSkin,
@@ -177,6 +179,28 @@ describe('grantHalfUpgrades', () => {
   it('leaves Echolocation alone - it is a purchase, not a rung on the tree', () => {
     grantHalfUpgrades();
     expect(ownsEcholocation()).toBe(false);
+  });
+});
+
+describe('developer mode', () => {
+  it('is off until it is switched on', () => {
+    expect(developerModeActive()).toBe(false);
+  });
+
+  it('switches on and back off', () => {
+    setDeveloperMode(true);
+    expect(developerModeActive()).toBe(true);
+    setDeveloperMode(false);
+    expect(developerModeActive()).toBe(false);
+  });
+
+  it('is kept outside the build, so clearing one does not switch the other', () => {
+    setDeveloperMode(true);
+    grantHalfUpgrades();
+    // Wiping the store's own state leaves the testing flag where it was, and vice versa.
+    localStorage.removeItem('svsd-store');
+    expect(developerModeActive()).toBe(true);
+    expect(upgradeLevel('speed')).toBe(0);
   });
 });
 
