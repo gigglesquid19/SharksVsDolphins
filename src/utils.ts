@@ -59,15 +59,42 @@ export function sweptDistance(a: Swept, b: Swept): number {
  * different numbers of taps or different patience, and so the counter resets the same way: a gap
  * longer than `gapMs` starts again, which is what stops idle prodding ever reaching the count.
  */
-export function secretTapGesture(taps: number, gapMs: number, onFire: () => void): () => void {
+export function secretTapGesture(
+  taps: number,
+  gapMs: number,
+  onFire: () => void,
+  onProgress?: (count: number, needed: number) => void,
+): () => void {
   let count = 0;
   let lastAt = 0;
   return () => {
     const now = Date.now();
     count = now - lastAt > gapMs ? 1 : count + 1;
     lastAt = now;
-    if (count < taps) return;
+    if (count < taps) {
+      // Something visible from partway in. A gesture that stays silent until it fires is
+      // indistinguishable from one that is not registering, which is exactly how it reads when
+      // a tap lands slightly wide or a beat too slow.
+      onProgress?.(count, taps);
+      return;
+    }
     count = 0;
     onFire();
   };
+}
+
+/**
+ * Binds a tap gesture to an element in a way a thumb can actually drive.
+ *
+ * pointerdown rather than click: on touch, a click on a non-interactive element can be held back
+ * or dropped entirely, and rapid taps on text start a selection whose magnifier eats the rest of
+ * them. The two CSS properties are the other half of that - without them the browser is trying
+ * to select words while the gesture is trying to count taps.
+ */
+export function bindSecretTaps(el: HTMLElement, handler: () => void): void {
+  el.style.userSelect = 'none';
+  el.style.webkitUserSelect = 'none';
+  el.style.touchAction = 'manipulation';
+  el.style.cursor = 'default';
+  el.addEventListener('pointerdown', handler);
 }

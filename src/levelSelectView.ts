@@ -9,7 +9,7 @@ import {
 } from './levels';
 import type { SharkKind } from './sprites';
 import { getPearls } from './pearls';
-import { secretTapGesture } from './utils';
+import { bindSecretTaps, secretTapGesture } from './utils';
 import { developerModeActive, grantHalfUpgrades, halfUpgradeLevel, setDeveloperMode } from './store';
 import {
   FREE_START_LEVEL,
@@ -102,7 +102,11 @@ export function setupLevelSelect(opts: LevelSelectOpts): LevelSelectHandles {
    * grid. The count resets if the taps are slow, so idle prodding never triggers it.
    */
   const SECRET_TAPS = 7;
-  const SECRET_TAP_GAP_MS = 900;
+  // 2.5s, not 0.9. A person taps, glances at the screen to see whether anything happened, and
+  // taps again - which overran the old window every time, silently restarting the count and
+  // leaving the gesture looking broken. Being generous costs nothing: seven taps inside two and
+  // a half seconds of each other is still not something anyone does by accident.
+  const SECRET_TAP_GAP_MS = 2500;
   let taps = 0;
   let lastTapAt = 0;
 
@@ -317,10 +321,12 @@ export function setupLevelSelect(opts: LevelSelectOpts): LevelSelectHandles {
     selected = null;
     showGrid();
   });
-  document.getElementById('levelSelectHeading')?.addEventListener('click', onHeadingTap);
+  const headingEl = document.getElementById('levelSelectHeading') as HTMLElement | null;
+  if (headingEl) bindSecretTaps(headingEl, onHeadingTap);
   // The whole Pearls block, icon included - the number on its own is about 12px wide, and a
   // gesture that resets on a miss cannot be built on a target that small.
-  (pearlsEl?.closest('.store-pearls') ?? pearlsEl)?.addEventListener('click', onPearlsTap);
+  const pearlsTapTarget = (pearlsEl?.closest('.store-pearls') ?? pearlsEl) as HTMLElement | null;
+  if (pearlsTapTarget) bindSecretTaps(pearlsTapTarget, onPearlsTap);
 
   return {
     open(): void {

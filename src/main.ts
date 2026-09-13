@@ -7,7 +7,7 @@ import { nextTrackIn, trackTitle } from './music';
 import { CANVAS_H, CANVAS_W } from './constants';
 import { getPearls } from './pearls';
 import { developerModeActive, grantHalfUpgrades, halfUpgradeLevel, setDeveloperMode } from './store';
-import { secretTapGesture } from './utils';
+import { bindSecretTaps, secretTapGesture } from './utils';
 import { DAILY_REWARDS, claimDailyReward, dailyRewardAvailable, nextStreakDay } from './dailyReward';
 import type { ConsumableId, Inventory } from './inventory';
 import { CONSUMABLE_ORDER, CONSUMABLES } from './inventory';
@@ -573,38 +573,58 @@ const inputs = {
    *
    * Bound to the whole row rather than the number, which is a few pixels wide on a phone.
    */
-  const pausePearlsRow = document.querySelector('.pause-pearls') as HTMLElement | null;
-  if (pausePearlsRow) {
-    // The message goes in a line of its own beside the row, never inside it. Rewriting the row
-    // would replace #pearlsNumber, and game.ts looks that element up once at startup - the
-    // balance would have quietly stopped updating from the first time the cheat was used.
+  /**
+   * Puts the developer-mode gesture on a Pearl display.
+   *
+   * Two Pearl displays carry it: this one, on the pause panel, and Level Select's, which has its
+   * own notice and so binds the gesture itself. The title screen's and the Store's deliberately
+   * do not - those are places a player is reading a balance rather than setting up a test.
+   */
+  function installDeveloperModeTaps(el: HTMLElement): void {
     let note: HTMLParagraphElement | null = null;
     let noteTimer = 0;
-    pausePearlsRow.addEventListener(
-      'click',
-      secretTapGesture(7, 900, () => {
-        const turningOn = !developerModeActive();
-        setDeveloperMode(turningOn);
-        const raised = turningOn ? grantHalfUpgrades() : 0;
-        const half = halfUpgradeLevel();
-        if (!note) {
-          note = document.createElement('p');
-          note.className = 'pause-cheat-note';
-          pausePearlsRow.insertAdjacentElement('afterend', note);
-        }
-        note.textContent = turningOn
-          ? `Developer mode on: every upgrade at level ${half}` +
-            (raised > 0 ? ` (${raised} granted)` : ' already') +
-            ', a dolphin every 10s. Restart the level to feel the new pace.'
-          : 'Developer mode off. Dolphins back to their usual pace; the upgrades are yours to keep.';
-        window.clearTimeout(noteTimer);
-        noteTimer = window.setTimeout(() => {
-          note?.remove();
-          note = null;
-        }, 3000);
-      }),
+    bindSecretTaps(
+      el,
+      secretTapGesture(
+        7,
+        2500,
+        () => {
+          const turningOn = !developerModeActive();
+          setDeveloperMode(turningOn);
+          const raised = turningOn ? grantHalfUpgrades() : 0;
+          const half = halfUpgradeLevel();
+          if (!note) {
+            note = document.createElement('p');
+            note.className = 'pause-cheat-note';
+            el.insertAdjacentElement('afterend', note);
+          }
+          note.textContent = turningOn
+            ? `Developer mode on: every upgrade at level ${half}` +
+              (raised > 0 ? ` (${raised} granted)` : ' already') +
+              ', a dolphin every 10s. Restart the level to feel the new pace.'
+            : 'Developer mode off. Dolphins back to their usual pace; the upgrades are yours to keep.';
+          window.clearTimeout(noteTimer);
+          noteTimer = window.setTimeout(() => {
+            note?.remove();
+            note = null;
+          }, 3000);
+        },
+        // Counts up from partway in, so a run of taps that is landing looks different from one
+        // that is not - the only way to tell, otherwise, is whether the seventh does anything.
+        (count, needed) => {
+          if (count < 3) return;
+          el.style.opacity = String(1 - 0.12 * (needed - count));
+          window.setTimeout(() => { el.style.opacity = ''; }, 2600);
+        },
+      ),
     );
   }
+
+  const pausePearlsRow = document.querySelector('.pause-pearls') as HTMLElement | null;
+  // The note is inserted after the row rather than written into it: rewriting the row would
+  // replace #pearlsNumber, which game.ts looks up once at startup, and the balance would quietly
+  // stop updating from the first use of the cheat onwards.
+  if (pausePearlsRow) installDeveloperModeTaps(pausePearlsRow);
 
   document.getElementById('pauseBtn')!.addEventListener('click', () => game.togglePause());
   document.getElementById('pauseResumeBtn')!.addEventListener('click', () => game.togglePause());
