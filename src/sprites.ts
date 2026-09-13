@@ -1,6 +1,11 @@
 import { AnimatedSprite, Container, Graphics, Rectangle, Sprite, Texture } from 'pixi.js';
 
-export type SharkKind = 'greatWhite' | 'hammerhead' | 'tiger';
+/**
+ * Every shark in the water. The first three each have their own animated strip; the last two are
+ * drawn from the tiger's, reshaped and recoloured (see SHARK_KIND_LOOK in game.ts), which is how
+ * a new species gets added without commissioning a new sprite sheet.
+ */
+export type SharkKind = 'greatWhite' | 'hammerhead' | 'tiger' | 'frilled' | 'cookiecutter';
 
 export interface SharkTextureSet {
   move: Texture[];
@@ -24,17 +29,27 @@ export function sliceSharkStrip(baseTexture: Texture): Texture[] {
   return frames;
 }
 
+const SHARK_SWIM_SPEED = 0.15;
+const SHARK_ATTACK_SPEED = 0.28;
+
 export class SharkFishSprite extends AnimatedSprite {
   private moveTextures: Texture[];
   private attackTextures: Texture[];
   private attacking = false;
+  /**
+   * How fast this shark works through its frames, against the stock rate. A species drawn from
+   * another one's strip needs it: the same nine frames played slowly read as a long body
+   * undulating, and played fast as something small flicking about.
+   */
+  private readonly speedScale: number;
 
-  constructor(textures: SharkTextureSet) {
+  constructor(textures: SharkTextureSet, speedScale = 1) {
     super(textures.move);
     this.moveTextures = textures.move;
     this.attackTextures = textures.attack;
+    this.speedScale = speedScale;
     this.anchor.set(0.5);
-    this.animationSpeed = 0.15;
+    this.animationSpeed = SHARK_SWIM_SPEED * speedScale;
     this.play();
   }
 
@@ -42,7 +57,7 @@ export class SharkFishSprite extends AnimatedSprite {
     if (attacking === this.attacking) return;
     this.attacking = attacking;
     this.textures = attacking ? this.attackTextures : this.moveTextures;
-    this.animationSpeed = attacking ? 0.28 : 0.15;
+    this.animationSpeed = (attacking ? SHARK_ATTACK_SPEED : SHARK_SWIM_SPEED) * this.speedScale;
     this.gotoAndPlay(0);
   }
 }
@@ -248,8 +263,8 @@ function cssToHex(css: string): number {
   return 0x33619e;
 }
 
-export function createSharkSprite(textures: SharkTextureSet): SharkFishSprite {
-  return new SharkFishSprite(textures);
+export function createSharkSprite(textures: SharkTextureSet, speedScale = 1): SharkFishSprite {
+  return new SharkFishSprite(textures, speedScale);
 }
 
 export function makeRadialGradientTexture(size: number, color: string): Texture {
@@ -260,6 +275,38 @@ export function makeRadialGradientTexture(size: number, color: string): Texture 
   const grad = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
   grad.addColorStop(0, color);
   grad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size, size);
+  return Texture.from(c);
+}
+
+/**
+ * The fraction of the vignette texture's radius that is left completely clear. Exported so the
+ * caller can size the sprite from the lit radius it actually wants: a clear circle of R pixels
+ * needs the sprite drawn 2R / VIGNETTE_CLEAR_FRACTION across.
+ */
+export const VIGNETTE_CLEAR_FRACTION = 0.1;
+const VIGNETTE_SOLID_FRACTION = 0.17;
+
+/**
+ * A darkness with a hole in the middle: clear at the centre, solid `color` from a short way out
+ * to the edge. Laid over the scene and parked on the dolphin, it is the light the pod has left
+ * at depth - everything past arm's reach goes black, which is what the deep zones need and what
+ * makes Echolocation the only way to see.
+ *
+ * Drawn mostly solid rather than as a soft falloff so that one sprite, scaled up, still covers
+ * the whole canvas however close to a corner the player swims.
+ */
+export function makeVignetteTexture(size: number, color: string): Texture {
+  const c = document.createElement('canvas');
+  c.width = size;
+  c.height = size;
+  const ctx = c.getContext('2d')!;
+  const grad = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  grad.addColorStop(0, 'rgba(0,0,0,0)');
+  grad.addColorStop(VIGNETTE_CLEAR_FRACTION, 'rgba(0,0,0,0)');
+  grad.addColorStop(VIGNETTE_SOLID_FRACTION, color);
+  grad.addColorStop(1, color);
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, size, size);
   return Texture.from(c);
