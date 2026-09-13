@@ -132,6 +132,33 @@ export class Shark {
   stunDx = 0;
   stunDy = 0;
 
+  /**
+   * Large cookiecutter: the pod member it has singled out, and where the strike has got to.
+   *
+   * Driven by Game.updateLockOnStrikes rather than by move(), because picking a victim needs the
+   * whole pod and move() only ever sees the player. 'warning' is the window the player has to
+   * break the line it is about to commit to; 'zoom' is the run itself, aimed once and never
+   * corrected, which is what makes boosting out of the way a dodge rather than a delay.
+   */
+  lockTarget: Dolphin | null = null;
+  lockPhase: 'none' | 'warning' | 'zoom' = 'none';
+  lockPhaseEndTime = 0;
+  lockCooldownEnd = 0;
+  lockDx = 0;
+  lockDy = 0;
+
+  /**
+   * Large frilled: how far the head is thrown forward, 0 (drawn in) to 1 (a full body length out).
+   *
+   * Held as a fraction rather than a distance because what a body length is in world units is the
+   * draw loop's business, not this class's. Game.updateFrilledReach runs the phases; the draw
+   * loop stretches the sprite by it and the bite check reaches along it.
+   */
+  reach = 0;
+  reachPhase: 'none' | 'out' | 'hold' | 'back' = 'none';
+  reachPhaseEndTime = 0;
+  reachCooldownEnd = 0;
+
   constructor(i: number) {
     this.id = i;
     this._x = Math.floor(Math.random() * 100);

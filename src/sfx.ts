@@ -310,6 +310,43 @@ class SfxEngine {
     this.tone(ctx, 440, now + 0.02, 1.3, { type: 'sine', gain: 0.12, glideTo: 300 });
   }
 
+  /**
+   * A large cookiecutter has singled a dolphin out: two rising notes, repeated, over a low pulse.
+   *
+   * Deliberately unlike anything else down here. It is the only warning the player gets, and it
+   * has to be recognisable while a banner is being read and a pod is being steered - so it climbs,
+   * where the bite and the game-over both fall, and it repeats rather than ringing once.
+   */
+  playLockOnWarning(): void {
+    const ctx = this.ensureContext();
+    const now = ctx.currentTime;
+
+    for (const at of [0, 0.28]) {
+      this.tone(ctx, 520, now + at, 0.16, { type: 'square', gain: 0.11, glideTo: 900 });
+      this.tone(ctx, 780, now + at + 0.1, 0.18, { type: 'square', gain: 0.08, glideTo: 1300 });
+    }
+    this.tone(ctx, 90, now, 0.6, { type: 'sine', gain: 0.16, glideTo: 60 });
+  }
+
+  /** The run itself: the warning's climb, completed and gone in a quarter of a second. */
+  playLockOnStrike(): void {
+    const ctx = this.ensureContext();
+    const now = ctx.currentTime;
+
+    this.click(ctx, now, 0.05, 2600);
+    this.tone(ctx, 900, now, 0.22, { type: 'sawtooth', gain: 0.14, glideTo: 2200 });
+    this.tone(ctx, 140, now, 0.3, { type: 'sine', gain: 0.16, glideTo: 70 });
+  }
+
+  /** The frilled shark throwing its head out: a low sweep opening rather than a snap. */
+  playFrilledStrike(): void {
+    const ctx = this.ensureContext();
+    const now = ctx.currentTime;
+
+    this.tone(ctx, 200, now, 0.45, { type: 'sawtooth', gain: 0.1, glideTo: 520 });
+    this.tone(ctx, 70, now, 0.5, { type: 'sine', gain: 0.14, glideTo: 130 });
+  }
+
   /** Short percussive kill blip whose pitch climbs with the combo step (0-based), then caps. */
   playSharkKill(step: number): void {
     const ctx = this.ensureContext();

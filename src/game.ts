@@ -206,6 +206,41 @@ const SHARK_KIND_SCALE: Record<SharkKind, number> = {
   frilled: 1,
   cookiecutter: 1,
 };
+/**
+ * Large cookiecutter: it picks one dolphin out of the pod and runs at it.
+ *
+ * The real animal takes a single bite out of something far bigger than itself and leaves, which
+ * is the behaviour this is after: not a chase, but one committed run at one dolphin. The warning
+ * is the whole of the counterplay - the run is aimed once, when the warning ends, and never
+ * corrected, so moving the pod off that line is a dodge rather than a postponement.
+ */
+const LOCK_INTERVAL_MS = 30000;
+/**
+ * How long a level gets before the first one. Without it the cooldown starts at zero and the
+ * strike lands on the opening tick, so a level could open with a dolphin already being run down
+ * before the player had taken a stroke.
+ */
+const LOCK_FIRST_DELAY_MS = 8000;
+/** How long the player has between the banner and the run being aimed. */
+const LOCK_WARNING_MS = 1500;
+const LOCK_ZOOM_MS = 900;
+/** Against the shark's own speed. A cookiecutter is quick; locked on it is the quickest thing down there. */
+const LOCK_ZOOM_SPEED = 4.5;
+/** It has to be able to see the pod to single one out of it. */
+const LOCK_RANGE = 45;
+
+/**
+ * Large frilled: the head is thrown forward up to the animal's own length, snake-fashion.
+ *
+ * The extension is what makes a slow shark dangerous - you can outswim the body and still be
+ * inside the strike. It ramps rather than snapping out, and that ramp is the tell: at this size
+ * the reach is most of the arena's width, so arriving instantly would be unreadable.
+ */
+const REACH_EXTEND_MS = 450;
+const REACH_HOLD_MS = 250;
+const REACH_RETRACT_MS = 350;
+const REACH_COOLDOWN_MS = 3000;
+
 const HAMMERHEAD_SPEED_BONUS = 1.15;
 const GREAT_WHITE_LARGE_SPEED_BONUS = 1.25;
 
@@ -2208,6 +2243,13 @@ ${zone.depth}`, 'levelup', duration + 1400);
       container.addChild(this.createFallbackSharkFish());
     }
 
+    if (shark.kind === 'cookiecutter') {
+      const lockTell = new Graphics();
+      lockTell.name = 'lockTell';
+      lockTell.visible = false;
+      container.addChild(lockTell);
+    }
+
     if (look.photophores) {
       const lights = createPhotophores(look.photophores, look.photophoreColor ?? 0x4ade80);
       lights.name = 'photo';
@@ -3208,6 +3250,173 @@ ${cleared.name} Zone Liberated
   }
 
   /** Radius at which a shark can bite the pod. Deliberately tight - see sharkRamRadius. */
+  /**
+   * How long a shark is drawn, in world units - the same product the draw loop scales the sprite
+   * by, over WORLD_SCALE. The frilled shark's strike reaches one of these.
+   */
+  private sharkBodyLength(shark: Shark): number {
+    const look = SHARK_KIND_LOOK[shark.kind];
+    const frame = 64 * SHARK_BASE_SCALE * SHARK_KIND_SCALE[shark.kind] * shark.sizeMultiplier;
+    return (frame * look.stretchX) / WORLD_SCALE;
+  }
+
+  /** Pod members a shark is allowed to take: the player and anyone recruited. */
+  private podMembers(): Dolphin[] {
+    return this.dolphins.filter((d) => d.isPlayer || d.recruited);
+  }
+
+  /**
+   * The large cookiecutter's lock-on run.
+   *
+   * Every LOCK_INTERVAL_MS it singles out one pod member, announces it, and a moment later runs
+   * at where that dolphin was when the warning ended. The aim is taken once: a run that tracked
+   * its target would be unavoidable, and the player is meant to be able to boost the pod off the
+   * line. Reaching the target is handled by the ordinary bite check, which knows to take the
+   * locked dolphin rather than whichever one happens to be last in the list.
+   */
+  private updateLockOnStrikes(now: number): void {
+    if (!this.player) return;
+    for (const shark of this.sharks) {
+      if (shark.kind !== 'cookiecutter' || !shark.large) continue;
+
+      // A target that has already been eaten, or left the pod, ends the strike wherever it is.
+      if (shark.lockTarget && !this.dolphins.includes(shark.lockTarget)) {
+        shark.lockTarget = null;
+        shark.lockPhase = 'none';
+        shark.lockCooldownEnd = now + LOCK_INTERVAL_MS;
+        continue;
+      }
+
+      if (shark.lockPhase === 'warning') {
+        if (now < shark.lockPhaseEndTime) continue;
+        // Aim now, at where it is now, and commit.
+        const target = shark.lockTarget;
+        if (!target) {
+          shark.lockPhase = 'none';
+          shark.lockCooldownEnd = now + LOCK_INTERVAL_MS;
+          continue;
+        }
+        const dx = directionDelta(target._x, shark._x);
+        const dy = target._y - shark._y;
+        const d = Math.hypot(dx, dy) || 1;
+        shark.lockDx = dx / d;
+        shark.lockDy = dy / d;
+        shark.lockPhase = 'zoom';
+        shark.lockPhaseEndTime = now + LOCK_ZOOM_MS;
+        sfx.playLockOnStrike();
+        continue;
+      }
+
+      if (shark.lockPhase === 'zoom') {
+        if (now < shark.lockPhaseEndTime) continue;
+        shark.lockPhase = 'none';
+        shark.lockTarget = null;
+        shark.lockCooldownEnd = now + LOCK_INTERVAL_MS;
+        continue;
+      }
+
+      // Idle: pick someone, if it is off cooldown and can see the pod at all.
+      if (shark.lockCooldownEnd === 0) {
+        shark.lockCooldownEnd = now + LOCK_FIRST_DELAY_MS;
+        continue;
+      }
+      if (now < shark.lockCooldownEnd) continue;
+      if (this.levelGloom > 0 && shark.cloaked) continue;
+      const candidates = this.podMembers().filter(
+        (d) => this.distanceBetweenEntities(shark, d) <= LOCK_RANGE && now >= d.invulnerableUntil,
+      );
+      if (candidates.length === 0) continue;
+      const target = candidates[Math.floor(Math.random() * candidates.length)];
+      shark.lockTarget = target;
+      shark.lockPhase = 'warning';
+      shark.lockPhaseEndTime = now + LOCK_WARNING_MS;
+      sfx.playLockOnWarning();
+      this.showBanner(target.isPlayer ? 'Cookiecutter locked on you!' : 'Cookiecutter locked on!', 'storm', LOCK_WARNING_MS);
+      this.setStatus('A cookiecutter has picked out a dolphin');
+    }
+  }
+
+  /** Drives a locked shark forward itself, in place of its ordinary pursuit. */
+  private moveLockedShark(shark: Shark, sharkSpeed: number): void {
+    // lastX/lastY are left alone: the step loop rolls them over at the end of every tick, which
+    // is what the swept bite check reads, and move() does not touch them either.
+    const step = sharkSpeed * shark.speedMultiplier * LOCK_ZOOM_SPEED;
+    shark._x = wrapX(shark._x + shark.lockDx * step);
+    shark._y = clampEntityY(shark._y + shark.lockDy * step, 4);
+    shark.headingX = shark.lockDx;
+    shark.headingY = shark.lockDy;
+  }
+
+  /**
+   * The large frilled shark's head extension.
+   *
+   * Runs whenever a pod member is inside one body length: the head goes out over REACH_EXTEND_MS,
+   * holds, and comes back. Nothing about the body moves - the reach is all in the strike, which
+   * is what lets something this slow still be dangerous to a dolphin that has outswum it.
+   */
+  private updateFrilledReach(now: number): void {
+    for (const shark of this.sharks) {
+      if (shark.kind !== 'frilled' || !shark.large) continue;
+
+      if (shark.reachPhase === 'out') {
+        const left = shark.reachPhaseEndTime - now;
+        shark.reach = Math.max(0, Math.min(1, 1 - left / REACH_EXTEND_MS));
+        if (now >= shark.reachPhaseEndTime) {
+          shark.reach = 1;
+          shark.reachPhase = 'hold';
+          shark.reachPhaseEndTime = now + REACH_HOLD_MS;
+        }
+        continue;
+      }
+      if (shark.reachPhase === 'hold') {
+        if (now >= shark.reachPhaseEndTime) {
+          shark.reachPhase = 'back';
+          shark.reachPhaseEndTime = now + REACH_RETRACT_MS;
+        }
+        continue;
+      }
+      if (shark.reachPhase === 'back') {
+        const left = shark.reachPhaseEndTime - now;
+        shark.reach = Math.max(0, Math.min(1, left / REACH_RETRACT_MS));
+        if (now >= shark.reachPhaseEndTime) {
+          shark.reach = 0;
+          shark.reachPhase = 'none';
+          shark.reachCooldownEnd = now + REACH_COOLDOWN_MS;
+        }
+        continue;
+      }
+
+      shark.reach = 0;
+      if (now < shark.reachCooldownEnd) continue;
+      const range = this.sharkBodyLength(shark);
+      const inRange = this.podMembers().some((d) => this.distanceBetweenEntities(shark, d) <= range);
+      if (!inRange) continue;
+      shark.reachPhase = 'out';
+      shark.reachPhaseEndTime = now + REACH_EXTEND_MS;
+      sfx.playFrilledStrike();
+    }
+  }
+
+  /** Wrap-aware distance between any two things in the water. */
+  private distanceBetweenEntities(a: { _x: number; _y: number }, b: { _x: number; _y: number }): number {
+    return Math.hypot(directionDelta(a._x, b._x), a._y - b._y);
+  }
+
+  /**
+   * Where a shark's jaws actually are. Ordinarily its own position; for a frilled shark mid-strike,
+   * out along its heading by however far the head has been thrown.
+   */
+  private sharkBitePoint(shark: Shark): { _x: number; _y: number; lastX: number; lastY: number } {
+    if (shark.reach <= 0) return shark;
+    const out = this.sharkBodyLength(shark) * shark.reach;
+    return {
+      _x: shark._x + shark.headingX * out,
+      _y: shark._y + shark.headingY * out,
+      lastX: shark.lastX + shark.headingX * out,
+      lastY: shark.lastY + shark.headingY * out,
+    };
+  }
+
   private sharkHitRadius(shark: Shark): number {
     if (shark.matriarch) return 10;
     const base = shark.kind === 'greatWhite' && shark.large ? 6 : 4;
@@ -3231,7 +3440,8 @@ ${cleared.name} Zone Liberated
   private sharkContactsPod(shark: Shark): boolean {
     if (!this.player) return false;
     const radius = this.sharkHitRadius(shark);
-    return this.dolphins.some((d) => (d.isPlayer || d.recruited) && sweptDistance(shark, d) < radius);
+    const jaws = this.sharkBitePoint(shark);
+    return this.dolphins.some((d) => (d.isPlayer || d.recruited) && sweptDistance(jaws, d) < radius);
   }
 
   /**
@@ -3751,7 +3961,18 @@ ${cleared.name} Zone Liberated
       // A Ghost Shrimp overrides all of that: nothing in the water can sense the pod, however
       // large or far-sighted it is.
       const ghosted = now < this.ghostUntil;
+      // Both run before the sharks move, so a strike that starts this tick is already committed
+      // when the shark is asked where to go.
+      if (!ghosted) {
+        this.updateLockOnStrikes(now);
+        this.updateFrilledReach(now);
+      }
       for (const shark of this.sharks) {
+        // A shark mid-run is not steering any more; it is going where it aimed.
+        if (shark.lockPhase === 'zoom') {
+          this.moveLockedShark(shark, sharkSpeed);
+          continue;
+        }
         const unlimitedRange = allSharksLarge || shark.kind === 'greatWhite' || shark.kind === 'hammerhead';
         shark.move(sharkSpeed, this.player, this.sharks, unlimitedRange, now, ghosted);
       }
@@ -3896,8 +4117,23 @@ ${cleared.name} Zone Liberated
             // The Matriarch takes two pod members per bite; every other shark takes one.
             const bite = shark.matriarch ? 2 : 1;
             const victims: Dolphin[] = [];
+            // A cookiecutter that ran this dolphin down takes that one. Anything else about the
+            // bite is unchanged - including that it cannot take the player this way, who is lost
+            // through the extra-life branch below rather than by being removed from the pod.
+            const locked = shark.lockTarget;
+            if (
+              locked &&
+              !locked.isPlayer &&
+              locked.recruited &&
+              now >= locked.invulnerableUntil &&
+              this.dolphins.includes(locked) &&
+              sweptDistance(this.sharkBitePoint(shark), locked) < this.sharkHitRadius(shark)
+            ) {
+              victims.push(locked);
+            }
             for (let i = this.dolphins.length - 1; i >= 0 && victims.length < bite; i--) {
               const candidate = this.dolphins[i];
+              if (victims.includes(candidate)) continue;
               if (!candidate.isPlayer && candidate.recruited && now >= candidate.invulnerableUntil) {
                 victims.push(candidate);
               }
@@ -4155,7 +4391,29 @@ ${cleared.name} Zone Liberated
 
       const dx = this.player ? directionDelta(this.player._x, shark._x) : directionDelta(shark._x, shark.lastX);
       const facing = Math.abs(dx) > 0.3 ? (dx > 0 ? 1 : -1) : fish.scale.x >= 0 ? 1 : -1;
-      fish.scale.set(scaleX * facing, scaleY);
+
+      // A frilled shark mid-strike is drawn longer by however far its head is out, and shifted
+      // half that distance the way it is facing - stretching a sprite anchored at its middle
+      // would otherwise throw as much tail backwards as head forwards, and the tail has not
+      // moved. The bite reaches the same distance, from sharkBitePoint.
+      const stretched = scaleX * (1 + shark.reach);
+      fish.scale.set(stretched * facing, scaleY);
+      const grownPx = (stretched - scaleX) * 64 * facing;
+      fish.x = grownPx / 2;
+
+      const lockTell = sprite.getChildByName('lockTell') as Graphics | null;
+      if (lockTell) {
+        // A ring that closes as the warning runs out, so the moment it commits is readable from
+        // the water rather than only from the banner.
+        lockTell.clear();
+        const warning = shark.lockPhase === 'warning';
+        lockTell.visible = warning;
+        if (warning) {
+          const left = Math.max(0, Math.min(1, (shark.lockPhaseEndTime - now) / LOCK_WARNING_MS));
+          const radius = 10 + 26 * left;
+          lockTell.circle(0, 0, radius).stroke({ width: 2, color: 0xf87171, alpha: 0.35 + 0.5 * (1 - left) });
+        }
+      }
 
       // Each light is placed in the artwork's own frame coordinates, so it stays on the belly
       // however the species has been reshaped, while the light itself keeps a near-constant size
