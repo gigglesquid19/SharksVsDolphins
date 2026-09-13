@@ -236,6 +236,18 @@ const LOCK_RANGE = 45;
  * inside the strike. It ramps rather than snapping out, and that ramp is the tell: at this size
  * the reach is most of the arena's width, so arriving instantly would be unreadable.
  */
+/**
+ * How much of its own length the head is thrown, at full extension.
+ *
+ * Half, not all of it. A full body length is most of the arena's width on an animal this size,
+ * which made the strike less a reach than a second shark appearing in front of the first. Half
+ * still beats anything that has outswum the body, and is short enough to read as the same
+ * creature stretching.
+ *
+ * The trigger range, the bite point and the drawn stretch all take their distance from here, so
+ * what is drawn and what bites cannot come apart.
+ */
+const FRILLED_REACH_FRACTION = 0.5;
 const REACH_EXTEND_MS = 450;
 const REACH_HOLD_MS = 250;
 const REACH_RETRACT_MS = 350;
@@ -3388,7 +3400,7 @@ ${cleared.name} Zone Liberated
 
       shark.reach = 0;
       if (now < shark.reachCooldownEnd) continue;
-      const range = this.sharkBodyLength(shark);
+      const range = this.sharkBodyLength(shark) * FRILLED_REACH_FRACTION;
       const inRange = this.podMembers().some((d) => this.distanceBetweenEntities(shark, d) <= range);
       if (!inRange) continue;
       shark.reachPhase = 'out';
@@ -3408,7 +3420,7 @@ ${cleared.name} Zone Liberated
    */
   private sharkBitePoint(shark: Shark): { _x: number; _y: number; lastX: number; lastY: number } {
     if (shark.reach <= 0) return shark;
-    const out = this.sharkBodyLength(shark) * shark.reach;
+    const out = this.sharkBodyLength(shark) * FRILLED_REACH_FRACTION * shark.reach;
     return {
       _x: shark._x + shark.headingX * out,
       _y: shark._y + shark.headingY * out,
@@ -4396,7 +4408,7 @@ ${cleared.name} Zone Liberated
       // half that distance the way it is facing - stretching a sprite anchored at its middle
       // would otherwise throw as much tail backwards as head forwards, and the tail has not
       // moved. The bite reaches the same distance, from sharkBitePoint.
-      const stretched = scaleX * (1 + shark.reach);
+      const stretched = scaleX * (1 + FRILLED_REACH_FRACTION * shark.reach);
       fish.scale.set(stretched * facing, scaleY);
       const grownPx = (stretched - scaleX) * 64 * facing;
       fish.x = grownPx / 2;
