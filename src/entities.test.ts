@@ -115,10 +115,41 @@ describe('Shark.move idle search', () => {
   /** How close to a bound counts as being on it, in world units. */
   const EDGE = 1.5;
 
+  /**
+   * Where the wander is watched, and what it is watched away from.
+   *
+   * The player sits in the middle of the arena and the shark starts 60 units below it, as far
+   * out as the arena allows without touching the floor. Far enough that the search drift, which
+   * closes about half a unit a tick, leaves a long stretch of genuine wandering before the shark
+   * crosses the 25-unit hunt radius and switches to chasing. The old pair had the player at (70, 120), which in a 79x137 arena is
+   * hard into a corner, so the drift walked the shark into the walls and held it there: most of
+   * a 200-tick run was spent pinned, and what little movement was left was the clamp's rather
+   * than the wander's.
+   */
+  /** Matches HUNT_RADIUS in entities.ts: past this a small shark has lost the pod and wanders. */
+  const HUNT_RADIUS = 25;
+  const WANDER_PLAYER: [number, number] = [39, 68];
+  const WANDER_START: [number, number] = [39, 128];
+
+  /**
+   * Walks a wandering shark and returns its movement in runs of consecutive ticks.
+   *
+   * Runs, rather than one flat list, because ticks spent against a wall have to be left out and
+   * simply dropping them is not enough: a tiger is clamped at the x bounds rather than wrapped,
+   * so a shark pressed against one has its movement flattened into the wall, which reads as a
+   * hard turn it never made. But dropping those ticks leaves the vectors on either side of the
+   * gap next to each other in the list while being seconds apart in the water, and comparing
+   * their directions manufactures exactly the reversal the exclusion was meant to remove.
+   *
+   * Breaking the list at each gap keeps every comparison between two genuinely consecutive
+   * ticks. This began mattering when the arena narrowed to 79 units: the walls are closer
+   * together now, so a 200-tick wander meets them far more often than it used to.
+   */
   function wanderPath(ticks: number) {
-    const p = playerAt(70, 120);
-    const s = testShark(20, 50);
-    const vecs: [number, number][] = [];
+    const p = playerAt(WANDER_PLAYER[0], WANDER_PLAYER[1]);
+    const s = testShark(WANDER_START[0], WANDER_START[1]);
+    const runs: [number, number][][] = [];
+    let run: [number, number][] = [];
     for (let i = 0; i < ticks; i++) {
       const bx = s._x;
       const by = s._y;
@@ -127,38 +158,49 @@ describe('Shark.move idle search', () => {
       if (vx > SIZE_X / 2) vx -= SIZE_X;
       if (vx < -SIZE_X / 2) vx += SIZE_X;
       const vy = s._y - by;
-      // A tick spent against a wall says nothing about the wander: a tiger is clamped at the x
-      // bounds rather than wrapped, so a shark pressed against one has its movement flattened by
-      // the clamp, which reads as a hard turn it never made. Only ticks in open water are
-      // measured. This started mattering when the arena narrowed to 79 units - the walls are
-      // simply closer together now, and a 200-tick wander meets them far more often.
       const againstWall = s._x <= EDGE || s._x >= SIZE_X - EDGE || s._y <= EDGE || s._y >= SIZE_Y - 1 - EDGE;
-      if (!againstWall && Math.hypot(vx, vy) > 0.01) vecs.push([vx, vy]);
+      // Inside the hunt radius the shark is not wandering at all - it has seen the pod and is
+      // steering at it, which is a different behaviour with a different turn rate. The search
+      // drift carries it in there eventually, so the back half of a long run is pursuit unless
+      // it is excluded, and pursuit was being averaged in as though it were wander.
+      const hunting = s.distanceBetween(p) <= HUNT_RADIUS;
+      if (againstWall || hunting || Math.hypot(vx, vy) <= 0.01) {
+        if (run.length > 1) runs.push(run);
+        run = [];
+        continue;
+      }
+      run.push([vx, vy]);
     }
-    return { s, vecs };
+    if (run.length > 1) runs.push(run);
+    return { s, runs, vecCount: runs.reduce((n, r) => n + r.length, 0) };
   }
 
   it('cruises instead of twitching on the spot', () => {
-    const { vecs } = wanderPath(200);
+    const { runs, vecCount } = wanderPath(200);
     // The old wander rolled a fresh random axis/sign/distance each tick: ~87 degrees of
     // direction change per tick and 13% outright reversals. A cruising shark turns gently.
     let sum = 0;
+    let turns = 0;
     let reversals = 0;
-    for (let i = 1; i < vecs.length; i++) {
-      const a = Math.atan2(vecs[i - 1][1], vecs[i - 1][0]);
-      const b = Math.atan2(vecs[i][1], vecs[i][0]);
-      let diff = Math.abs(b - a) * (180 / Math.PI);
-      if (diff > 180) diff = 360 - diff;
-      sum += diff;
-      if (diff > 150) reversals++;
+    for (const run of runs) {
+      for (let i = 1; i < run.length; i++) {
+        const a = Math.atan2(run[i - 1][1], run[i - 1][0]);
+        const b = Math.atan2(run[i][1], run[i][0]);
+        let diff = Math.abs(b - a) * (180 / Math.PI);
+        if (diff > 180) diff = 360 - diff;
+        sum += diff;
+        turns++;
+        if (diff > 150) reversals++;
+      }
     }
-    expect(sum / (vecs.length - 1)).toBeLessThan(20);
-    expect(reversals).toBeLessThan(vecs.length * 0.05);
+    expect(turns).toBeGreaterThan(40);
+    expect(sum / turns).toBeLessThan(20);
+    expect(reversals).toBeLessThan(vecCount * 0.05);
   });
 
   it('actually gets somewhere rather than milling in place', () => {
     const { s } = wanderPath(200);
-    expect(s.distanceBetween({ _x: 20, _y: 50 })).toBeGreaterThan(10);
+    expect(s.distanceBetween({ _x: WANDER_START[0], _y: WANDER_START[1] })).toBeGreaterThan(10);
   });
 
   it('stays within the vertical bounds while searching', () => {
