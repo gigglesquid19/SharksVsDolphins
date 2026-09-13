@@ -53,11 +53,44 @@ function showFatal(label: string, detail: unknown): void {
 window.addEventListener('error', (event) => showFatal('[onerror]', event.error ?? event.message));
 window.addEventListener('unhandledrejection', (event) => showFatal('[unhandledrejection]', event.reason));
 
-// Registers the Workbox-generated service worker (see vite.config.ts) so the built assets
-// are cached for offline play. registerType is 'prompt', and we deliberately pass no
-// onNeedRefresh handler: a new deploy installs a waiting worker that only takes over on the
-// next cold launch, so a running game is never served a half-swapped set of JS chunks.
-registerSW({ immediate: true });
+/**
+ * Registers the Workbox service worker (see vite.config.ts) so the built assets are cached for
+ * offline play, and offers the update when a new deploy lands.
+ *
+ * registerType is 'prompt' for a good reason - swapping JS chunks under a running game breaks it,
+ * because every deploy deletes the old hashed chunks from Pages and the live page starts asking
+ * for files that now 404. What was missing is the other half of 'prompt': something to prompt
+ * with. Passing no onNeedRefresh left the new worker waiting indefinitely, and a waiting worker
+ * does not take over on a reload - it waits for every tab on the origin to close, which on a
+ * desktop browser can be a very long time and is not something a reload or a hard-refresh does.
+ * The effect was players sitting on a build from several deploys ago with no way to know.
+ *
+ * updateSW(true) skips the wait and reloads in one go, so the page comes back on a complete,
+ * consistent asset set rather than a half-swapped one - which is exactly what the old comment
+ * was trying to avoid.
+ */
+const updateSW = registerSW({
+  immediate: true,
+  onNeedRefresh() {
+    const bar = document.createElement('div');
+    bar.className = 'update-bar';
+    bar.innerHTML = '<span>A new version is ready.</span>';
+    const btn = document.createElement('button');
+    btn.textContent = 'Reload';
+    btn.addEventListener('click', () => {
+      btn.disabled = true;
+      btn.textContent = 'Updating…';
+      void updateSW(true);
+    });
+    const later = document.createElement('button');
+    later.className = 'update-bar-dismiss';
+    later.textContent = 'Later';
+    later.setAttribute('aria-label', 'Dismiss the update notice');
+    later.addEventListener('click', () => bar.remove());
+    bar.append(btn, later);
+    document.body.appendChild(bar);
+  },
+});
 
 const canvas = document.getElementById('simCanvas') as HTMLCanvasElement;
 const canvasWrap = document.getElementById('canvasWrap') as HTMLDivElement;

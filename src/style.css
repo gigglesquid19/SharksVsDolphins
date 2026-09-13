@@ -2170,3 +2170,41 @@ button.mega-shrimp.green {
     gap: 10px;
   }
 }
+
+/* Shown when a new deploy has installed and is waiting to take over. Fixed to the bottom so it
+   never covers the HUD, and it only ever appears between one build and the next. */
+.update-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100vw - 24px);
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: rgba(2, 6, 23, 0.92);
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(6px);
+  font-size: 0.85rem;
+  color: var(--text);
+}
+.update-bar button {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: none;
+  font-weight: 700;
+  font-size: 0.82rem;
+  cursor: pointer;
+  background: linear-gradient(135deg, #38bdf8, #0ea5e9);
+  color: #04121f;
+}
+.update-bar button[disabled] { opacity: 0.6; cursor: default; }
+.update-bar .update-bar-dismiss {
+  background: transparent;
+  color: var(--muted);
+  font-weight: 600;
+}
