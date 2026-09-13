@@ -16,6 +16,7 @@ import {
   makeDolphinBodyCanvas,
   makeRadialGradientTexture,
   makeVignetteTexture,
+  photophorePulseAlpha,
   sliceSharkStrip,
   SharkFishSprite,
   Photophore,
@@ -104,12 +105,6 @@ const GLOOM_SIGHT_LIT = 22;
 const GLOOM_SIGHT_DARK = 10;
 /** The lit circle sits a little outside the Echolocation ring, so the ring itself stays legible. */
 const GLOOM_ECHO_MARGIN = 1.08;
-/**
- * How much further a shark's own lights carry than its body. Past the pod's sight a glowing
- * species is still a pair of lights moving in the black - which is the point of having them -
- * while the body, and the pod size needed to ram it, stay hidden until it is close or pinged.
- */
-const PHOTOPHORE_SIGHT_FACTOR = 1.7;
 /** The pod a sandbox hands you, enough to ram anything currently benched there. */
 const SANDBOX_STARTING_POD = 5;
 const HUNTING_MODE_POD_SIZE = 4;
@@ -4101,8 +4096,8 @@ ${cleared.name} Zone Liberated
 
       // Each light is placed in the artwork's own frame coordinates, so it stays on the belly
       // however the species has been reshaped, while the light itself keeps a near-constant size
-      // on screen - a shark drawn small still has to be findable by its lights. They breathe
-      // rather than hold steady, each shark on its own phase so a shoal never blinks in unison.
+      // on screen - a shark drawn small still has to be findable by its lights. They hold a low
+      // glow and flare periodically, each shark seeded by its id so a shoal never flares in unison.
       const lights = sprite.getChildByName('photo') as Container | null;
       if (lights) {
         const spots = look.photophores ?? [];
@@ -4114,7 +4109,7 @@ ${cleared.name} Zone Liberated
           dot.position.set(spot.x * scaleX * facing, spot.y * scaleY);
           dot.scale.set(dotScale);
         }
-        lights.alpha = 0.68 + 0.32 * Math.sin(now / 430 + shark.id * 1.7);
+        lights.alpha = photophorePulseAlpha(now, shark.id);
       }
 
       if (fish instanceof SharkFishSprite) {
@@ -4156,15 +4151,15 @@ ${cleared.name} Zone Liberated
         bodySeen = true;
       }
 
-      // A shark that carries its own lights is not wholly lost once the body goes: out to a way
-      // beyond the pod's sight it is still a point of light on the move. What stays hidden is
+      // A shark that carries its own lights is never lost once the body goes: at any distance it
+      // is still a point of light on the move, anywhere in the water. What stays hidden is
       // everything that tells you what it is - the shape, and the pod size needed to ram it.
-      const lightsSeen =
-        !!lights &&
-        this.levelGloom > 0 &&
-        !!this.player &&
-        !shark.cloaked &&
-        this.distanceToPlayer(shark) <= this.gloomSightRadius() * PHOTOPHORE_SIGHT_FACTOR;
+      //
+      // The lights used to cut out past 1.7x the pod's sight, which meant a glowing shark simply
+      // vanished at range rather than being tracked across the level - the one thing carrying
+      // lights was meant to buy. Cloak still hides them: that is a deliberate mechanic, and a
+      // light that survived it would leave nothing for cloaking to do.
+      const lightsSeen = !!lights && this.levelGloom > 0 && !shark.cloaked;
 
       sprite.visible = bodySeen || lightsSeen;
       fish.visible = bodySeen;

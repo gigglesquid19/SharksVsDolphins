@@ -285,6 +285,36 @@ export interface Photophore {
  *
  * A soft halo, a middle, and a hard core, drawn additively so they read as light in dark water.
  */
+/**
+ * One full photophore cycle, and the share of it spent flaring rather than resting.
+ *
+ * The lights used to breathe on a plain sine, which at a distance reads as a steady smudge and
+ * sits in with the background. A long rest broken by a short flare reads as something alive
+ * instead, and a flare is what carries: it is the change the eye catches in black water, not the
+ * brightness.
+ */
+const PHOTOPHORE_PULSE_PERIOD_MS = 2600;
+const PHOTOPHORE_PULSE_FLARE_SHARE = 0.28;
+/** The glow held between flares, and the top of the flare itself. */
+export const PHOTOPHORE_ALPHA_REST = 0.45;
+export const PHOTOPHORE_ALPHA_PEAK = 1;
+
+/**
+ * Alpha for a shark's lights at `nowMs`, resting for most of the cycle and flaring briefly.
+ *
+ * `seed` offsets each shark around the cycle - pass the shark's id - so a group never flares in
+ * unison. The offset is stepped by the golden ratio, which spreads consecutive ids across the
+ * period instead of clustering them the way a plain `id * k` does once k divides into the run.
+ */
+export function photophorePulseAlpha(nowMs: number, seed = 0): number {
+  const offset = (seed * 0.618033988749895) % 1;
+  const phase = (((nowMs / PHOTOPHORE_PULSE_PERIOD_MS + offset) % 1) + 1) % 1;
+  if (phase >= PHOTOPHORE_PULSE_FLARE_SHARE) return PHOTOPHORE_ALPHA_REST;
+  // A half sine over the flare: rest -> peak -> rest, with no corner at either end.
+  const envelope = Math.sin((phase / PHOTOPHORE_PULSE_FLARE_SHARE) * Math.PI);
+  return PHOTOPHORE_ALPHA_REST + (PHOTOPHORE_ALPHA_PEAK - PHOTOPHORE_ALPHA_REST) * envelope;
+}
+
 export function createPhotophores(spots: Photophore[], color: number): Container {
   const group = new Container();
   for (let i = 0; i < spots.length; i++) {
