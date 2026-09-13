@@ -112,6 +112,9 @@ describe('Shark.move smooth pursuit', () => {
 describe('Shark.move idle search', () => {
   // A tiger only wanders when the player is outside its 25-unit hunt radius and it has no
   // unlimited range (great whites / hammerheads always pursue, so they never idle).
+  /** How close to a bound counts as being on it, in world units. */
+  const EDGE = 1.5;
+
   function wanderPath(ticks: number) {
     const p = playerAt(70, 120);
     const s = testShark(20, 50);
@@ -124,7 +127,13 @@ describe('Shark.move idle search', () => {
       if (vx > SIZE_X / 2) vx -= SIZE_X;
       if (vx < -SIZE_X / 2) vx += SIZE_X;
       const vy = s._y - by;
-      if (Math.hypot(vx, vy) > 0.01) vecs.push([vx, vy]);
+      // A tick spent against a wall says nothing about the wander: a tiger is clamped at the x
+      // bounds rather than wrapped, so a shark pressed against one has its movement flattened by
+      // the clamp, which reads as a hard turn it never made. Only ticks in open water are
+      // measured. This started mattering when the arena narrowed to 79 units - the walls are
+      // simply closer together now, and a 200-tick wander meets them far more often.
+      const againstWall = s._x <= EDGE || s._x >= SIZE_X - EDGE || s._y <= EDGE || s._y >= SIZE_Y - 1 - EDGE;
+      if (!againstWall && Math.hypot(vx, vy) > 0.01) vecs.push([vx, vy]);
     }
     return { s, vecs };
   }
