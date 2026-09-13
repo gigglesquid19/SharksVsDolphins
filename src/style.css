@@ -498,7 +498,7 @@ button.school.mega-pod:hover:not(:disabled) { box-shadow: 0 6px 22px rgba(168, 8
 /* Only a fallback: applyFullscreenCanvasSize sets both dimensions in pixels as soon as it runs,
    measuring the control bar first. Whichever of the two budgets binds, the ratio is kept. */
 .canvas-wrap:fullscreen canvas, .canvas-wrap.compact canvas {
-  width: min(100vw, calc(100vh * 0.75));
+  width: min(100vw, calc(100vh * (79 / 137)));
   height: auto;
   max-width: none;
   border-radius: 0;
@@ -1881,12 +1881,13 @@ button.mega-shrimp.green {
   display: none;
 }
 
-/* The arena is 3:4, so the canvas is too. The width is capped by what the height budget allows
-   rather than letting max-height clamp a full-width box, which would squash the picture. */
+/* The arena is 79:137, so the canvas is too. The width is capped by what the height budget
+   allows rather than letting max-height clamp a full-width box, which would squash the picture.
+   On a phone it is the width that binds, not the height budget - see constants.ts. */
 canvas {
   display: block;
-  aspect-ratio: 3 / 4;
-  width: min(100%, calc(74vh * 0.75));
+  aspect-ratio: 79 / 137;
+  width: min(100%, calc(74vh * (79 / 137)));
   height: auto;
   margin: 0 auto;
   border-radius: 14px;
@@ -2137,4 +2138,12 @@ canvas {
   .stats { grid-template-columns: 1fr; }
   .dpad-row { flex-wrap: wrap; gap: 12px; }
   body { padding: 16px 12px; }
+
+  /* On a phone the title and the controls write-up were taking 295px of an 852px screen, above
+     the water rather than beside it, which pushed the bottom of the arena below the fold - the
+     play area had to be scrolled to be seen whole. Both are reference rather than gameplay: the
+     summary under the arena still says what the game is, and tutorialHints.ts teaches the
+     controls in play, where they are needed. Desktop keeps them; it has the room. */
+  h1 { display: none; }
+  #hintPanel { display: none; }
 }

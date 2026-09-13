@@ -113,7 +113,7 @@ describe('Shark.move idle search', () => {
   // A tiger only wanders when the player is outside its 25-unit hunt radius and it has no
   // unlimited range (great whites / hammerheads always pursue, so they never idle).
   function wanderPath(ticks: number) {
-    const p = playerAt(95, 95);
+    const p = playerAt(70, 120);
     const s = testShark(20, 50);
     const vecs: [number, number][] = [];
     for (let i = 0; i < ticks; i++) {
@@ -121,8 +121,8 @@ describe('Shark.move idle search', () => {
       const by = s._y;
       s.move(1, p, [s], false, NOW);
       let vx = s._x - bx;
-      if (vx > 50) vx -= 100;
-      if (vx < -50) vx += 100;
+      if (vx > SIZE_X / 2) vx -= SIZE_X;
+      if (vx < -SIZE_X / 2) vx += SIZE_X;
       const vy = s._y - by;
       if (Math.hypot(vx, vy) > 0.01) vecs.push([vx, vy]);
     }
@@ -153,7 +153,7 @@ describe('Shark.move idle search', () => {
   });
 
   it('stays within the vertical bounds while searching', () => {
-    const p = playerAt(85, 110);
+    const p = playerAt(70, 125);
     const s = testShark(20, 50);
     for (let i = 0; i < 400; i++) {
       s.move(1, p, [s], false, NOW);
@@ -175,20 +175,20 @@ describe('Shark.move hunt radius', () => {
   function step(shark: Shark, player: Dolphin): number {
     const bx = shark._x;
     const by = shark._y;
-    shark.move(1, player, [shark, testShark(80, 110)], false, NOW);
+    shark.move(1, player, [shark, testShark(10, 130)], false, NOW);
     return Math.hypot(shark._x - bx, shark._y - by);
   }
 
   it('a large shark still hunts a player 30 units away', () => {
     const p = playerAt(50, 50);
-    const big = testShark(80, 50, { large: true });
+    const big = testShark(20, 50, { large: true });
     expect(step(big, p)).toBeCloseTo(PURSUIT_STEP, 5);
     expect(big._x).toBeLessThan(80); // moved toward the player
   });
 
   it('a small shark at the same distance has lost track and is searching', () => {
     const p = playerAt(50, 50);
-    const small = testShark(80, 50);
+    const small = testShark(20, 50);
     expect(step(small, p)).toBeCloseTo(CRUISE_STEP, 5);
   });
 
@@ -220,7 +220,7 @@ describe('Shark.move Matriarch charge', () => {
     const p = playerAt(50, 50);
     const m = matriarch(70, 50);
     m.enraged = true;
-    const escort = testShark(90, 90, { kind: 'greatWhite', large: true });
+    const escort = testShark(20, 120, { kind: 'greatWhite', large: true });
     expect(firstStep(m, p, [escort])).toBeGreaterThan(2);
   });
 
@@ -233,7 +233,7 @@ describe('Shark.move Matriarch charge', () => {
   it('does not charge before she is enraged and escorts are still alive', () => {
     const p = playerAt(50, 50);
     const m = matriarch(70, 50);
-    const escort = testShark(90, 90, { kind: 'greatWhite', large: true });
+    const escort = testShark(20, 120, { kind: 'greatWhite', large: true });
     expect(firstStep(m, p, [escort])).toBeLessThan(2);
   });
 });
@@ -272,16 +272,19 @@ describe('Shark.move search drift', () => {
   // working its way toward the pod - sharks milling at random read as ignoring the player,
   // which is the wrong feel for the opening of a level.
   it('closes on a player it has not noticed yet', () => {
-    const p = playerAt(50, 50);
-    const s = testShark(90, 50);
+    const p = playerAt(39, 68);
+    const s = testShark(63, 100);
     const start = s.distanceBetween(p);
     for (let i = 0; i < 60; i++) s.move(1, p, [s], false, NOW);
     expect(s.distanceBetween(p)).toBeLessThan(start);
   });
 
   it('drifts in from any direction, not just one axis', () => {
-    const p = playerAt(50, 50);
-    for (const [x, y] of [[90, 50], [10, 50], [50, 90], [50, 12]] as [number, number][]) {
+    // Offsets from the middle of the water rather than absolute points: every one has to clear
+    // the 25-unit hunt radius and still land inside the arena, and the horizontal pair has only
+    // SIZE_X / 2 to play with, since the world wraps and nothing can be further across than that.
+    const p = playerAt(39, 68);
+    for (const [x, y] of [[69, 68], [9, 68], [39, 108], [39, 28]] as [number, number][]) {
       const s = testShark(x, y);
       const start = s.distanceBetween(p);
       for (let i = 0; i < 60; i++) s.move(1, p, [s], false, NOW);
@@ -292,8 +295,8 @@ describe('Shark.move search drift', () => {
   it('still wanders rather than driving straight at the player', () => {
     // If the drift dominated, the search would just be a slower chase. Compare the ground it
     // covers against the distance it actually closed: a straight run would make these equal.
-    const p = playerAt(50, 50);
-    const s = testShark(90, 50);
+    const p = playerAt(39, 68);
+    const s = testShark(63, 100);
     const start = s.distanceBetween(p);
     let travelled = 0;
     for (let i = 0; i < 60; i++) {
