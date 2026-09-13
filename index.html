@@ -225,7 +225,7 @@
           <input id="speed" type="number" value="80" min="20" max="500">
         </div>
       </div>
-      <div class="hint" id="hint">Use the arrow keys, WASD, or the on-screen D-pad to swim. On mobile you can also touch and hold anywhere on the water; the dolphin swims in that direction relative to the centre of the screen. Swim off the left or right edge to wrap around, Pac-Man style. Find lost dolphins to recruit them to your pod. Each dolphin is a life; if a shark catches you, one dolphin is lost. Once your pod reaches 4 dolphins, you enter HUNTING MODE and can destroy sharks by ramming them.</div>
+      <div class="hint" id="hint">Use the arrow keys, WASD, or the on-screen D-pad to swim. On mobile you can also touch and hold anywhere on the water; the dolphin swims in that direction relative to the centre of the screen. Swim off the left or right edge to wrap around, Pac-Man style. Find lost dolphins to recruit them to your pod. Each dolphin is a life; if a shark catches you, one dolphin is lost. Once your pod reaches 4 dolphins, you enter HUNTING MODE and can destroy sharks by ramming them. Tap the middle of the water to Boost, and tap it twice for Echolocation - the rings around your dolphin show when each is charged.</div>
     </div>
 
     <div class="panel canvas-wrap" id="canvasWrap">
@@ -431,7 +431,10 @@
           <div class="stat shark stat-hidden"><div class="stat-label">Sharks</div><span class="stat-value" id="statSharks">0</span></div>
           <div class="stat stat-hidden"><div class="stat-label">Status</div><span class="stat-value" id="statStatus" style="font-size: 0.85rem; font-weight: 700;">Ready</span></div>
         </div>
-        <div class="sprint-btn-wrap">
+        <!-- Boost and Echolocation are fired by tapping the water, and their cooldowns are drawn
+             as rings around the dolphin. The buttons stay in the page because the keyboard
+             shortcuts and the cooldown bookkeeping run through them; they are never shown. -->
+        <div class="sprint-btn-wrap hidden" id="sprintBtnWrap">
           <button id="sprintBtn" class="sprint-btn" aria-label="Sprint">⚡</button>
           <div class="sprint-cooldown-ring" id="sprintCooldownRing"></div>
         </div>

@@ -399,11 +399,10 @@ const inputs = {
   // Dips the music under a sting, then brings it back. Reads the slider each time rather than
   // caching a level, so it still lands where the player left the volume if they move it mid-duck,
   // and a second duck starting before the first has finished simply restarts the timer.
-  // Echolocation is Endless-only and has to be bought, so the button only exists when the run
-  // actually offers it - see Game's per-run setup.
-  onEchoAvailabilityChange: (available: boolean) => {
-    document.getElementById('echoBtnWrap')?.classList.toggle('hidden', !available);
-  },
+  // Echolocation is fired by double-tapping the water and its cooldown is drawn around the
+  // dolphin, so there is no button left to show or hide. The callback stays because the game
+  // still reports the ability coming and going, and a future control may want to know.
+  onEchoAvailabilityChange: () => {},
   // A shrimp button only exists while there is one of that kind to spend, so an empty pack does
   // not leave dead controls on screen.
   onConsumableChange: (counts: Inventory) => {
@@ -832,6 +831,7 @@ const inputs = {
 
   const sprintCooldownRing = document.getElementById('sprintCooldownRing') as HTMLDivElement;
   let sprintWasReady = true;
+
   // One handler per kind, built from the same table the Store renders from, so adding a fourth
   // shrimp later means adding a row and a button rather than another copy of this block.
   function useShrimp(id: ConsumableId): void {
@@ -907,10 +907,70 @@ const inputs = {
     );
   }
 
+  /**
+   * Abilities from the water itself: a tap in the middle of the screen is Boost, two taps are
+   * Echolocation. Holding still steers, as it always did.
+   *
+   * The middle is the one part of the water where a press means nothing - steering is measured
+   * from the centre outwards, so a touch there asks for no direction at all. That makes it free to
+   * carry the abilities, and it is a target a thumb can find without looking, which is the whole
+   * point: nobody should be hunting for a small button while a shark closes on them.
+   */
+  const TAP_MAX_MS = 260;
+  const TAP_SLOP_PX = 16;
+  const DOUBLE_TAP_MS = 280;
+  /** Half-width of the tap zone, as a fraction of the canvas's shorter side. */
+  const TAP_ZONE = 0.22;
+
+  let tapStartAt = 0;
+  let tapStartX = 0;
+  let tapStartY = 0;
+  let tapMoved = false;
+  let lastTapAt = 0;
+
+  function inTapZone(clientX: number, clientY: number): boolean {
+    const rect = gameCanvas.getBoundingClientRect();
+    const dx = (clientX - rect.left) / rect.width - 0.5;
+    const dy = (clientY - rect.top) / rect.height - 0.5;
+    return Math.hypot(dx, dy) <= TAP_ZONE;
+  }
+
+  function beginTap(clientX: number, clientY: number): void {
+    tapStartAt = Date.now();
+    tapStartX = clientX;
+    tapStartY = clientY;
+    tapMoved = false;
+  }
+
+  function trackTap(clientX: number, clientY: number): void {
+    if (Math.hypot(clientX - tapStartX, clientY - tapStartY) > TAP_SLOP_PX) tapMoved = true;
+  }
+
+  /** Called on release. Fires an ability only if the press was a tap in the middle, not a steer. */
+  function endTap(): void {
+    const startedAt = tapStartAt;
+    tapStartAt = 0;
+    if (!startedAt || tapMoved) return;
+    const now = Date.now();
+    if (now - startedAt > TAP_MAX_MS) return;
+    if (!inTapZone(tapStartX, tapStartY)) return;
+
+    if (now - lastTapAt <= DOUBLE_TAP_MS) {
+      // The second half of a double tap: take back the boost the first half fired and ping instead.
+      lastTapAt = 0;
+      game.undoRecentBoost();
+      fireEcho();
+      return;
+    }
+    lastTapAt = now;
+    game.boostNow();
+  }
+
   gameCanvas.addEventListener('touchstart', (e) => {
     e.preventDefault();
     const touch = e.touches[0];
     if (!touch) return;
+    beginTap(touch.clientX, touch.clientY);
     updatePointerDirection(touch.clientX, touch.clientY);
   }, { passive: false });
 
@@ -918,27 +978,36 @@ const inputs = {
     e.preventDefault();
     const touch = e.touches[0];
     if (!touch) return;
+    trackTap(touch.clientX, touch.clientY);
     updatePointerDirection(touch.clientX, touch.clientY);
   }, { passive: false });
 
   gameCanvas.addEventListener('touchend', (e) => {
     e.preventDefault();
     game.setPointer(false);
+    endTap();
   }, { passive: false });
 
   gameCanvas.addEventListener('touchcancel', (e) => {
     e.preventDefault();
     game.setPointer(false);
+    tapStartAt = 0;
   }, { passive: false });
 
   gameCanvas.addEventListener('mousedown', (e) => {
     game.setPointer(true);
+    beginTap(e.clientX, e.clientY);
     updatePointerDirection(e.clientX, e.clientY);
   });
   gameCanvas.addEventListener('mousemove', (e) => {
-    if (e.buttons) updatePointerDirection(e.clientX, e.clientY);
+    if (!e.buttons) return;
+    trackTap(e.clientX, e.clientY);
+    updatePointerDirection(e.clientX, e.clientY);
   });
-  window.addEventListener('mouseup', () => game.setPointer(false));
+  window.addEventListener('mouseup', () => {
+    game.setPointer(false);
+    endTap();
+  });
 })().catch((e) => showFatal('[main init]', e));
 
 /**

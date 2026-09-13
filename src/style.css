@@ -1934,6 +1934,9 @@ canvas {
   align-items: center;
   justify-content: center;
 }
+/* Needed because the display above would otherwise beat the plain .hidden rule, which is why every
+   one of these wrappers used to carry its own #id.hidden line further down. */
+.sprint-btn-wrap.hidden { display: none; }
 
 .sprint-btn {
   width: 90px;

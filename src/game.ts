@@ -192,6 +192,11 @@ const SHARK_BASE_SCALE = 0.6;
 // flat 6-unit trigger while the bite itself needed 4 units and only ever tested the dolphin you
 // were steering, so the animation regularly played over a follower with no bite behind it.
 const SHARK_ATTACK_ANTICIPATION = 1.5;
+/** How long after a tap-fired Boost a second tap can still take it back. */
+const BOOST_UNDO_WINDOW_MS = 400;
+/** Radii of the two ability arcs drawn around the player, just outside the body. */
+const BOOST_METER_RADIUS = 17;
+const ECHO_METER_RADIUS = 21;
 const SHARK_KIND_SCALE: Record<SharkKind, number> = {
   greatWhite: 2,
   hammerhead: 2,
@@ -448,6 +453,9 @@ export class Game {
   private sprinting = false;
   private sprintEndTime = 0;
   private sprintCooldownEnd = 0;
+  /** When the last Boost began, and what the cooldown was before it, so it can be given back. */
+  private sprintStartedAt = 0;
+  private sprintPrevCooldownEnd = 0;
   private sprintCooldownReduction = 0;
   /** Extra sprint duration in ms from the Store's Boost Duration upgrade (Endless only). */
   private sprintDurationBonus = 0;
@@ -856,6 +864,47 @@ export class Game {
   /** 0 right after sprinting, ramping up to 1 once the cooldown has fully recharged - lets the UI
    * show a recharge indicator on the Sprint button instead of it just silently becoming usable. */
   /** Sprint duration in ms: the base plus the Store's Boost Duration upgrade. */
+  /**
+   * Starts a Boost if it is off cooldown, and reports whether one began.
+   *
+   * `announce` is off for a boost fired by a tap on the water: the ring around the dolphin
+   * already says what happened, and a banner for something the player does every few seconds is
+   * the kind of clutter the gesture exists to get rid of. The previous cooldown is kept so a tap
+   * that turns out to be half of a double tap can be given back - see undoRecentBoost.
+   */
+  private startSprint(now: number, announce: boolean): boolean {
+    if (now < this.sprintCooldownEnd) return false;
+    this.sprintPrevCooldownEnd = this.sprintCooldownEnd;
+    this.sprintStartedAt = now;
+    this.sprinting = true;
+    this.sprintEndTime = now + this.sprintDurationMs();
+    this.sprintCooldownEnd = this.sprintEndTime + Math.max(3000, SPRINT_COOLDOWN - this.sprintCooldownReduction);
+    this.setStatus('Sprint!');
+    if (announce) this.showBanner('Sprint!', 'victory', 800);
+    return true;
+  }
+
+  /** Boost, fired by a tap on the water rather than by holding the key. */
+  boostNow(): boolean {
+    if (!this.running || this.paused) return false;
+    return this.startSprint(Date.now(), false);
+  }
+
+  /**
+   * Hands back a Boost fired a moment ago, cooldown and all.
+   *
+   * A tap is Boost and a double tap is Echolocation, and the only way to tell them apart is to
+   * wait - which would put a delay on the ability a player reaches for in a hurry. So the boost
+   * fires at once and is taken back if a second tap lands, which costs the player the couple of
+   * ticks of speed they already had rather than the whole cooldown.
+   */
+  undoRecentBoost(): void {
+    if (Date.now() - this.sprintStartedAt > BOOST_UNDO_WINDOW_MS) return;
+    this.sprinting = false;
+    this.sprintEndTime = 0;
+    this.sprintCooldownEnd = this.sprintPrevCooldownEnd;
+  }
+
   private sprintDurationMs(): number {
     return SPRINT_DURATION + this.sprintDurationBonus;
   }
@@ -1884,6 +1933,37 @@ ${zone.depth}`, 'levelup', duration + 1400);
     }
   }
 
+  /**
+   * The two arcs around the player: Boost on the inside, Echolocation outside it.
+   *
+   * An arc that fills as the ability comes back, and a faint closed ring once it is ready, so the
+   * state is readable at a glance without reading a number. Echolocation's arc is only drawn if
+   * the ability is owned, so a player who has not bought it sees one ring rather than a dial that
+   * never does anything.
+   */
+  private drawAbilityMeters(sprite: Container): void {
+    const boostMeter = sprite.getChildByName('boostMeter') as Graphics | null;
+    const echoMeter = sprite.getChildByName('echoMeter') as Graphics | null;
+
+    const arc = (g: Graphics, radius: number, fraction: number, color: number) => {
+      g.clear();
+      if (fraction >= 1) {
+        g.circle(0, 0, radius).stroke({ width: 1.5, color, alpha: 0.5 });
+        return;
+      }
+      // Starts at twelve o'clock and fills clockwise, the way any dial does.
+      const start = -Math.PI / 2;
+      g.arc(0, 0, radius, start, start + Math.PI * 2 * Math.max(0, fraction));
+      g.stroke({ width: 2.5, color, alpha: 0.85 });
+    };
+
+    if (boostMeter) arc(boostMeter, BOOST_METER_RADIUS, this.getSprintCooldownFraction(), 0xfacc15);
+    if (echoMeter) {
+      if (this.hasEcholocation()) arc(echoMeter, ECHO_METER_RADIUS, this.getEchoCooldownFraction(), 0x67e8f9);
+      else echoMeter.clear();
+    }
+  }
+
   private addEntitySprite(container: Container, zIndex: number): void {
     this.entityContainer.addChild(container);
     container.zIndex = zIndex;
@@ -1910,6 +1990,16 @@ ${zone.depth}`, 'levelup', duration + 1400);
     invulRing.circle(0, 0, 14).stroke({ width: 2, color: 0xa855f7, alpha: 0 });
     invulRing.name = 'invulRing';
     container.addChild(invulRing);
+
+    // The two ability meters. Drawn on the dolphin rather than in a corner because that is where
+    // the player is already looking, and because the abilities are now fired by tapping the water
+    // rather than by finding a button - there is no button left to put a dial on.
+    const boostMeter = new Graphics();
+    boostMeter.name = 'boostMeter';
+    container.addChild(boostMeter);
+    const echoMeter = new Graphics();
+    echoMeter.name = 'echoMeter';
+    container.addChild(echoMeter);
 
     const fish = createDolphinSprite(skinById(equippedSkinId()).palette);
     fish.name = 'fish';
@@ -3585,13 +3675,7 @@ ${cleared.name} Zone Liberated
     }
 
     if (now >= this.sprintEndTime) this.sprinting = false;
-    if (this.keys[' '] && now >= this.sprintCooldownEnd) {
-      this.sprinting = true;
-      this.sprintEndTime = now + this.sprintDurationMs();
-      this.sprintCooldownEnd = now + this.sprintDurationMs() + Math.max(3000, SPRINT_COOLDOWN - this.sprintCooldownReduction);
-      this.setStatus('Sprint!');
-      this.showBanner('Sprint!', 'victory', 800);
-    }
+    if (this.keys[' ']) this.startSprint(now, true);
 
     this.movePlayer();
     for (const dolphin of this.dolphins) {
@@ -3995,6 +4079,8 @@ ${cleared.name} Zone Liberated
       if (invulnerable) {
         invulRing.circle(0, 0, 14).stroke({ width: 2, color: 0xa855f7, alpha: 1 });
       }
+
+      if (dolphin.isPlayer) this.drawAbilityMeters(sprite);
     }
 
     for (const [shark, sprite] of this.sharkSprites) {
