@@ -343,7 +343,16 @@ const SHARK_KIND_LOOK: Record<SharkKind, SharkLook> = {
     animationSpeed: 1.7,
     glow: 'rgba(74, 222, 128, 0.55)',
     smallSize: 0.62,
-    speed: 1.3,
+    /**
+     * Quick, but no longer the quickest thing in the water by a clear margin.
+     *
+     * At 1.3 it outran every other species - a hammerhead is 1.15 and everything else 1.0 - and
+     * being both the hardest to see and the fastest to arrive left very little to do about one.
+     * Level with the hammerhead it still reads as quick, which is the whole of its character,
+     * without being the reason a level is lost. The lock-on run scales off this too, so the
+     * strike came down with it.
+     */
+    speed: 1.15,
     // One, and green, like the real animal's. A single point moving fast is all the warning a
     // player gets of one of these.
     photophores: [{ x: 1, y: 5 }],
