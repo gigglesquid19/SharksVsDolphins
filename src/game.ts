@@ -11,12 +11,14 @@ import { ParticleSystem } from './particles';
 import {
   createDolphinSprite,
   createJellyfishSprite,
+  createPhotophores,
   createSharkSprite,
   makeDolphinBodyCanvas,
   makeRadialGradientTexture,
   makeVignetteTexture,
   sliceSharkStrip,
   SharkFishSprite,
+  Photophore,
   SharkKind,
   SharkTextureSet,
   VIGNETTE_CLEAR_FRACTION,
@@ -102,6 +104,14 @@ const GLOOM_SIGHT_LIT = 22;
 const GLOOM_SIGHT_DARK = 10;
 /** The lit circle sits a little outside the Echolocation ring, so the ring itself stays legible. */
 const GLOOM_ECHO_MARGIN = 1.08;
+/**
+ * How much further a shark's own lights carry than its body. Past the pod's sight a glowing
+ * species is still a pair of lights moving in the black - which is the point of having them -
+ * while the body, and the pod size needed to ram it, stay hidden until it is close or pinged.
+ */
+const PHOTOPHORE_SIGHT_FACTOR = 1.7;
+/** The pod a sandbox hands you, enough to ram anything currently benched there. */
+const SANDBOX_STARTING_POD = 5;
 const HUNTING_MODE_POD_SIZE = 4;
 const MATRIARCH_HITS_REQUIRED = 3;
 const MATRIARCH_HIT_COOLDOWN_MS = 900;
@@ -222,6 +232,14 @@ interface SharkLook {
   smallSize: number;
   /** Speed against the level's own multiplier. */
   speed: number;
+  /**
+   * Lights along the underside, in the strip's own frame coordinates. A deep-water species has
+   * them for the same reason the real ones do, and for one of ours: in black water they are the
+   * only thing that gives a shark's position away, so a player can follow a pair of lights
+   * drifting in the dark without being able to see what is carrying them.
+   */
+  photophores?: Photophore[];
+  photophoreColor?: number;
 }
 
 const THREAT_GLOW = 'rgba(248, 113, 113, 0.5)';
@@ -236,13 +254,40 @@ const SHARK_KIND_LOOK: Record<SharkKind, SharkLook> = {
    * half speed so the whole body appears to ripple rather than beat. Slower than a tiger in the
    * water to match - it is meant to be outswum, not outfought.
    */
-  frilled: { tint: 0xb2b9a4, stretchX: 2.05, stretchY: 0.56, animationSpeed: 0.5, glow: THREAT_GLOW, smallSize: 1.55, speed: 0.85 },
+  frilled: {
+    tint: 0xb2b9a4,
+    stretchX: 2.05,
+    stretchY: 0.56,
+    animationSpeed: 0.5,
+    glow: THREAT_GLOW,
+    smallSize: 1.55,
+    speed: 0.85,
+    // Two, well apart, so the pair reads as something long even when the body itself cannot be
+    // seen - the gap between the lights is the only measure of its size in the dark.
+    photophores: [
+      { x: -14, y: 5 },
+      { x: 10, y: 5 },
+    ],
+    photophoreColor: 0x67e8f9,
+  },
   /**
    * Cookiecutter: a tiger shrunk to a third, blacked out, and animated fast so it flicks about.
    * Its glow is the green of the real animal's underside rather than the usual red, which is also
    * the only way to spot one in dark water before it reaches you.
    */
-  cookiecutter: { tint: 0x3d4352, stretchX: 1.12, stretchY: 0.82, animationSpeed: 1.7, glow: 'rgba(74, 222, 128, 0.55)', smallSize: 0.62, speed: 1.3 },
+  cookiecutter: {
+    tint: 0x3d4352,
+    stretchX: 1.12,
+    stretchY: 0.82,
+    animationSpeed: 1.7,
+    glow: 'rgba(74, 222, 128, 0.55)',
+    smallSize: 0.62,
+    speed: 1.3,
+    // One, and green, like the real animal's. A single point moving fast is all the warning a
+    // player gets of one of these.
+    photophores: [{ x: 1, y: 5 }],
+    photophoreColor: 0x4ade80,
+  },
 };
 
 const SHARK_INTRO_INFO: Partial<Record<SharkKind, { name: string; description: string }>> = {
@@ -1619,6 +1664,12 @@ export class Game {
         // A sandbox is dark on purpose and Echolocation is the answer to that, so it hands the
         // ability over whether or not it has been bought - otherwise the depth is untestable.
         this.echoAvailable = ownsEcholocation() || isSandboxLevel(config.level);
+        // And it starts you with a pod rather than alone. A single dolphin in black water dies
+        // in about five seconds, and every shark worth testing has to be rammed by a pod that
+        // meets its number - a bench you cannot fight on tests nothing.
+        if (isSandboxLevel(config.level)) {
+          this.charismaBonusDolphins = Math.max(this.charismaBonusDolphins, SANDBOX_STARTING_POD);
+        }
         this.echoDurationMs = echo.durationMs;
         this.echoCooldownMs = echo.cooldownMs;
         this.echoRadius = echo.radius;
@@ -1995,6 +2046,12 @@ ${zone.depth}`, 'levelup', duration + 1400);
     } else {
       console.warn('No shark textures available yet, using fallback shark sprite.');
       container.addChild(this.createFallbackSharkFish());
+    }
+
+    if (look.photophores) {
+      const lights = createPhotophores(look.photophores, look.photophoreColor ?? 0x4ade80);
+      lights.name = 'photo';
+      container.addChild(lights);
     }
 
     const reqText = new Text({
@@ -3930,12 +3987,25 @@ ${cleared.name} Zone Liberated
       const scaleY = baseScale * look.stretchY;
 
       const dx = this.player ? directionDelta(this.player._x, shark._x) : directionDelta(shark._x, shark.lastX);
-      if (Math.abs(dx) > 0.3) {
-        const dir = dx > 0 ? 1 : -1;
-        fish.scale.set(scaleX * dir, scaleY);
-      } else {
-        const dirSign = fish.scale.x >= 0 ? 1 : -1;
-        fish.scale.set(scaleX * dirSign, scaleY);
+      const facing = Math.abs(dx) > 0.3 ? (dx > 0 ? 1 : -1) : fish.scale.x >= 0 ? 1 : -1;
+      fish.scale.set(scaleX * facing, scaleY);
+
+      // Each light is placed in the artwork's own frame coordinates, so it stays on the belly
+      // however the species has been reshaped, while the light itself keeps a near-constant size
+      // on screen - a shark drawn small still has to be findable by its lights. They breathe
+      // rather than hold steady, each shark on its own phase so a shoal never blinks in unison.
+      const lights = sprite.getChildByName('photo') as Container | null;
+      if (lights) {
+        const spots = look.photophores ?? [];
+        const dotScale = Math.min(1.5, Math.max(1.1, baseScale));
+        for (let i = 0; i < lights.children.length; i++) {
+          const dot = lights.children[i];
+          const spot = spots[i];
+          if (!spot) continue;
+          dot.position.set(spot.x * scaleX * facing, spot.y * scaleY);
+          dot.scale.set(dotScale);
+        }
+        lights.alpha = 0.68 + 0.32 * Math.sin(now / 430 + shark.id * 1.7);
       }
 
       if (fish instanceof SharkFishSprite) {
@@ -3964,17 +4034,33 @@ ${cleared.name} Zone Liberated
       // it sits inside the ping, and a cloaked one stays ghosted so you can still tell it is
       // hiding rather than simply swimming at you.
       const revealed = this.sharkRevealedByEcho(shark);
+      let bodySeen: boolean;
       if (shark.cloaked) {
-        sprite.visible = revealed;
+        bodySeen = revealed;
         if (revealed) sprite.alpha = Math.min(sprite.alpha, 0.45);
       } else if (this.activeEvent?.type === 'storm' && this.player) {
-        sprite.visible = revealed || shark.distanceBetween(this.player) <= STORM_VISIBILITY_RADIUS;
+        bodySeen = revealed || shark.distanceBetween(this.player) <= STORM_VISIBILITY_RADIUS;
       } else if (this.levelGloom > 0 && this.player) {
         // At depth a shark is only there if it is inside the pod's light or inside a ping.
-        sprite.visible = revealed || this.distanceToPlayer(shark) <= this.gloomSightRadius();
+        bodySeen = revealed || this.distanceToPlayer(shark) <= this.gloomSightRadius();
       } else {
-        sprite.visible = true;
+        bodySeen = true;
       }
+
+      // A shark that carries its own lights is not wholly lost once the body goes: out to a way
+      // beyond the pod's sight it is still a point of light on the move. What stays hidden is
+      // everything that tells you what it is - the shape, and the pod size needed to ram it.
+      const lightsSeen =
+        !!lights &&
+        this.levelGloom > 0 &&
+        !!this.player &&
+        !shark.cloaked &&
+        this.distanceToPlayer(shark) <= this.gloomSightRadius() * PHOTOPHORE_SIGHT_FACTOR;
+
+      sprite.visible = bodySeen || lightsSeen;
+      fish.visible = bodySeen;
+      glow.visible = bodySeen;
+      if (reqText) reqText.visible = bodySeen;
     }
 
     this.drawJellyfish();

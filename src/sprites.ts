@@ -267,6 +267,37 @@ export function createSharkSprite(textures: SharkTextureSet, speedScale = 1): Sh
   return new SharkFishSprite(textures, speedScale);
 }
 
+export interface Photophore {
+  /** Position in the shark strip's own 64px frame, centre at 0,0. Positive y is the belly. */
+  x: number;
+  y: number;
+}
+
+/**
+ * The row of lights along a deep-water shark's underside: one Graphics per light, positioned by
+ * the caller each frame.
+ *
+ * Each light is its own child rather than all of them being drawn into one shape, because where a
+ * light sits and how big it looks have to scale differently. The positions follow the body, so a
+ * species stretched into an eel carries its lights spread along it; the lights themselves stay
+ * roughly a fixed size on screen, or a cookiecutter a third the size of a tiger would wear one too
+ * small to see - and being seen is the entire job.
+ *
+ * A soft halo, a middle, and a hard core, drawn additively so they read as light in dark water.
+ */
+export function createPhotophores(spots: Photophore[], color: number): Container {
+  const group = new Container();
+  for (let i = 0; i < spots.length; i++) {
+    const dot = new Graphics();
+    dot.circle(0, 0, 8).fill({ color, alpha: 0.16 });
+    dot.circle(0, 0, 4).fill({ color, alpha: 0.42 });
+    dot.circle(0, 0, 1.8).fill({ color, alpha: 1 });
+    dot.blendMode = 'add';
+    group.addChild(dot);
+  }
+  return group;
+}
+
 export function makeRadialGradientTexture(size: number, color: string): Texture {
   const c = document.createElement('canvas');
   c.width = size;
