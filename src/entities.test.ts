@@ -255,6 +255,35 @@ describe('Shark.move large-hammerhead flank', () => {
   });
 });
 
+describe('Shark.move frilled flank', () => {
+  // The frilled shark flanks whatever its size, unlike the hammerhead, which only does it when
+  // large - the levels that field a frilled field only small ones, so gating it on size would
+  // have meant a behaviour nothing ever performs.
+  it('approaches a distant player at an angle rather than head-on', () => {
+    const p = playerAt(30, 90);
+    const s = testShark(30, 50, { kind: 'frilled' });
+    s.move(1, p, [s], true, NOW);
+    // Straight down at the player would leave headingX ~ 0; an arc puts weight on the other axis.
+    expect(Math.abs(s.headingX)).toBeGreaterThan(0.2);
+  });
+
+  it('does it small, where a hammerhead would not', () => {
+    const p = playerAt(30, 90);
+    const frilled = testShark(30, 50, { kind: 'frilled' });
+    const hammer = testShark(30, 50, { kind: 'hammerhead' });
+    frilled.move(1, p, [frilled], true, NOW);
+    hammer.move(1, p, [hammer], true, NOW);
+    expect(Math.abs(frilled.headingX)).toBeGreaterThan(Math.abs(hammer.headingX));
+  });
+
+  it('still closes once it is on top of the player, so the arc never stops it connecting', () => {
+    const p = playerAt(50, 50);
+    const s = testShark(50, 46, { kind: 'frilled' });
+    for (let i = 0; i < 30; i++) s.move(1, p, [s], true, NOW);
+    expect(s.distanceBetween(p)).toBeLessThan(4);
+  });
+});
+
 describe('Shark.move never retreats from the pod', () => {
   it('keeps closing on a pod big enough to destroy it', () => {
     // Sharks used to hold a buffer off a kill-capable pod. It read as the shark fleeing rather

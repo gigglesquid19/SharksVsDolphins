@@ -280,9 +280,15 @@ export class Shark {
       let desX = toPlayerX;
       let desY = toPlayerY;
 
-      // Large hammerheads swing wide and come in from the side; the offset shrinks to 0 as
-      // they close so they still connect. Two hammerheads on opposite sides form a pincer.
-      const flanking = this.large && this.kind === 'hammerhead';
+      // Flankers swing wide and come in from the side; the offset shrinks to 0 as they close so
+      // they still connect. Two on opposite sides form a pincer.
+      //
+      // Large hammerheads, and every frilled shark whatever its size. The frilled is gated on
+      // kind rather than on size because the levels that field one field only small ones - gating
+      // it the way the hammerhead is gated would have meant writing a behaviour nothing ever
+      // performs. It suits the animal too: a long body that arcs round rather than charging is
+      // the thing you are told to outswim rather than outfight.
+      const flanking = (this.large && this.kind === 'hammerhead') || this.kind === 'frilled';
       if (flanking) {
         if (this.flankSign === 0) this.flankSign = toPlayerY >= 0 ? 1 : -1;
         const perpX = -toPlayerY / dist;

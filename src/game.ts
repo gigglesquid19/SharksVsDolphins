@@ -306,12 +306,12 @@ const SHARK_INTRO_INFO: Partial<Record<SharkKind, { name: string; description: s
   frilled: {
     name: 'Frilled Shark',
     description:
-      'A long eel of a shark from the twilight water. It is slower than anything else down here and never stops coming - you are meant to outswim it, not outfight it.',
+      'A long eel of a shark from the twilight water. It is slower than anything else down here, it comes round at you from the side rather than straight on, and it never stops. Ten dolphins would see one off; you are meant to outswim it, not outfight it.',
   },
   cookiecutter: {
     name: 'Cookiecutter Shark',
     description:
-      'Small, black and quick, lit only by the green glow of its own belly. One is barely a threat and three dolphins see it off, but they do not travel alone.',
+      'Small, black and quick, lit only by the green glow of its own belly. One is barely a threat, but it takes five dolphins to see off, and they do not travel alone.',
   },
 };
 
@@ -3299,15 +3299,21 @@ ${cleared.name} Zone Liberated
         return this.currentLevel <= GREAT_WHITE_EASED_UNTIL_LEVEL ? 10 : 12;
       }
       if (kind === 'hammerhead') return 10;
-      if (kind === 'frilled') return 9;
-      if (kind === 'cookiecutter') return 6;
+      // Both kept above their small forms below, so size never makes one cheaper to ram.
+      if (kind === 'frilled') return 12;
+      if (kind === 'cookiecutter') return 8;
     } else {
       if (kind === 'tiger') return 4;
       if (kind === 'greatWhite') return 5;
       if (kind === 'hammerhead') return 4;
-      // A long body but a weak bite, against something barely bigger than a dolphin's snout.
-      if (kind === 'frilled') return 5;
-      if (kind === 'cookiecutter') return 3;
+      // The two deep-water species cost far more pod than their size suggests, which is the
+      // point of them: a frilled shark at 10 is not something a working pod rams on the way
+      // past - it has to be outswum until the pod is nearly at its limit, and the level that
+      // fields them caps the pod at 15. The cookiecutter at 5 is past the 4 that merely opens
+      // Hunting Mode, so arriving in Hunting Mode is no longer the same as being able to clear
+      // one out of the way.
+      if (kind === 'frilled') return 10;
+      if (kind === 'cookiecutter') return 5;
     }
     return HUNTING_MODE_POD_SIZE;
   }
