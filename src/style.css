@@ -598,12 +598,16 @@ button.school.mega-pod:hover:not(:disabled) { box-shadow: 0 6px 22px rgba(168, 8
 }
 .pause-overlay.hidden { display: none; }
 
+/* A fixed width rather than one that grows with the longest label, because the panel is laid out
+   in two columns and those columns should be the same width whatever is sitting in them. */
 .pause-panel {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 14px;
-  padding: 28px 36px;
+  align-items: stretch;
+  gap: 12px;
+  width: min(360px, 100%);
+  box-sizing: border-box;
+  padding: 24px 22px;
   background: var(--panel);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: var(--radius);
@@ -611,6 +615,7 @@ button.school.mega-pod:hover:not(:disabled) { box-shadow: 0 6px 22px rgba(168, 8
 }
 .pause-panel h2 {
   margin: 0;
+  text-align: center;
   font-size: 1.6rem;
   font-weight: 800;
   letter-spacing: -0.02em;
@@ -619,7 +624,33 @@ button.school.mega-pod:hover:not(:disabled) { box-shadow: 0 6px 22px rgba(168, 8
   background-clip: text;
   color: transparent;
 }
-.pause-panel button { width: 170px; }
+/* Resume is the way out of this menu and the only thing most players want, so it keeps the full
+   width. Everything else pairs off into two columns, which halves the height of the panel and
+   stops a phone having to scroll it. */
+.pause-panel > button { width: 100%; }
+.pause-grid,
+.pause-settings {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  width: 100%;
+}
+.pause-grid button,
+.pause-settings button {
+  width: 100%;
+  min-width: 0;
+  padding: 11px 8px;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* The volume pill, and the level picker when fullscreen parks it here, take a row to themselves. */
+.pause-settings #volumeControl,
+.pause-settings #levelSelectWrap {
+  grid-column: 1 / -1;
+  justify-content: center;
+}
 
 .level-up-overlay {
   position: fixed;
@@ -1836,14 +1867,9 @@ button.mega-shrimp.green {
 }
 
 .pause-settings {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  margin-top: 4px;
+  margin-top: 2px;
   padding-top: 14px;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
-  width: 100%;
 }
 .pause-settings:empty {
   display: none;
