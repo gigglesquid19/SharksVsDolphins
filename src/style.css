@@ -1880,8 +1880,13 @@ button.mega-shrimp.green {
 
 /* The arena is 79:137, so the canvas is too. The width is capped by what the height budget
    allows rather than letting max-height clamp a full-width box, which would squash the picture.
-   On a phone it is the width that binds, not the height budget - see constants.ts. */
-canvas {
+   On a phone it is the width that binds, not the height budget - see constants.ts.
+
+   Scoped to the arena by id, not to `canvas`. As a bare element rule it was stamping the arena's
+   proportions onto every canvas on the page: the Store's skin previews set `height: auto`, so
+   they inherited the aspect-ratio and drew a 150x100 dolphin into a 127x221 box. The Your
+   Dolphin preview escaped only by pinning its own width and height. */
+#simCanvas {
   display: block;
   aspect-ratio: 79 / 137;
   width: min(100%, calc(74vh * (79 / 137)));
@@ -2143,4 +2148,16 @@ canvas {
      controls in play, where they are needed. Desktop keeps them; it has the room. */
   h1 { display: none; }
   #hintPanel { display: none; }
+
+  /* Two up in the shop, always. The tiles ask for at least 150px each, which with the gap wants
+     312px, and a 393px phone leaves the panel only 296px to give - 16px short, so auto-fill
+     quietly dropped to a single column and the shop became a long scroll of one item at a time.
+     Asking for two columns outright says what is actually wanted, and minmax(0, 1fr) lets a tile
+     be narrower than its contents would otherwise force rather than overflowing the panel. The
+     panel's own padding comes in to buy those columns room; nothing outside the shop moves. */
+  .store-panel { padding: 14px; }
+  .store-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
 }
