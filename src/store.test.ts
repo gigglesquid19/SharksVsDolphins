@@ -9,6 +9,7 @@ import {
   buySkin,
   buyUpgrade,
   canBuyUpgrade,
+  baseEcholocationStats,
   echolocationStats,
   echolocationUnlocked,
   endlessStartBonuses,
@@ -177,6 +178,25 @@ describe('Echolocation', () => {
 
   it('leaves the other upgrades ungated', () => {
     expect(canBuyUpgrade('speed')).toBe(true);
+  });
+
+  it('lends the unupgraded ability, whatever has been bought on top of it', () => {
+    // What a dark depth hands a player who has not bought Echolocation. It must not move when
+    // upgrades are bought, or someone who never paid for the ability would end up with a better
+    // one than a player who paid and has not levelled it yet.
+    const lentBefore = baseEcholocationStats();
+    markCampaignCleared();
+    awardPearls(10_000);
+    buyEcholocation();
+    buyUpgrade('echoDuration');
+    buyUpgrade('echoRadius');
+
+    expect(baseEcholocationStats()).toEqual(lentBefore);
+    const upgraded = echolocationStats();
+    expect(upgraded.durationMs).toBeGreaterThan(lentBefore.durationMs);
+    expect(upgraded.radius).toBeGreaterThan(lentBefore.radius);
+    // The one number the two share: lending does not hand out a shorter wait either.
+    expect(baseEcholocationStats().cooldownMs).toBe(upgraded.cooldownMs);
   });
 
   it('grows duration and radius with the levels bought, leaving cooldown alone', () => {

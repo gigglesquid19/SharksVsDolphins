@@ -14,6 +14,8 @@ import {
   MAX_START_LEVEL,
   buyLevelAccess,
   hasLevelAccess,
+  canBuyDarkDepths,
+  depthNeedsEcholocation,
   levelAccessPrice,
   setTestUnlockAll,
   testUnlockAllActive,
@@ -137,7 +139,7 @@ export function setupLevelSelect(opts: LevelSelectOpts): LevelSelectHandles {
         cells.push(
           `<button class="${classes.join(' ')}" data-level="${level}">
             <span class="level-cell-number">${level}</span>
-            <span class="level-cell-state">${unlocked ? (isSandboxLevel(level) ? '\u{1F9EA}' : '') : '\u{1F512}'}</span>
+            <span class="level-cell-state">${unlocked ? (isSandboxLevel(level) ? '\u{1F9EA}' : '') : depthNeedsEcholocation(level) && !canBuyDarkDepths() ? '\u{1F30A}' : '\u{1F512}'}</span>
           </button>`,
         );
       }
@@ -223,13 +225,19 @@ export function setupLevelSelect(opts: LevelSelectOpts): LevelSelectHandles {
         .join('');
     }
 
+    // Shut until Echolocation is on the shelf, which is to say until the campaign is cleared.
+    // Checked before affordability, because being short of Pearls is not why this one is closed.
+    const needsEcho = !unlocked && depthNeedsEcholocation(level) && !canBuyDarkDepths();
+
     if (previewNoteEl) {
-      previewNoteEl.classList.toggle('warn', !ranked);
-      previewNoteEl.textContent = isSandboxLevel(level)
-        ? 'Test water for trying new sharks out, dark as the depth really is. Echolocation is lent to you here.'
-        : ranked
-          ? 'A dive from the surface counts on the leaderboard.'
-          : 'A dive from this depth never counts on the leaderboard.';
+      previewNoteEl.classList.toggle('warn', needsEcho || !ranked);
+      previewNoteEl.textContent = needsEcho
+        ? 'The water is dark from here down. Clear the campaign to unlock Echolocation in the Store, and this depth opens with it.'
+        : isSandboxLevel(level)
+          ? 'Test water for trying new sharks out, dark as the depth really is. Echolocation is lent to you here.'
+          : ranked
+            ? 'A dive from the surface counts on the leaderboard.'
+            : 'A dive from this depth never counts on the leaderboard.';
     }
 
     if (previewActionBtn) {
@@ -237,6 +245,10 @@ export function setupLevelSelect(opts: LevelSelectOpts): LevelSelectHandles {
         previewActionBtn.textContent = 'Start Level';
         previewActionBtn.disabled = false;
         previewActionBtn.onclick = () => opts.onDive(level);
+      } else if (needsEcho) {
+        previewActionBtn.textContent = 'Echolocation needed';
+        previewActionBtn.disabled = true;
+        previewActionBtn.onclick = null;
       } else if (short > 0) {
         previewActionBtn.textContent = `${short} more Pearls needed`;
         previewActionBtn.disabled = true;

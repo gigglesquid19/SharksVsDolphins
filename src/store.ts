@@ -220,6 +220,22 @@ export function echolocationStats(): { durationMs: number; radius: number; coold
   };
 }
 
+/**
+ * Echolocation as it comes out of the box, with none of the bought upgrades on it.
+ *
+ * What a dark level lends a player who has not bought the ability. Lending the upgraded numbers
+ * would hand someone who never bought Echolocation a better one than a player who bought it and
+ * has not yet levelled it, and would make the duration and radius upgrades worth buying only for
+ * the levels that are not dark - which is most of them.
+ */
+export function baseEcholocationStats(): { durationMs: number; radius: number; cooldownMs: number } {
+  return {
+    durationMs: ECHO_BASE_DURATION_MS,
+    radius: ECHO_BASE_RADIUS,
+    cooldownMs: ECHO_COOLDOWN_MS,
+  };
+}
+
 /** Depthless starting bonuses from the purchased upgrade levels - the whole of a Depthless build. */
 export function endlessStartBonuses(): {
   vitalityLives: number;

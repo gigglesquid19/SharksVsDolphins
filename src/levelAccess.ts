@@ -1,5 +1,6 @@
 import { spendPearls } from './pearls';
 import { ENDLESS_BACKGROUND_COUNT } from './levels';
+import { ECHOLOCATION_PRICE, echolocationUnlocked } from './store';
 
 const KEY = 'svsd-depth-access';
 const TEST_UNLOCK_KEY = 'svsd-depth-test-unlock';
@@ -26,14 +27,49 @@ const BASE_PRICE = 50;
 const PRICE_PER_LEVEL = 25;
 
 /**
+ * The first dark depth. From here down the water needs Echolocation to be read at all, which is
+ * why these depths are both dearer and gated - see levelAccessPrice and depthNeedsEcholocation.
+ */
+export const FIRST_DARK_LEVEL = 11;
+
+/**
+ * What a dark depth costs on top of its place in the curve: the price of Echolocation itself.
+ *
+ * A dive that starts down there is lent the ability if it has not been bought, so the depth is
+ * carrying an ability as well as a starting point, and it should be paid for accordingly.
+ * Pinned to ECHOLOCATION_PRICE rather than written as its own number so the two cannot drift.
+ */
+const DARK_DEPTH_SURCHARGE = ECHOLOCATION_PRICE;
+
+/**
  * Pearls to unlock a starting depth. Climbs with the level, so skipping the whole descent costs
  * more than a full descent pays - a player who wants the Hadal is meant to reach it first and
- * buy the shortcut afterwards, not instead.
+ * buy the shortcut afterwards, not instead. From the first dark depth it also carries the
+ * surcharge above, which is the step up from 250 at level 10 to 475 at level 11.
  */
 export function levelAccessPrice(level: number): number {
   const depth = Math.floor(level);
   if (!Number.isFinite(depth) || depth <= FREE_START_LEVEL) return 0;
-  return BASE_PRICE + (depth - FREE_START_LEVEL - 1) * PRICE_PER_LEVEL;
+  const curve = BASE_PRICE + (depth - FREE_START_LEVEL - 1) * PRICE_PER_LEVEL;
+  return depth >= FIRST_DARK_LEVEL ? curve + DARK_DEPTH_SURCHARGE : curve;
+}
+
+/**
+ * Whether this depth is one that cannot be bought until Echolocation has been unlocked in the
+ * Store - which is to say until the campaign has been cleared.
+ *
+ * Buying a depth is buying a shortcut into water you could otherwise have descended into, and
+ * from level 11 that water is dark. Selling someone the dark before they have any means of seeing
+ * in it sells them a level they cannot play, so these depths stay shut until the ability that
+ * answers them is at least available to them.
+ */
+export function depthNeedsEcholocation(level: number): boolean {
+  return Math.floor(level) >= FIRST_DARK_LEVEL;
+}
+
+/** Whether the player has met that requirement yet. */
+export function canBuyDarkDepths(): boolean {
+  return echolocationUnlocked();
 }
 
 function load(): number[] {
@@ -106,6 +142,8 @@ export function buyLevelAccess(level: number): boolean {
   const depth = Math.floor(level);
   if (!Number.isFinite(depth) || depth <= FREE_START_LEVEL || depth > MAX_START_LEVEL) return false;
   if (hasLevelAccess(depth)) return false;
+  // Shut, and not merely unaffordable, until Echolocation is on the shelf.
+  if (depthNeedsEcholocation(depth) && !canBuyDarkDepths()) return false;
   if (!spendPearls(levelAccessPrice(depth))) return false;
   const levels = load();
   levels.push(depth);

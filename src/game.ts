@@ -62,7 +62,7 @@ import {
   PEARLS_FLAWLESS_CAMPAIGN_BONUS,
 } from './pearls';
 import { getDolphinName } from './profile';
-import { echolocationStats, endlessStartBonuses, equippedSkinId, grantSkin, ownsEcholocation, ownsSkin } from './store';
+import { baseEcholocationStats, echolocationStats, endlessStartBonuses, equippedSkinId, grantSkin, ownsEcholocation, ownsSkin } from './store';
 import { markCampaignCleared } from './progress';
 import { hasLevelAccess, startLevelIsRanked } from './levelAccess';
 import { skinById } from './skins';
@@ -105,6 +105,11 @@ const GLOOM_SIGHT_LIT = 22;
 const GLOOM_SIGHT_DARK = 10;
 /** The lit circle sits a little outside the Echolocation ring, so the ring itself stays legible. */
 const GLOOM_ECHO_MARGIN = 1.08;
+/**
+ * The shallowest depth a Level Select dive is lent Echolocation at: the first level of the
+ * Mesopelagic, which is where the water starts being dark.
+ */
+const ECHO_LENT_FROM_LEVEL = 11;
 /** The pod a sandbox hands you, enough to ram anything currently benched there. */
 const SANDBOX_STARTING_POD = 5;
 const HUNTING_MODE_POD_SIZE = 4;
@@ -1746,10 +1751,22 @@ export class Game {
         this.sprintCooldownReduction = b.sprintCooldownReduction;
         this.sprintDurationBonus = b.sprintDurationBonus;
 
-        const echo = echolocationStats();
-        // A sandbox is dark on purpose and Echolocation is the answer to that, so it hands the
-        // ability over whether or not it has been bought - otherwise the depth is untestable.
-        this.echoAvailable = ownsEcholocation() || isSandboxLevel(config.level);
+        // A dark depth is dark on purpose and Echolocation is the answer to it, so two cases hand
+        // the ability over whether or not it has been bought: a sandbox, which would otherwise be
+        // untestable, and a dive that was started from Level Select at the first dark depth or
+        // deeper. The second matters because Echolocation cannot be bought until the campaign has
+        // been cleared, while a starting depth costs only Pearls - without this, a player can pay
+        // for a depth they have no way to equip for.
+        //
+        // Only a dive that BEGINS down there is lent it. Descending into the dark from level 1 is
+        // a run that has had the whole campaign to earn the ability, and taking it as a gift at
+        // level 11 would undercut both the purchase and the descent.
+        const owned = ownsEcholocation();
+        const lent =
+          !owned && (isSandboxLevel(config.level) || this.depthlessStartLevel >= ECHO_LENT_FROM_LEVEL);
+        // Lent Echolocation is the base ability, never the bought upgrades - see store.ts.
+        const echo = lent ? baseEcholocationStats() : echolocationStats();
+        this.echoAvailable = owned || lent;
         // And it starts you with a pod rather than alone. A single dolphin in black water dies
         // in about five seconds, and every shark worth testing has to be rammed by a pod that
         // meets its number - a bench you cannot fight on tests nothing.

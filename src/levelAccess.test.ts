@@ -1,9 +1,13 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { awardPearls, getPearls } from './pearls';
+import { markCampaignCleared } from './progress';
 import {
+  FIRST_DARK_LEVEL,
   FREE_START_LEVEL,
   MAX_START_LEVEL,
   buyLevelAccess,
+  canBuyDarkDepths,
+  depthNeedsEcholocation,
   hasLevelAccess,
   levelAccessPrice,
   purchasedStartLevels,
@@ -15,6 +19,11 @@ import {
 beforeEach(() => {
   localStorage.clear();
 });
+
+/** Opens the dark depths for purchase: they need Echolocation on the Store's shelf first. */
+function clearTheCampaign(): void {
+  markCampaignCleared();
+}
 
 describe('pricing', () => {
   it('is free to start where everyone starts', () => {
@@ -36,6 +45,7 @@ describe('pricing', () => {
 
 describe('buying', () => {
   it('unlocks a level and spends the price', () => {
+    clearTheCampaign();
     awardPearls(10_000);
     const before = getPearls();
     expect(buyLevelAccess(21)).toBe(true);
@@ -44,6 +54,7 @@ describe('buying', () => {
   });
 
   it('refuses when the Pearls are short, spending nothing', () => {
+    clearTheCampaign();
     awardPearls(levelAccessPrice(21) - 1);
     const before = getPearls();
     expect(buyLevelAccess(21)).toBe(false);
@@ -52,6 +63,7 @@ describe('buying', () => {
   });
 
   it('will not sell the same level twice', () => {
+    clearTheCampaign();
     awardPearls(100_000);
     expect(buyLevelAccess(11)).toBe(true);
     const after = getPearls();
@@ -72,6 +84,7 @@ describe('buying', () => {
   });
 
   it('keeps purchases sorted and unique', () => {
+    clearTheCampaign();
     awardPearls(1_000_000);
     buyLevelAccess(31);
     buyLevelAccess(11);
@@ -80,6 +93,7 @@ describe('buying', () => {
   });
 
   it('unlocks one level without unlocking its neighbours', () => {
+    clearTheCampaign();
     awardPearls(100_000);
     buyLevelAccess(21);
     expect(hasLevelAccess(20)).toBe(false);
@@ -112,6 +126,52 @@ describe('storage', () => {
   });
 });
 
+describe('the dark depths', () => {
+  it('names level 11 down as the depths that need Echolocation', () => {
+    expect(depthNeedsEcholocation(FIRST_DARK_LEVEL - 1)).toBe(false);
+    expect(depthNeedsEcholocation(FIRST_DARK_LEVEL)).toBe(true);
+    expect(depthNeedsEcholocation(MAX_START_LEVEL)).toBe(true);
+  });
+
+  it('will not sell one until Echolocation is on the shelf, and spends nothing trying', () => {
+    awardPearls(1_000_000);
+    const before = getPearls();
+    expect(canBuyDarkDepths()).toBe(false);
+    expect(buyLevelAccess(FIRST_DARK_LEVEL)).toBe(false);
+    expect(hasLevelAccess(FIRST_DARK_LEVEL)).toBe(false);
+    expect(getPearls()).toBe(before);
+  });
+
+  it('still sells the depths above it while the campaign is unbeaten', () => {
+    awardPearls(1_000_000);
+    expect(buyLevelAccess(FIRST_DARK_LEVEL - 1)).toBe(true);
+    expect(hasLevelAccess(FIRST_DARK_LEVEL - 1)).toBe(true);
+  });
+
+  it('opens them once the campaign is cleared', () => {
+    clearTheCampaign();
+    awardPearls(1_000_000);
+    expect(canBuyDarkDepths()).toBe(true);
+    expect(buyLevelAccess(FIRST_DARK_LEVEL)).toBe(true);
+    expect(hasLevelAccess(FIRST_DARK_LEVEL)).toBe(true);
+  });
+
+  it('charges a step up at the first dark depth, for the ability the dive is lent', () => {
+    const lastLit = levelAccessPrice(FIRST_DARK_LEVEL - 1);
+    const firstDark = levelAccessPrice(FIRST_DARK_LEVEL);
+    // One level deeper, but far more than one level's worth of Pearls.
+    expect(firstDark).toBeGreaterThan(lastLit * 1.5);
+    expect(lastLit).toBe(250);
+    expect(firstDark).toBe(475);
+  });
+
+  it('keeps climbing level by level below the step', () => {
+    for (let depth = FIRST_DARK_LEVEL + 1; depth <= FIRST_DARK_LEVEL + 5; depth++) {
+      expect(levelAccessPrice(depth)).toBeGreaterThan(levelAccessPrice(depth - 1));
+    }
+  });
+});
+
 describe('the testing unlock', () => {
   it('is off until it is switched on', () => {
     expect(testUnlockAllActive()).toBe(false);
@@ -129,6 +189,7 @@ describe('the testing unlock', () => {
   });
 
   it('leaves real purchases alone when switched off', () => {
+    clearTheCampaign();
     awardPearls(100_000);
     buyLevelAccess(21);
     setTestUnlockAll(true);
