@@ -480,10 +480,14 @@ button.school.mega-pod:hover:not(:disabled) { box-shadow: 0 6px 22px rgba(168, 8
   backdrop-filter: none;
 }
 
+/* Top-aligned rather than centred: the bar is padded for at the top of the wrap, so centring put
+   the whole of the leftover height in one dead band between the bar and the water and left the
+   joystick pressed against the bottom edge of the play area. Aligned to the top, the water starts
+   directly under the bar and the slack collects around the thumb instead. */
 .canvas-wrap:fullscreen, .canvas-wrap.compact {
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
   background: #020617;
   width: 100vw;

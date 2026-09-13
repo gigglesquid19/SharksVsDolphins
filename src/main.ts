@@ -68,11 +68,16 @@ const canvasWrap = document.getElementById('canvasWrap') as HTMLDivElement;
 const controlsRow = document.querySelector('.canvas-wrap .game-controls') as HTMLElement | null;
 function syncStageTop(): void {
   if (!controlsRow) return;
-  // Compact/fullscreen floats the bar over the canvas and already pads the wrap for it.
+  // Compact/fullscreen centres a square canvas in a full-height wrap, so the wrap's top edge is
+  // nowhere near the water: anchoring the badges there put them up in the empty band above the
+  // play area and straight through the floating control bar. Measure the canvas itself instead,
+  // and the badges sit on the water's top corners wherever the canvas has ended up.
   const compact = !!document.fullscreenElement || canvasWrap.classList.contains('compact');
-  const offset = compact
-    ? 0
-    : controlsRow.getBoundingClientRect().bottom - canvasWrap.getBoundingClientRect().top;
+  const canvas = canvasWrap.querySelector('canvas');
+  const anchor = compact && canvas ? canvas : controlsRow;
+  const wrapTop = canvasWrap.getBoundingClientRect().top;
+  const rect = anchor.getBoundingClientRect();
+  const offset = compact ? rect.top - wrapTop : rect.bottom - wrapTop;
   canvasWrap.style.setProperty('--stage-top', `${Math.max(0, Math.round(offset))}px`);
 }
 
@@ -645,6 +650,8 @@ const inputs = {
       const side = Math.max(1, Math.min(window.innerWidth * WIDTH_FILL, availableHeight * HEIGHT_FILL));
       gameCanvas.style.width = `${side}px`;
       gameCanvas.style.height = `${side}px`;
+      // The badges hang off the canvas's top edge in this layout, which has just moved.
+      syncStageTop();
     } else {
       canvasWrap.style.paddingTop = '';
       // Clear the sizes Pixi writes inline (autoDensity) as well as anything the compact layout
