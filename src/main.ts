@@ -657,38 +657,46 @@ const inputs = {
     }
   }
 
-  // In fullscreen, only Start/Retry + Pause stay in the always-visible bar; everything else
-  // (settings, secondary actions) relocates into the pause panel so the bar stays one row and
-  // the canvas gets that space back. Moved back to their original spot on exiting fullscreen.
-  const RELOCATABLE_CONTROL_IDS = [
-    'levelSelectWrap',
-    'leaderboardBtn',
-    'achievementsBtn',
-    'fullscreenBtn',
-    'muteBtn',
-    'nextTrackBtn',
-    'volumeControl',
-  ];
+  // The bar above the water is for the things a player reaches for mid-game; everything else
+  // lives in the pause menu, which is where you already are when you want it. The leaderboard, the
+  // achievements and the music controls are never urgent, so they move there for good and the bar
+  // is left short enough to read at a glance.
+  const PAUSE_MENU_CONTROL_IDS = ['leaderboardBtn', 'achievementsBtn', 'muteBtn', 'nextTrackBtn', 'volumeControl'];
+  // In fullscreen, only Start/Retry + Pause can stay: the level picker and the Fullscreen toggle
+  // itself join the rest in the pause panel so the bar is one row, and come back on the way out.
+  const FULLSCREEN_CONTROL_IDS = ['levelSelectWrap', 'fullscreenBtn'];
   let relocatedControls: { el: HTMLElement; parent: HTMLElement; nextSibling: Node | null }[] = [];
 
-  function moveControlsIntoPauseMenu(): void {
-    if (relocatedControls.length) return;
+  /** Moves the named controls into the pause panel, remembering where each came from. */
+  function relocateControls(ids: string[]): void {
     const target = document.getElementById('pauseSettingsList');
     if (!target) return;
-    for (const id of RELOCATABLE_CONTROL_IDS) {
+    for (const id of ids) {
       const el = document.getElementById(id);
-      if (!el || !el.parentElement) continue;
+      if (!el || !el.parentElement || el.parentElement === target) continue;
       relocatedControls.push({ el, parent: el.parentElement, nextSibling: el.nextSibling });
       target.appendChild(el);
     }
   }
 
-  function restoreControlsFromPauseMenu(): void {
-    for (const { el, parent, nextSibling } of relocatedControls) {
+  /** Puts the named controls back where they were, leaving any others where they are. */
+  function restoreControls(ids: string[]): void {
+    relocatedControls = relocatedControls.filter(({ el, parent, nextSibling }) => {
+      if (!ids.includes(el.id)) return true;
       parent.insertBefore(el, nextSibling);
-    }
-    relocatedControls = [];
+      return false;
+    });
   }
+
+  function moveControlsIntoPauseMenu(): void {
+    relocateControls(FULLSCREEN_CONTROL_IDS);
+  }
+
+  function restoreControlsFromPauseMenu(): void {
+    restoreControls(FULLSCREEN_CONTROL_IDS);
+  }
+
+  relocateControls(PAUSE_MENU_CONTROL_IDS);
 
   // The native Android/iOS app has no browser chrome to escape and always fills the screen,
   // so it gets the compact layout permanently rather than through the (unreliable, in a
