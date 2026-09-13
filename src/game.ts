@@ -251,7 +251,16 @@ const FRILLED_REACH_FRACTION = 0.5;
 const REACH_EXTEND_MS = 450;
 const REACH_HOLD_MS = 250;
 const REACH_RETRACT_MS = 350;
-const REACH_COOLDOWN_MS = 3000;
+/**
+ * How long the head takes to recharge between strikes.
+ *
+ * Long, at 20 seconds. On a three-second recharge the strike came round roughly every four, which
+ * turned the reach into the shark's ordinary way of moving rather than a thing it did - and left
+ * no window in which a dolphin could safely be inside the range the body cannot reach. A spent
+ * strike now buys real time on the wrong side of it, which is what makes getting close to a
+ * frilled shark a decision rather than a mistake.
+ */
+const REACH_COOLDOWN_MS = 20000;
 
 const HAMMERHEAD_SPEED_BONUS = 1.15;
 const GREAT_WHITE_LARGE_SPEED_BONUS = 1.25;
@@ -3362,9 +3371,11 @@ ${cleared.name} Zone Liberated
   /**
    * The large frilled shark's head extension.
    *
-   * Runs whenever a pod member is inside one body length: the head goes out over REACH_EXTEND_MS,
-   * holds, and comes back. Nothing about the body moves - the reach is all in the strike, which
-   * is what lets something this slow still be dangerous to a dolphin that has outswum it.
+   * Fires when a pod member comes inside range: the head goes out over REACH_EXTEND_MS, holds,
+   * and comes back, and then the shark is spent for REACH_COOLDOWN_MS. Nothing about the body
+   * moves - the reach is all in the strike, which is what lets something this slow still be
+   * dangerous to a dolphin that has outswum it, and the recharge is what lets that dolphin get
+   * away with being close once the strike has been spent.
    */
   private updateFrilledReach(now: number): void {
     for (const shark of this.sharks) {
