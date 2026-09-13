@@ -778,7 +778,7 @@ export class Game {
     await this.createBackground();
     await this.loadSharkTextures();
     this.createEnvironment();
-    this.initModel(this.getSelectedLevelConfig());
+    this.initModel(this.getSelectedLevelConfig(), false, true);
 
     // Warm the Play Games sign-in state (no-op off Android) so the leaderboard
     // overlay can show a global rank without a round-trip delay.
@@ -1124,7 +1124,7 @@ export class Game {
     if (this.timer) clearTimeout(this.timer);
     this.flushLifetimeStats();
     this.createEnvironment();
-    this.initModel(this.getSelectedLevelConfig());
+    this.initModel(this.getSelectedLevelConfig(), false, true);
     this.setStatus('Ready');
     this.startBtn.textContent = 'Start';
   }
@@ -1135,7 +1135,22 @@ export class Game {
     if (this.timer) clearTimeout(this.timer);
     clearRunCheckpoint();
     this.createEnvironment();
-    this.initModel(this.getSelectedLevelConfig());
+    this.initModel(this.getSelectedLevelConfig(), false, true);
+    this.setStatus('Ready');
+    this.startBtn.textContent = 'Start';
+  }
+
+  /**
+   * Rebuilds the idle water at the depth the next run will begin from.
+   *
+   * Called when a level is chosen rather than when it is started, so the screen behind the Start
+   * button is the level that was picked. Without it the player looked at level 1 - its
+   * background, its sharks and its introduction cards - and only arrived at the depth they chose
+   * once they pressed Start.
+   */
+  showSelectedLevel(): void {
+    this.createEnvironment();
+    this.initModel(this.getSelectedLevelConfig(), false, true);
     this.setStatus('Ready');
     this.startBtn.textContent = 'Start';
   }
@@ -1605,7 +1620,15 @@ export class Game {
     this.addDolphinSprite(dolphin);
   }
 
-  private initModel(config = LEVELS[0], keepUpgrades = false): boolean {
+  /**
+   * Builds the water for a level.
+   *
+   * `silent` is for the model that sits on screen before anyone has pressed Start. That model
+   * exists only so the player can see where they are about to dive, and a shark-introduction
+   * card belongs to a run rather than to a preview - shown here it fires once for the idle
+   * level and then again the moment the run actually begins.
+   */
+  private initModel(config = LEVELS[0], keepUpgrades = false, silent = false): boolean {
     this.entityContainer.removeChildren();
     this.dolphinSprites.clear();
     this.sharkSprites.clear();
@@ -1752,7 +1775,7 @@ export class Game {
     this.loadBackground(getLevelBackground(config.level, this.mode)).catch((err) => console.warn('Background load failed:', err));
     this.updateStats();
     this.draw();
-    this.checkForNewSharks(config);
+    if (!silent) this.checkForNewSharks(config);
     this.announceLevel();
     this.applyLevelMusic();
     this.updateDolphinsSavedBadge();

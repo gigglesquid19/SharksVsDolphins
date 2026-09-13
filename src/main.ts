@@ -467,14 +467,18 @@ const inputs = {
     }, 250);
   }
 
+  // Each entry rebuilds the water for the mode it is entering, so the screen behind the Start
+  // button is always the level about to be played rather than whatever was there before.
   document.getElementById('titleCampaignBtn')!.addEventListener('click', () => {
     clearRunCheckpoint();
     game.setMode('campaign');
+    game.showSelectedLevel();
     levelSelectWrap.classList.remove('hidden');
     enterAppFromTitle();
   });
   document.getElementById('titleEndlessBtn')!.addEventListener('click', () => {
     game.setMode('endless');
+    game.showSelectedLevel();
     levelSelectWrap.classList.add('hidden');
     enterAppFromTitle();
   });
@@ -486,6 +490,8 @@ const inputs = {
     onDive: (level) => {
       game.setMode('endless');
       if (!game.setDepthlessStartLevel(level)) return;
+      // Show that depth straight away rather than level 1 until Start is pressed.
+      game.showSelectedLevel();
       depthSelect.close();
       levelSelectWrap.classList.add('hidden');
       enterAppFromTitle();
