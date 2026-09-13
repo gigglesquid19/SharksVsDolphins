@@ -1,4 +1,13 @@
-import { DEPTH_ZONES, DepthZone, getLevelBackground, getLevelConfig, zoneNumber } from './levels';
+import {
+  DEPTH_ZONES,
+  DepthZone,
+  LevelConfig,
+  getLevelBackground,
+  getLevelConfig,
+  isSandboxLevel,
+  zoneNumber,
+} from './levels';
+import type { SharkKind } from './sprites';
 import { getPearls } from './pearls';
 import {
   FREE_START_LEVEL,
@@ -30,6 +39,35 @@ export interface LevelSelectOpts {
   onDive(level: number): void;
   /** Balance changed, so the title screen's Pearl count needs refreshing. */
   onPearlsChange(): void;
+}
+
+/** What each kind is called on the preview card. */
+const SHARK_LABELS: Record<SharkKind, string> = {
+  greatWhite: 'great whites',
+  hammerhead: 'hammerheads',
+  tiger: 'tigers',
+  frilled: 'frilled sharks',
+  cookiecutter: 'cookiecutters',
+};
+
+/**
+ * What a bench actually holds, counted the same way it is stocked: the spawn deals a sandbox's
+ * kinds in turn, so four sharks of two kinds is two of each, and the card can say so.
+ */
+function benchRoster(config: LevelConfig): string {
+  const counts = new Map<SharkKind, number>();
+  for (let i = 0; i < config.normalSharkCount; i++) {
+    const kind = config.sharkKinds[i % config.sharkKinds.length];
+    counts.set(kind, (counts.get(kind) ?? 0) + 1);
+  }
+  return [...counts].map(([kind, n]) => `${n} ${SHARK_LABELS[kind] ?? kind}`).join(', ');
+}
+
+/** How dark a depth is, said in words rather than as a number the player has no scale for. */
+function lightLabel(gloom: number | undefined): string {
+  if (!gloom) return 'clear water';
+  if (gloom < 0.7) return 'dim - echo advised';
+  return 'near black - echo needed';
 }
 
 export function setupLevelSelect(opts: LevelSelectOpts): LevelSelectHandles {
@@ -99,7 +137,7 @@ export function setupLevelSelect(opts: LevelSelectOpts): LevelSelectHandles {
         cells.push(
           `<button class="${classes.join(' ')}" data-level="${level}">
             <span class="level-cell-number">${level}</span>
-            <span class="level-cell-state">${unlocked ? '' : '\u{1F512}'}</span>
+            <span class="level-cell-state">${unlocked ? (isSandboxLevel(level) ? '\u{1F9EA}' : '') : '\u{1F512}'}</span>
           </button>`,
         );
       }
@@ -132,15 +170,26 @@ export function setupLevelSelect(opts: LevelSelectOpts): LevelSelectHandles {
   /** Plain-English shark composition for a depth, from the config the level is actually built from. */
   function previewStats(level: number): [string, string][] {
     const config = getLevelConfig(level);
-    const kinds = config.sharkKinds
-      .map((k) => (k === 'greatWhite' ? 'great whites' : k === 'hammerhead' ? 'hammerheads' : 'tigers'))
-      .join(', ');
-    return [
+    const kinds = config.sharkKinds.map((k) => SHARK_LABELS[k] ?? k).join(', ') || 'nothing yet';
+
+    // A sandbox holds a known handful rather than a random draw, so it can say exactly what is down
+    // there - "n small, n large" of three kinds would say nothing about a bench.
+    if (isSandboxLevel(level)) {
+      return [
+        ['Sharks', config.normalSharkCount > 0 ? benchRoster(config) : 'empty test water'],
+        ['Light', lightLabel(config.gloom)],
+        ['Pod limit', String(config.maxDolphins)],
+      ];
+    }
+
+    const stats: [string, string][] = [
       ['Sharks', `${config.normalSharkCount} small, ${config.largeSharkCount} large`],
       ['Kinds', kinds],
       ['Shark speed', `${config.sharkSpeedMultiplier.toFixed(2)}x`],
       ['Pod limit', String(config.maxDolphins)],
     ];
+    if (config.gloom) stats.splice(3, 0, ['Light', lightLabel(config.gloom)]);
+    return stats;
   }
 
   /**
@@ -176,9 +225,11 @@ export function setupLevelSelect(opts: LevelSelectOpts): LevelSelectHandles {
 
     if (previewNoteEl) {
       previewNoteEl.classList.toggle('warn', !ranked);
-      previewNoteEl.textContent = ranked
-        ? 'A dive from the surface counts on the leaderboard.'
-        : 'A dive from this depth never counts on the leaderboard.';
+      previewNoteEl.textContent = isSandboxLevel(level)
+        ? 'Test water for trying new sharks out, dark as the depth really is. Echolocation is lent to you here.'
+        : ranked
+          ? 'A dive from the surface counts on the leaderboard.'
+          : 'A dive from this depth never counts on the leaderboard.';
     }
 
     if (previewActionBtn) {

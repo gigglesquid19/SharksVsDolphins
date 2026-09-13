@@ -7,6 +7,8 @@ import {
   getEndlessLevelConfig,
   getLevelBackground,
   getLevelConfig,
+  isSandboxLevel,
+  SANDBOX_LEVELS,
   zoneClearedAt,
   zoneEnteredAt,
   zoneForLevel,
@@ -154,5 +156,55 @@ describe('depth zones', () => {
       if (i > 0) expect(pair[0]).toBe(bounds[i - 1][1]);
       if (i < bounds.length - 1) expect(pair[1]).toBeGreaterThan(pair[0]);
     });
+  });
+});
+
+describe('the shark sandboxes', () => {
+  it('gives each test depth one species at a time, or nothing at all', () => {
+    expect(getLevelConfig(11).sharkKinds).toEqual(['frilled', 'cookiecutter']);
+    expect(getLevelConfig(21).sharkKinds).toEqual(['cookiecutter']);
+    expect(getLevelConfig(31).sharkKinds).toEqual([]);
+    for (const level of [11, 21, 31]) {
+      const config = getLevelConfig(level);
+      expect(config.largeSharkCount).toBe(0);
+      expect(config.matriarch).toBe(false);
+      expect(config.normalSharkCount).toBe(config.sharkKinds.length > 0 ? config.normalSharkCount : 0);
+    }
+  });
+
+  it('keeps every sandbox dark, and darker the deeper it is', () => {
+    const gloom = [11, 21, 31].map((level) => getLevelConfig(level).gloom ?? 0);
+    expect(gloom.every((g) => g > 0 && g <= 1)).toBe(true);
+    expect(gloom[0]).toBeLessThan(gloom[1]);
+    expect(gloom[1]).toBeLessThan(gloom[2]);
+  });
+
+  it('changes nothing else about them, so a shark put in one behaves as it would anywhere', () => {
+    // Everything but the shark list still sits on the curve the surrounding levels are on, so a
+    // shark dropped in here is as fast, and faces as big a pod, as it would one level either side.
+    for (const level of [11, 21, 31]) {
+      const before = getLevelConfig(level - 1);
+      const sandbox = getLevelConfig(level);
+      const after = getLevelConfig(level + 1);
+      expect(sandbox.level).toBe(level);
+      expect(sandbox.maxDolphins).toBeGreaterThanOrEqual(before.maxDolphins);
+      expect(sandbox.maxDolphins).toBeLessThanOrEqual(after.maxDolphins);
+      expect(sandbox.sharkSpeedMultiplier).toBeGreaterThan(before.sharkSpeedMultiplier);
+      expect(sandbox.sharkSpeedMultiplier).toBeLessThan(after.sharkSpeedMultiplier);
+    }
+  });
+
+  it('touches no other depth', () => {
+    for (let level = 1; level <= 50; level++) {
+      if (isSandboxLevel(level)) continue;
+      const config = getLevelConfig(level);
+      expect(config.normalSharkCount).toBeGreaterThan(0);
+      expect(config.gloom).toBeUndefined();
+    }
+    expect(Object.keys(SANDBOX_LEVELS).map(Number)).toEqual([11, 21, 31]);
+  });
+
+  it('opens a zone with each sandbox, so they are easy to find', () => {
+    for (const level of [11, 21, 31]) expect(zoneEnteredAt(level)).not.toBeNull();
   });
 });

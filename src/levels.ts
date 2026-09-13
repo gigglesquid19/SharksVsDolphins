@@ -15,6 +15,12 @@ export interface LevelConfig {
   maxDolphins: number;
   sharkSpeedMultiplier: number;
   matriarch?: boolean;
+  /**
+   * How dark this level is, 0 (full daylight, the default) to 1 (pitch black past the pod's own
+   * light). Anything above 0 both dims the picture and cuts how far a shark can be seen from, so
+   * at depth Echolocation stops being a convenience and becomes the only way to find anything.
+   */
+  gloom?: number;
 }
 
 const TIGER: SharkKind[] = ['tiger'];
@@ -147,9 +153,35 @@ const ENDLESS_BASE_SHARK_SPEED = LEVELS[LEVELS.length - 1].sharkSpeedMultiplier;
 const SHARK_SPEED_PER_LEVEL =
   (MAX_ENDLESS_SHARK_SPEED - ENDLESS_BASE_SHARK_SPEED) / (SHARK_SPEED_CAP_LEVEL - LEVELS.length);
 
+/**
+ * Test sandboxes: the level that opens the Mesopelagic, the Bathypelagic and the Abyssopelagic is
+ * stripped back to one species at a time, so a new shark can be watched on its own instead of
+ * being picked out of water already full of tigers.
+ *
+ * Everything else about the level is untouched - the depth, the artwork, the pod limit and the
+ * speed modifier all stay - so a shark put in here moves exactly as it would in a real descent.
+ * The override is a partial config rather than a flag for that reason: trying a new kind out is a
+ * matter of writing it in here, and the shark-intro card fires for it because the kind has not
+ * been seen this run.
+ *
+ * Each one is dark, as its depth really would be. Level 31 is still empty, ready for the next
+ * design; a level holding no sharks cannot be cleared, because the level-complete check only
+ * runs when a shark dies, so a run that reaches it stays there until the player quits.
+ */
+export const SANDBOX_LEVELS: Record<number, Partial<LevelConfig>> = {
+  11: { sharkKinds: ['frilled', 'cookiecutter'], normalSharkCount: 4, largeSharkCount: 0, matriarch: false, gloom: 0.62 },
+  21: { sharkKinds: ['cookiecutter'], normalSharkCount: 4, largeSharkCount: 0, matriarch: false, gloom: 0.8 },
+  31: { sharkKinds: [], normalSharkCount: 0, largeSharkCount: 0, matriarch: false, gloom: 0.9 },
+};
+
+/** Whether this depth is a bench for trying sharks out rather than a level meant to be fought through. */
+export function isSandboxLevel(level: number): boolean {
+  return Math.floor(level) in SANDBOX_LEVELS;
+}
+
 export function getEndlessLevelConfig(level: number): LevelConfig {
   const over = level - LEVELS.length;
-  return {
+  const base: LevelConfig = {
     level,
     sharkKinds: ALL_KINDS,
     normalSharkCount: Math.min(9 + Math.ceil(over / 3), 16),
@@ -161,6 +193,7 @@ export function getEndlessLevelConfig(level: number): LevelConfig {
     ),
     matriarch: over % 10 === 0,
   };
+  return isSandboxLevel(level) ? { ...base, ...SANDBOX_LEVELS[Math.floor(level)] } : base;
 }
 
 /** Resolves the config for any level: campaign levels 1-10 as authored, beyond that endless scaling. */

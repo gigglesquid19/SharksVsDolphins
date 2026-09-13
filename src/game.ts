@@ -14,10 +14,12 @@ import {
   createSharkSprite,
   makeDolphinBodyCanvas,
   makeRadialGradientTexture,
+  makeVignetteTexture,
   sliceSharkStrip,
   SharkFishSprite,
   SharkKind,
   SharkTextureSet,
+  VIGNETTE_CLEAR_FRACTION,
 } from './sprites';
 import { sfx } from './sfx';
 import {
@@ -25,6 +27,7 @@ import {
   LevelConfig,
   getLevelBackground,
   getLevelConfig,
+  isSandboxLevel,
   zoneClearedAt,
   zoneEnteredAt,
   zoneNumber,
@@ -90,6 +93,15 @@ const EVENT_DURATION = 30;
 const JELLYFISH_SWARM_DURATION = 45;
 const JELLYFISH_COUNT = 50;
 const STORM_VISIBILITY_RADIUS = 18;
+/**
+ * How far the pod can see for itself, in world units, in water with no gloom at all and in water
+ * at full gloom. Below the sunlit zone this is the whole of the difficulty: a shark outside this
+ * ring is not drawn and not hinted at, and the only way to find one is to ping for it.
+ */
+const GLOOM_SIGHT_LIT = 22;
+const GLOOM_SIGHT_DARK = 10;
+/** The lit circle sits a little outside the Echolocation ring, so the ring itself stays legible. */
+const GLOOM_ECHO_MARGIN = 1.08;
 const HUNTING_MODE_POD_SIZE = 4;
 const MATRIARCH_HITS_REQUIRED = 3;
 const MATRIARCH_HIT_COOLDOWN_MS = 900;
@@ -174,9 +186,64 @@ const SHARK_KIND_SCALE: Record<SharkKind, number> = {
   greatWhite: 2,
   hammerhead: 2,
   tiger: 1,
+  // Both deep-water species are drawn from the tiger strip, so they share its base scale and
+  // are sized against each other by SHARK_KIND_LOOK below.
+  frilled: 1,
+  cookiecutter: 1,
 };
 const HAMMERHEAD_SPEED_BONUS = 1.15;
 const GREAT_WHITE_LARGE_SPEED_BONUS = 1.25;
+
+/** Which loaded strip a kind is animated from. Three sheets, five species. */
+const SHARK_SPRITE_SOURCE: Record<SharkKind, 'greatWhite' | 'hammerhead' | 'tiger'> = {
+  greatWhite: 'greatWhite',
+  hammerhead: 'hammerhead',
+  tiger: 'tiger',
+  frilled: 'tiger',
+  cookiecutter: 'tiger',
+};
+
+/**
+ * Everything that makes one kind of shark look and move like itself rather than like the strip it
+ * borrows. Four cheap levers - colour, proportion, frame rate and size - are enough to get a new
+ * species out of an existing sheet, which is the only way the roster grows without new artwork.
+ */
+interface SharkLook {
+  /** Multiplied into the artwork's colour; 0xffffff leaves it as drawn. */
+  tint: number;
+  /** Non-uniform scale on top of the shark's size, for reshaping a borrowed silhouette. */
+  stretchX: number;
+  stretchY: number;
+  /** Frame rate against the stock swim cycle: below 1 undulates, above 1 flicks. */
+  animationSpeed: number;
+  /** The threat glow under the sprite. */
+  glow: string;
+  /** How big a small one of these is drawn. */
+  smallSize: number;
+  /** Speed against the level's own multiplier. */
+  speed: number;
+}
+
+const THREAT_GLOW = 'rgba(248, 113, 113, 0.5)';
+
+const SHARK_KIND_LOOK: Record<SharkKind, SharkLook> = {
+  greatWhite: { tint: 0xffffff, stretchX: 1, stretchY: 1, animationSpeed: 1, glow: THREAT_GLOW, smallSize: 1, speed: 1 },
+  hammerhead: { tint: 0xffffff, stretchX: 1, stretchY: 1, animationSpeed: 1, glow: THREAT_GLOW, smallSize: 1, speed: HAMMERHEAD_SPEED_BONUS },
+  tiger: { tint: 0xffffff, stretchX: 1, stretchY: 1, animationSpeed: 1, glow: THREAT_GLOW, smallSize: SMALL_TIGER_SIZE_MULTIPLIER, speed: 1 },
+  /**
+   * Frilled shark: the tiger pulled long and flattened until it reads as an eel, drained to the
+   * pale grey-brown of something that has never seen daylight, and worked through its frames at
+   * half speed so the whole body appears to ripple rather than beat. Slower than a tiger in the
+   * water to match - it is meant to be outswum, not outfought.
+   */
+  frilled: { tint: 0xb2b9a4, stretchX: 2.05, stretchY: 0.56, animationSpeed: 0.5, glow: THREAT_GLOW, smallSize: 1.55, speed: 0.85 },
+  /**
+   * Cookiecutter: a tiger shrunk to a third, blacked out, and animated fast so it flicks about.
+   * Its glow is the green of the real animal's underside rather than the usual red, which is also
+   * the only way to spot one in dark water before it reaches you.
+   */
+  cookiecutter: { tint: 0x3d4352, stretchX: 1.12, stretchY: 0.82, animationSpeed: 1.7, glow: 'rgba(74, 222, 128, 0.55)', smallSize: 0.62, speed: 1.3 },
+};
 
 const SHARK_INTRO_INFO: Partial<Record<SharkKind, { name: string; description: string }>> = {
   tiger: {
@@ -190,6 +257,16 @@ const SHARK_INTRO_INFO: Partial<Record<SharkKind, { name: string; description: s
   greatWhite: {
     name: 'Great White Shark',
     description: 'Older Great Whites grow far larger - it takes a big pod and a Boost dash to bring one down.',
+  },
+  frilled: {
+    name: 'Frilled Shark',
+    description:
+      'A long eel of a shark from the twilight water. It is slower than anything else down here and never stops coming - you are meant to outswim it, not outfight it.',
+  },
+  cookiecutter: {
+    name: 'Cookiecutter Shark',
+    description:
+      'Small, black and quick, lit only by the green glow of its own belly. One is barely a threat and three dolphins see it off, but they do not travel alone.',
   },
 };
 
@@ -462,6 +539,10 @@ export class Game {
   private parallaxY = 0;
   private entityContainer!: Container;
   private stormOverlay!: Graphics;
+  /** The darkness at depth, parked on the pod. Hidden entirely in water with no gloom. */
+  private gloomOverlay!: Sprite;
+  /** This level's darkness, 0 to 1, from its config. */
+  private levelGloom = 0;
   private particles!: ParticleSystem;
   private dolphinSprites = new Map<Dolphin, Container>();
   private sharkSprites = new Map<Shark, Container>();
@@ -614,6 +695,13 @@ export class Game {
     this.stage.addChild(this.jellyfishContainer);
     this.stage.addChild(this.fxContainer);
     this.stage.addChild(this.entityContainer);
+
+    // Over the entities, so a shark outside the pod's light is swallowed by it rather than
+    // merely tinted, and under the storm overlay, which is weather rather than depth.
+    this.gloomOverlay = new Sprite(makeVignetteTexture(512, 'rgb(1, 6, 16)'));
+    this.gloomOverlay.anchor.set(0.5);
+    this.gloomOverlay.visible = false;
+    this.stage.addChild(this.gloomOverlay);
 
     this.stormOverlay = new Graphics();
     this.stage.addChild(this.stormOverlay);
@@ -962,6 +1050,11 @@ export class Game {
   private sharkRevealedByEcho(shark: Shark): boolean {
     if (!this.player || !this.isEcholocating()) return false;
     return shark.distanceBetween(this.player) <= this.echoRadius;
+  }
+
+  /** How far the pod can see unaided at this depth. The whole screen, in water with no gloom. */
+  private gloomSightRadius(): number {
+    return GLOOM_SIGHT_LIT - (GLOOM_SIGHT_LIT - GLOOM_SIGHT_DARK) * this.levelGloom;
   }
 
   getSprintCooldownFraction(): number {
@@ -1523,7 +1616,9 @@ export class Game {
         this.sprintDurationBonus = b.sprintDurationBonus;
 
         const echo = echolocationStats();
-        this.echoAvailable = ownsEcholocation();
+        // A sandbox is dark on purpose and Echolocation is the answer to that, so it hands the
+        // ability over whether or not it has been bought - otherwise the depth is untestable.
+        this.echoAvailable = ownsEcholocation() || isSandboxLevel(config.level);
         this.echoDurationMs = echo.durationMs;
         this.echoCooldownMs = echo.cooldownMs;
         this.echoRadius = echo.radius;
@@ -1869,8 +1964,9 @@ ${zone.depth}`, 'levelup', duration + 1400);
 
   private addSharkSprite(shark: Shark): void {
     const container = new Container();
+    const look = SHARK_KIND_LOOK[shark.kind];
 
-    const glowTex = makeRadialGradientTexture(64, 'rgba(248, 113, 113, 0.5)');
+    const glowTex = makeRadialGradientTexture(64, look.glow);
     const glow = new Sprite(glowTex);
     glow.anchor.set(0.5);
     glow.width = 48;
@@ -1880,15 +1976,16 @@ ${zone.depth}`, 'levelup', duration + 1400);
     container.addChild(glow);
 
     const textureSet =
-      this.sharkTextureSets[shark.kind] ??
+      this.sharkTextureSets[SHARK_SPRITE_SOURCE[shark.kind]] ??
       this.sharkTextureSets.greatWhite ??
       this.sharkTextureSets.hammerhead ??
       this.sharkTextureSets.tiger;
 
     if (textureSet) {
       try {
-        const fish = createSharkSprite(textureSet);
+        const fish = createSharkSprite(textureSet, look.animationSpeed);
         fish.name = 'fish';
+        fish.tint = look.tint;
         fish.scale.set(SHARK_BASE_SCALE);
         container.addChild(fish);
       } catch (err) {
@@ -2999,10 +3096,15 @@ ${cleared.name} Zone Liberated
         return this.currentLevel <= GREAT_WHITE_EASED_UNTIL_LEVEL ? 10 : 12;
       }
       if (kind === 'hammerhead') return 10;
+      if (kind === 'frilled') return 9;
+      if (kind === 'cookiecutter') return 6;
     } else {
       if (kind === 'tiger') return 4;
       if (kind === 'greatWhite') return 5;
       if (kind === 'hammerhead') return 4;
+      // A long body but a weak bite, against something barely bigger than a dolphin's snout.
+      if (kind === 'frilled') return 5;
+      if (kind === 'cookiecutter') return 3;
     }
     return HUNTING_MODE_POD_SIZE;
   }
@@ -3014,18 +3116,18 @@ ${cleared.name} Zone Liberated
       shark._x = Math.floor(Math.random() * SIZE);
       shark._y = Math.floor(Math.random() * SIZE);
       tries += 1;
-    } while (this.spawnDistanceToPlayer(shark) < SHARK_SPAWN_CLEARANCE && tries < 40);
+    } while (this.distanceToPlayer(shark) < SHARK_SPAWN_CLEARANCE && tries < 40);
     shark.lastX = shark._x;
     shark.lastY = shark._y;
   }
 
   /**
-   * Distance from a candidate spawn to the player, measured the way the world actually works.
-   * The keep-out used to compare raw x values, which ignores the horizontal wrap entirely: a
-   * shark placed at x=98 with the player at x=2 measured as 96 units clear when it was really 4,
-   * so sharks could appear right on top of the pod at the start of a level.
+   * Distance from a shark to the player, measured the way the world actually works. Comparing raw
+   * x values ignores the horizontal wrap entirely: a shark at x=98 with the player at x=2 measures
+   * as 96 units clear when it is really 4. That used to let sharks spawn on top of the pod, and it
+   * would just as happily hide one standing next to you in the dark.
    */
-  private spawnDistanceToPlayer(shark: Shark): number {
+  private distanceToPlayer(shark: Shark): number {
     if (!this.player) return Infinity;
     return Math.hypot(directionDelta(shark._x, this.player._x), shark._y - this.player._y);
   }
@@ -3037,11 +3139,20 @@ ${cleared.name} Zone Liberated
     this.sharks = [];
 
     let id = 0;
+    // A sandbox deals its species in turn rather than at random: with only a handful of sharks in
+    // the water, a random draw can easily put none of one kind in front of you, which is the one
+    // thing a test bench must not do. Every real level still draws at random.
+    const bench = isSandboxLevel(config.level);
+    const pickKind = (i: number) =>
+      bench
+        ? config.sharkKinds[i % config.sharkKinds.length]
+        : config.sharkKinds[Math.floor(Math.random() * config.sharkKinds.length)];
+
     for (let i = 0; i < config.normalSharkCount; i++) {
       const shark = new Shark(id++);
-      shark.kind = config.sharkKinds[Math.floor(Math.random() * config.sharkKinds.length)];
-      if (shark.kind === 'tiger') shark.sizeMultiplier = SMALL_TIGER_SIZE_MULTIPLIER;
-      shark.speedMultiplier = config.sharkSpeedMultiplier * (shark.kind === 'hammerhead' ? HAMMERHEAD_SPEED_BONUS : 1);
+      shark.kind = pickKind(i);
+      shark.sizeMultiplier = SHARK_KIND_LOOK[shark.kind].smallSize;
+      shark.speedMultiplier = config.sharkSpeedMultiplier * SHARK_KIND_LOOK[shark.kind].speed;
       this.randomizeSharkSpawnPosition(shark);
       shark._y = clampEntityY(shark._y, 4);
       this.sharks.push(shark);
@@ -3050,10 +3161,13 @@ ${cleared.name} Zone Liberated
 
     for (let i = 0; i < config.largeSharkCount; i++) {
       const shark = new Shark(id++);
-      shark.kind = config.sharkKinds[Math.floor(Math.random() * config.sharkKinds.length)];
+      shark.kind = pickKind(i);
       shark.large = true;
       shark.sizeMultiplier = shark.kind === 'tiger' ? 2.5 : LARGE_SHARK_SIZE_MULTIPLIER;
-      shark.speedMultiplier = config.sharkSpeedMultiplier * (shark.kind === 'hammerhead' ? HAMMERHEAD_SPEED_BONUS : 1) * (shark.kind === 'greatWhite' ? GREAT_WHITE_LARGE_SPEED_BONUS : 1);
+      shark.speedMultiplier =
+        config.sharkSpeedMultiplier *
+        SHARK_KIND_LOOK[shark.kind].speed *
+        (shark.kind === 'greatWhite' ? GREAT_WHITE_LARGE_SPEED_BONUS : 1);
       this.randomizeSharkSpawnPosition(shark);
       const margin = Math.ceil((24 * shark.sizeMultiplier) / (CANVAS_SIZE / SIZE));
       shark._y = clampEntityY(shark._y, margin);
@@ -3061,6 +3175,7 @@ ${cleared.name} Zone Liberated
       this.addSharkSprite(shark);
     }
 
+    this.levelGloom = Math.max(0, Math.min(1, config.gloom ?? 0));
     this.maxDolphins = config.maxDolphins;
     this.dolphinSpawnInterval = config.level === 10 ? DOLPHIN_SPAWN_INTERVAL / 2 : DOLPHIN_SPAWN_INTERVAL;
 
@@ -3807,15 +3922,20 @@ ${cleared.name} Zone Liberated
       sprite.y = shark._y * scale + scale / 2;
 
       const fish = sprite.getChildByName('fish') as Container;
+      const look = SHARK_KIND_LOOK[shark.kind];
       const baseScale = SHARK_BASE_SCALE * SHARK_KIND_SCALE[shark.kind] * shark.sizeMultiplier;
+      // The stretch rides on top of the facing sign, which is what reshapes a borrowed strip
+      // into another species without touching the artwork.
+      const scaleX = baseScale * look.stretchX;
+      const scaleY = baseScale * look.stretchY;
 
       const dx = this.player ? directionDelta(this.player._x, shark._x) : directionDelta(shark._x, shark.lastX);
       if (Math.abs(dx) > 0.3) {
         const dir = dx > 0 ? 1 : -1;
-        fish.scale.set(baseScale * dir, baseScale);
+        fish.scale.set(scaleX * dir, scaleY);
       } else {
         const dirSign = fish.scale.x >= 0 ? 1 : -1;
-        fish.scale.set(baseScale * dirSign, baseScale);
+        fish.scale.set(scaleX * dirSign, scaleY);
       }
 
       if (fish instanceof SharkFishSprite) {
@@ -3849,6 +3969,9 @@ ${cleared.name} Zone Liberated
         if (revealed) sprite.alpha = Math.min(sprite.alpha, 0.45);
       } else if (this.activeEvent?.type === 'storm' && this.player) {
         sprite.visible = revealed || shark.distanceBetween(this.player) <= STORM_VISIBILITY_RADIUS;
+      } else if (this.levelGloom > 0 && this.player) {
+        // At depth a shark is only there if it is inside the pod's light or inside a ping.
+        sprite.visible = revealed || this.distanceToPlayer(shark) <= this.gloomSightRadius();
       } else {
         sprite.visible = true;
       }
@@ -3860,5 +3983,28 @@ ${cleared.name} Zone Liberated
     if (this.activeEvent?.type === 'storm') {
       this.stormOverlay.rect(0, 0, CANVAS_SIZE, CANVAS_SIZE).fill({ color: 0x0b1225, alpha: 0.5 });
     }
+
+    this.drawGloom(scale);
+  }
+
+  /**
+   * The darkness at depth: a hole of light around the pod and black everywhere else, opened out to
+   * the full reach of a ping while Echolocation is running. That widening is the point of the
+   * whole thing - down here the ability is not a convenience, it is how you see.
+   */
+  private drawGloom(scale: number): void {
+    if (this.levelGloom <= 0 || !this.player) {
+      this.gloomOverlay.visible = false;
+      return;
+    }
+    const lit = this.isEcholocating() ? this.echoRadius * GLOOM_ECHO_MARGIN : this.gloomSightRadius();
+    // Sized from the clear middle of the texture outwards, which leaves the solid part far larger
+    // than the canvas however close to an edge the pod swims.
+    const span = (2 * lit * scale) / VIGNETTE_CLEAR_FRACTION;
+    this.gloomOverlay.visible = true;
+    this.gloomOverlay.width = span;
+    this.gloomOverlay.height = span;
+    this.gloomOverlay.alpha = this.levelGloom;
+    this.gloomOverlay.position.set(this.player._x * scale + scale / 2, this.player._y * scale + scale / 2);
   }
 }
