@@ -181,7 +181,9 @@ const SHARK_SPEED_PER_LEVEL =
  * bench for whatever comes next is 21, and 31 after it.
  */
 export const SANDBOX_LEVELS: Record<number, Partial<LevelConfig>> = {
-  21: { sharkKinds: ['cookiecutter'], normalSharkCount: 4, largeSharkCount: 0, matriarch: false, gloom: 0.8, dealKindsInTurn: true },
+  // The same water level 11 opens with, so the deep events can be watched against a shark mix
+  // that is already understood rather than against a new one at the same time.
+  21: { sharkKinds: ['cookiecutter', 'frilled'], normalSharkCount: 4, largeSharkCount: 0, matriarch: false, gloom: 0.8, dealKindsInTurn: true },
   31: { sharkKinds: [], normalSharkCount: 0, largeSharkCount: 0, matriarch: false, gloom: 0.9, dealKindsInTurn: true },
 };
 

@@ -162,8 +162,10 @@ describe('depth zones', () => {
 });
 
 describe('the shark sandboxes', () => {
-  it('gives each test depth one species at a time, or nothing at all', () => {
-    expect(getLevelConfig(21).sharkKinds).toEqual(['cookiecutter']);
+  it('gives each test depth a known roster, or nothing at all', () => {
+    // 21 mirrors level 11's water on purpose: the deep events are watched there against a shark
+    // mix that is already understood, rather than against a new one at the same time.
+    expect(getLevelConfig(21).sharkKinds).toEqual(['cookiecutter', 'frilled']);
     expect(getLevelConfig(31).sharkKinds).toEqual([]);
     for (const level of [21, 31]) {
       const config = getLevelConfig(level);

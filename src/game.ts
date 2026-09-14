@@ -117,6 +117,26 @@ const JELLYFISH_MAX_LEVEL = 19;
  * shark's strike - this is the arena narrowing, not something lunging, and the counterplay is
  * choosing a lane early rather than reacting late.
  */
+/**
+ * On a test bench the deep events are dealt in turn and soon, rather than rolled for.
+ *
+ * The same reasoning the bench already applies to shark species: a one-in-five roll every sixty
+ * seconds is fine for a level being played and useless for one being tested on, where the whole
+ * point is to see the thing you came to look at. Both events are guaranteed, one after the other,
+ * with the first arriving a few seconds in.
+ */
+const BENCH_FIRST_EVENT_AT = 12;
+/**
+ * Longer than the kraken lasts, deliberately.
+ *
+ * updateEvents returns early while an event is running, so a warning due during one is never
+ * given - the next event would simply appear. At 40 seconds of kraken from a start at 12, the
+ * gap has to clear 52 seconds with five to spare for the warning, or the megamouth arrives
+ * unannounced and the bench fails to demonstrate the one thing worth checking about it.
+ */
+const BENCH_EVENT_INTERVAL = 50;
+const BENCH_EVENT_ORDER: GameEventType[] = ['kraken', 'megamouth'];
+
 const KRAKEN_DURATION = 40;
 const KRAKEN_ARMS = 3;
 const TENTACLE_TELEGRAPH_MS = 600;
@@ -1968,7 +1988,11 @@ export class Game {
     this.playerHitCooldownUntil = 0;
     this.hideBanner();
     this.activeEvent = null;
-    this.nextEventCheckTime = EVENT_CHECK_INTERVAL;
+    // A bench gets its first event a few seconds in rather than after a full minute, and the
+    // order starts over with the level so the same thing is always first out of the gate.
+    const bench = isSandboxLevel(config.level);
+    this.nextEventCheckTime = bench ? BENCH_FIRST_EVENT_AT : EVENT_CHECK_INTERVAL;
+    this.benchEventIndex = 0;
     this.pendingEvent = null;
     this.eventWarningShown = false;
     this.planNextEvent();
@@ -4252,6 +4276,14 @@ ${cleared.name} Zone Liberated
    * the depth simply has no weather.
    */
   private planNextEvent(): void {
+    if (isSandboxLevel(this.currentLevel)) {
+      this.pendingEvent = BENCH_EVENT_ORDER[this.benchEventIndex % BENCH_EVENT_ORDER.length];
+      this.benchEventIndex += 1;
+      this.nextEventWarningTime = this.nextEventCheckTime - 5;
+      this.eventWarningShown = false;
+      return;
+    }
+
     const allowed: GameEventType[] = [];
     if (this.stormsAllowed()) allowed.push('storm');
     if (this.jellyfishAllowed()) allowed.push('jellyfish');
@@ -4311,6 +4343,9 @@ ${cleared.name} Zone Liberated
     return !getLevelConfig(this.currentLevel).matriarch;
   }
 
+  /** Which bench event comes next. Advanced by planNextEvent, reset with the level. */
+  private benchEventIndex = 0;
+
   private updateEvents(): void {
     if (this.activeEvent) {
       if (this.gameTime >= this.activeEvent.endsAt) this.endEvent();
@@ -4326,7 +4361,7 @@ ${cleared.name} Zone Liberated
       } else if (this.pendingEvent === 'megamouth') {
         this.startMegamouth();
       }
-      this.nextEventCheckTime += EVENT_CHECK_INTERVAL;
+      this.nextEventCheckTime += isSandboxLevel(this.currentLevel) ? BENCH_EVENT_INTERVAL : EVENT_CHECK_INTERVAL;
       this.planNextEvent();
     } else if (this.pendingEvent && this.gameTime >= this.nextEventWarningTime && !this.eventWarningShown) {
       this.eventWarningShown = true;
