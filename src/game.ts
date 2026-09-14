@@ -3678,6 +3678,24 @@ ${cleared.name} Zone Liberated
   }
 
   /**
+   * Which pod member a hazard takes: a follower if any follower is in reach, and the player only
+   * when nobody else is.
+   *
+   * The pod is the health bar - every dolphin is a life, and the player is the last of them. A
+   * shark's bite has always worked this way, searching the pod for someone who is not the player
+   * and only falling through to the extra-life branch when it finds nobody. The kraken, the
+   * megamouth and the jellyfish did not: each took the first pod member it found in reach, and
+   * since the player is always the first entry in `dolphins`, an arm that touched the player took
+   * the player - ending a run on the spot with a full pod of followers swimming alongside
+   * untouched. That is the bug this exists to close, and it is worth having in one place so the
+   * next hazard cannot get it wrong on its own.
+   */
+  private pickHazardVictim(inReach: (d: Dolphin) => boolean): Dolphin | undefined {
+    const pod = this.podMembers();
+    return pod.find((d) => !d.isPlayer && inReach(d)) ?? pod.find((d) => d.isPlayer && inReach(d));
+  }
+
+  /**
    * The large cookiecutter's lock-on run.
    *
    * Every LOCK_INTERVAL_MS it singles out one pod member, announces it, and a moment later runs
@@ -5492,8 +5510,8 @@ ${cleared.name} Zone Liberated
         !!this.megamouth && !this.megamouth.beaten && this.megamouth.distanceBetween(d) < MEGAMOUTH_HIT_RADIUS;
       const now = Date.now();
       if (now >= this.playerHitCooldownUntil && now >= this.ghostUntil) {
-        const victim = this.dolphins.find(
-          (d) => (d.isPlayer || d.recruited) && now >= d.invulnerableUntil && (grabbed(d) || swept(d)),
+        const victim = this.pickHazardVictim(
+          (d) => now >= d.invulnerableUntil && (grabbed(d) || swept(d)),
         );
         if (victim) {
           const caught = grabbed(victim) ? 'Grabbed!' : 'Swept aside!';
@@ -5523,19 +5541,17 @@ ${cleared.name} Zone Liberated
       }
     }
 
-    if (this.activeEvent?.type === 'jellyfish' && this.player) {
+    // One sting a second for the whole pod, not one a tick. The cooldown used to be applied only
+    // when the player was the one stung, so a pod crossing a dense swarm could lose a dolphin on
+    // every frame - twelve a second - while the rule the other two hazards are written to says a
+    // pod cannot be stripped faster than one member a second. Guarded rather than returned on:
+    // the frame's clock is advanced further down and must not be skipped.
+    if (this.activeEvent?.type === 'jellyfish' && this.player && now >= this.playerHitCooldownUntil) {
       for (const jelly of this.jellyfish) {
-        let victim: Dolphin | undefined;
-        for (const d of this.dolphins) {
-          if (!d.isPlayer && !d.recruited) continue;
-          if (jelly.distanceBetween(d) < 2.5) {
-            victim = d;
-            break;
-          }
-        }
+        const victim = this.pickHazardVictim((d) => jelly.distanceBetween(d) < 2.5);
         if (!victim) continue;
-        if (victim.isPlayer && (now < this.playerHitCooldownUntil || now < this.player.invulnerableUntil)) continue;
-        if (victim.isPlayer) this.playerHitCooldownUntil = now + 1000;
+        if (victim.isPlayer && now < this.player.invulnerableUntil) continue;
+        this.playerHitCooldownUntil = now + 1000;
         sfx.playBite();
         if (victim.isPlayer) {
           if (this.vitalityLives > 0) {
