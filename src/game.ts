@@ -92,7 +92,18 @@ function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 }
 
-const DOLPHIN_SPAWN_INTERVAL = 12;
+const DOLPHIN_SPAWN_INTERVAL = 14;
+/**
+ * How long a shark has to wait after taking a dolphin before it can take another.
+ *
+ * There is a one-second floor on the pod as a whole - no hazard can strip it faster than that -
+ * but that was the only limit, so a single shark that got inside the pod and stayed there fed
+ * once a second for as long as it was there. Four seconds a shark makes the same contact a thing
+ * that costs you one dolphin and a moment to recover, rather than the pod. It does not make the
+ * shark any less dangerous to be near: it keeps hunting throughout, and every other shark in the
+ * water is still on its own clock.
+ */
+const SHARK_FEED_COOLDOWN_MS = 4000;
 /**
  * What that interval becomes with developer mode on: a third off the ordinary 15, so a pod comes
  * together fast enough to actually get at the deep levels' sharks.
@@ -338,8 +349,14 @@ const SHARK_BASE_SCALE = 0.6;
 // flat 6-unit trigger while the bite itself needed 4 units and only ever tested the dolphin you
 // were steering, so the animation regularly played over a follower with no bite behind it.
 const SHARK_ATTACK_ANTICIPATION = 1.5;
-/** How long after a tap-fired Boost a second tap can still take it back. */
-const BOOST_UNDO_WINDOW_MS = 400;
+/**
+ * How long after a tap-fired Boost a second tap can still take it back.
+ *
+ * Has to stay above main.ts's DOUBLE_TAP_MS: that decides how late a second tap still counts as
+ * a double tap, and this decides how late the first tap's boost can still be refunded. If the
+ * window closed first, a slow double tap would cost a boost and ping anyway.
+ */
+const BOOST_UNDO_WINDOW_MS = 500;
 /** Radii of the two ability arcs drawn around the player, just outside the body. */
 const BOOST_METER_RADIUS = 17;
 const ECHO_METER_RADIUS = 21;
@@ -5024,6 +5041,9 @@ ${cleared.name} Zone Liberated
     if (this.activeEvent?.type !== 'jellyfish') {
       if (this.player && now >= this.playerHitCooldownUntil && now >= this.player.invulnerableUntil && now >= this.ghostUntil) {
         for (const shark of this.sharks) {
+          // Still full from the last one. Checked before contact so a shark parked in the pod
+          // cannot feed again on the next tick - see SHARK_FEED_COOLDOWN_MS.
+          if (now < shark.feedCooldownUntil) continue;
           if (this.sharkContactsPod(shark)) {
             sfx.playBite();
             // The Matriarch takes two pod members per bite; every other shark takes one.
@@ -5052,6 +5072,7 @@ ${cleared.name} Zone Liberated
             }
             if (victims.length > 0) {
               this.playerHitCooldownUntil = now + 1000;
+              shark.feedCooldownUntil = now + SHARK_FEED_COOLDOWN_MS;
               this.resetKillCombo();
               // Feeding gives a cloaked tiger away - it surfaces and has to recharge.
               this.revealShark(shark, now);

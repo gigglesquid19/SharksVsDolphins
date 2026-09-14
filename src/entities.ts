@@ -128,6 +128,15 @@ export class Shark {
    * blast and cannot hunt, charge or ambush - see Game.usePistolShrimpItem.
    */
   stunnedUntil = 0;
+  /**
+   * Full from the last dolphin it took, and unable to take another until this time.
+   *
+   * It keeps hunting, and it is still something to swim away from - it simply cannot feed again
+   * yet. Without this a shark sitting inside the pod ate one dolphin a second for as long as it
+   * stayed there, which is not a fight so much as a leak: the pod could be halved before there
+   * was anything useful to do about it. See SHARK_FEED_COOLDOWN_MS.
+   */
+  feedCooldownUntil = 0;
   /** Unit direction the blast threw it in, held for the length of the stun. */
   stunDx = 0;
   stunDy = 0;

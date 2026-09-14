@@ -1043,11 +1043,40 @@ const inputs = {
    * carry the abilities, and it is a target a thumb can find without looking, which is the whole
    * point: nobody should be hunting for a small button while a shark closes on them.
    */
-  const TAP_MAX_MS = 260;
-  const TAP_SLOP_PX = 16;
-  const DOUBLE_TAP_MS = 280;
-  /** Half-width of the tap zone, as a fraction of the canvas's shorter side. */
-  const TAP_ZONE = 0.22;
+  /**
+   * How long a press can last and still count as a tap.
+   *
+   * Was 260ms, which is about how long a deliberate tap takes when you are calm and looking at
+   * your thumb. With a shark closing it is longer than that, and every press that ran over simply
+   * did nothing - no boost, no feedback, nothing to tell the player the game had decided they
+   * were steering. Half a second is past what anyone taps in a hurry while still being far short
+   * of a press-and-hold.
+   */
+  const TAP_MAX_MS = 550;
+  /**
+   * How far the finger can travel and still count as a tap rather than a steer.
+   *
+   * 16px is less than a thumb rolls on its own pad without meaning to, on a screen where the
+   * whole arena is about 350px across.
+   */
+  const TAP_SLOP_PX = 30;
+  /**
+   * How long after one tap a second one reads as a double tap (Echolocation) rather than another
+   * Boost. Must stay under BOOST_UNDO_WINDOW_MS in game.ts, which is what takes the first tap's
+   * boost back - past that window the player pays for a boost and gets a ping as well.
+   */
+  const DOUBLE_TAP_MS = 420;
+  /**
+   * The tap target in the middle of the water, as a fraction of the canvas per axis - so it is an
+   * ellipse the shape of the arena rather than a circle, covering this much of the width and the
+   * same of the height.
+   *
+   * Raised from 0.22, which is roughly double the area. Nothing draws this zone, so a player
+   * aiming for "the middle" is aiming at something they cannot see, and the cost of missing it
+   * was an ability that silently failed. Quick taps out at this radius were only ever a flick of
+   * steering that the hold-to-swim controls do better anyway.
+   */
+  const TAP_ZONE = 0.30;
 
   let tapStartAt = 0;
   let tapStartX = 0;
