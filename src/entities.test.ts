@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SIZE_X, SIZE_Y } from './constants';
-import { Tentacle, Dolphin, Jellyfish, Shark } from './entities';
+import { Megamouth, MEGAMOUTH_EVASION_SPREAD, Tentacle, Dolphin, Jellyfish, Shark } from './entities';
 
 describe('Dolphin', () => {
   it('measures Euclidean distance between points', () => {
@@ -517,5 +517,72 @@ describe('Shark kraken flight', () => {
     }
     s.krakenFlight = 'none';
     expect(s.isOffStage()).toBe(false);
+  });
+});
+
+describe('Megamouth evasion', () => {
+  const makeMegamouth = (x: number, y: number): Megamouth => new Megamouth(x, y, 1, 0, 0.84);
+
+  /** The heading's angle, in radians. */
+  const heading = (m: Megamouth): number => Math.atan2(m.dirY, m.dirX);
+
+  /** Smallest angle between two headings, so wrap-around at PI never reads as a huge gap. */
+  const angleBetween = (a: number, b: number): number => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
+
+  it('keeps the heading a unit vector, so the speed is the speed', () => {
+    const m = makeMegamouth(40, 60);
+    for (const roll of [0, 0.25, 0.5, 0.75, 1]) {
+      m.pickEvasiveHeading(10, 10, roll);
+      expect(Math.hypot(m.dirX, m.dirY)).toBeCloseTo(1, 10);
+    }
+  });
+
+  it('runs directly away from the pod on a centred roll', () => {
+    // Pod below it, so straight away is straight up: negative Y, no horizontal component.
+    const m = makeMegamouth(40, 60);
+    m.pickEvasiveHeading(40, 90, 0.5);
+    expect(m.dirX).toBeCloseTo(0, 6);
+    expect(m.dirY).toBeCloseTo(-1, 6);
+  });
+
+  it('never breaks back toward the pod, at either end of the spread', () => {
+    const m = makeMegamouth(40, 60);
+    const away = Math.atan2(60 - 90, 40 - 40);
+    for (const roll of [0, 0.5, 1]) {
+      m.pickEvasiveHeading(40, 90, roll);
+      // Half the spread either side of away is the worst case, and it is still a quarter turn
+      // short of sideways - so whatever it rolls, it is leaving.
+      expect(angleBetween(heading(m), away)).toBeLessThanOrEqual(MEGAMOUTH_EVASION_SPREAD / 2 + 1e-9);
+    }
+  });
+
+  it('spends its spread, rather than always running the same line', () => {
+    const m = makeMegamouth(40, 60);
+    m.pickEvasiveHeading(40, 90, 0);
+    const low = heading(m);
+    m.pickEvasiveHeading(40, 90, 1);
+    expect(angleBetween(heading(m), low)).toBeCloseTo(MEGAMOUTH_EVASION_SPREAD, 6);
+  });
+
+  it('reads the pod the short way round the wrap', () => {
+    // It sits just inside the left edge and the pod just inside the right: across the seam the
+    // pod is a few units to its left, so it should break right - not left, into the pod.
+    const m = makeMegamouth(2, 60);
+    m.pickEvasiveHeading(SIZE_X - 2, 60, 0.5);
+    expect(m.dirX).toBeCloseTo(1, 6);
+  });
+
+  it('holds its own line when the pod is exactly on top of it', () => {
+    // atan2(0, 0) is 0, which would send it due east from wherever it happened to be caught.
+    const m = new Megamouth(40, 60, 0, -1, 0.84);
+    m.pickEvasiveHeading(40, 60, 0.5);
+    expect(m.dirX).toBeCloseTo(0, 6);
+    expect(m.dirY).toBeCloseTo(-1, 6);
+  });
+
+  it('starts out as scenery: not defensive, unhurt', () => {
+    const m = makeMegamouth(40, 60);
+    expect(m.defensive).toBe(false);
+    expect(m.hitsTaken).toBe(0);
   });
 });

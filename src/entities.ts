@@ -482,23 +482,37 @@ export class Tentacle {
   }
 }
 
+/** How wide a spread, in radians, the evasive heading is allowed either side of straight away. */
+export const MEGAMOUTH_EVASION_SPREAD = Math.PI / 2;
+
 /**
- * The megamouth: an enormous filter feeder that has no interest in the pod.
+ * The megamouth: an enormous filter feeder that has no interest in the pod - until it is the
+ * only thing left in the water.
  *
- * It never steers at anyone - it holds a heading and crosses the arena - but it is big enough
- * that being where it is going costs a dolphin. The threat is entirely positional, which is the
- * point of it: everything else down here is hunting you, and this is the one thing that simply
- * does not care.
+ * While there are sharks to hunt it never steers at anyone: it holds a heading and crosses the
+ * arena, and being where it is going costs a dolphin. The threat is entirely positional, which
+ * is the point of it - everything else down here is hunting you, and this is the one thing that
+ * simply does not care.
+ *
+ * Once the sharks are gone it turns defensive, and stops being scenery. It is the last thing
+ * between the pod and the surface, so it has to be brought down before the level ends, and it
+ * spends that phase running: see pickEvasiveHeading.
  */
 export class Megamouth {
   _x: number;
   _y: number;
   lastX: number;
   lastY: number;
-  /** Unit heading, fixed for the crossing. */
+  /** Unit heading. Fixed for the crossing, re-picked constantly once it turns defensive. */
   dirX: number;
   dirY: number;
   speed: number;
+  /** Set when it is the last thing alive: three times the speed, and no longer swimming straight. */
+  defensive = false;
+  /** Boosted rams landed on it so far, against MEGAMOUTH_HITS_REQUIRED. */
+  hitsTaken = 0;
+  /** Timestamp (ms) of the next heading change while defensive. */
+  nextTurnAt = 0;
 
   constructor(x: number, y: number, dirX: number, dirY: number, speed: number) {
     this._x = x;
@@ -512,5 +526,30 @@ export class Megamouth {
 
   distanceBetween(other: { _x: number; _y: number }): number {
     return Math.sqrt((this._x - other._x) ** 2 + (this._y - other._y) ** 2);
+  }
+
+  /**
+   * Turns it away from the pod, give or take.
+   *
+   * Straight away every time would be a creature that can be herded into a wall and held there;
+   * a pure random walk would be one that wanders back into the pod by accident and dies to a
+   * boost it never saw. A random spread either side of directly away is neither: it is always
+   * leaving, but which way it breaks is worth guessing at.
+   *
+   * The horizontal gap is measured the short way round the wrap, so a pod that has just come
+   * through the seam is still behind it rather than suddenly a whole arena away.
+   *
+   * `roll` is 0..1 - passed in rather than drawn here so the steering can be tested.
+   */
+  pickEvasiveHeading(fromX: number, fromY: number, roll: number): void {
+    let dx = this._x - fromX;
+    if (dx > SIZE_X / 2) dx -= SIZE_X;
+    else if (dx < -SIZE_X / 2) dx += SIZE_X;
+    const dy = this._y - fromY;
+    // Directly on top of the pod there is no "away" to read, so it breaks along its own heading.
+    const away = dx === 0 && dy === 0 ? Math.atan2(this.dirY, this.dirX) : Math.atan2(dy, dx);
+    const angle = away + (roll - 0.5) * MEGAMOUTH_EVASION_SPREAD;
+    this.dirX = Math.cos(angle);
+    this.dirY = Math.sin(angle);
   }
 }

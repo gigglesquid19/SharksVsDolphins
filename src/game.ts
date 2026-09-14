@@ -180,6 +180,24 @@ const MEGAMOUTH_HIT_RADIUS = 13;
 /** How far past the edge it goes before wrapping round, in world units. */
 const MEGAMOUTH_WRAP_MARGIN = 26;
 /**
+ * What it takes to bring one down: ten dolphins in the water and three boosted rams.
+ *
+ * Deliberately the Matriarch's own shape - a pod requirement past anything a shark asks for, and
+ * three hits rather than one - because by the time it is the last thing alive the level has
+ * become a boss fight whether or not it was billed as one. Ten is inside the Mesopelagic's cap of
+ * fifteen with room to lose a few on the way, so a pod that has been played well can always
+ * finish it.
+ */
+const MEGAMOUTH_POD_REQUIREMENT = 10;
+const MEGAMOUTH_HITS_REQUIRED = 3;
+/** Spacing between rams, so one pass through it cannot land the whole fight. */
+const MEGAMOUTH_HIT_COOLDOWN_MS = 900;
+/** Its speed once it turns defensive. Past the pod's cruise, short of a Boost - so only a dash catches it. */
+const MEGAMOUTH_DEFENSIVE_SPEED_FACTOR = 3;
+/** How long it holds an evasive heading before breaking a different way, in ms. */
+const MEGAMOUTH_TURN_MIN_MS = 520;
+const MEGAMOUTH_TURN_MAX_MS = 1100;
+/**
  * Lights along its underside, in the strip's own frame coordinates - the same space the sharks'
  * photophores are given in. Spaced unevenly on purpose: an even row reads as something made,
  * and the one thing this has to read as is alive.
@@ -560,6 +578,10 @@ export class Game {
   private megamouth: Megamouth | null = null;
   private megamouthSprite: Container | null = null;
   private megamouthLights: Container | null = null;
+  /** Rate limit on rams landing on the megamouth - see MEGAMOUTH_HIT_COOLDOWN_MS. */
+  private megamouthHitCooldownUntil = 0;
+  /** Set once, when it turns on the pod, so the moment is announced a single time. */
+  private megamouthTurnedAnnounced = false;
   private jellyfishSprites = new Map<Jellyfish, Container>();
   private matriarch: Shark | null = null;
   private matriarchWarningTime = 0;
@@ -3896,6 +3918,8 @@ ${cleared.name} Zone Liberated
       this.megamouthLights = null;
     }
     this.megamouth = null;
+    this.megamouthHitCooldownUntil = 0;
+    this.megamouthTurnedAnnounced = false;
   }
 
   /**
@@ -3907,12 +3931,17 @@ ${cleared.name} Zone Liberated
    * so in dark water it arrives as a row of lights on something enormous, which is exactly the
    * read the zone has spent ten levels teaching.
    *
-   * It is deliberately not pushed into `sharks`: the level-complete check counts that list, and a
-   * creature the pod cannot kill must never be the thing a run is waiting on.
+   * It is deliberately not pushed into `sharks`: almost everything that reads that list - the
+   * cloak cycle, the Matriarch's spawner, the kill loop - is about sharks hunting the pod, and
+   * this is not that. The level-complete check reads it separately instead (see step()), because
+   * unlike the storm or the swarm this one does not pass: once it has arrived it has to be
+   * brought down before the water is clear.
    */
   private startMegamouth(): void {
     this.activeEvent = { type: 'megamouth', endsAt: this.gameTime + MEGAMOUTH_DURATION };
     this.clearMegamouth();
+    this.megamouthHitCooldownUntil = 0;
+    this.megamouthTurnedAnnounced = false;
 
     // One heading, held for the whole event: it enters off a side at a random height and simply
     // keeps going, wrapping round rather than leaving. Something this size crossing once and
@@ -3943,20 +3972,57 @@ ${cleared.name} Zone Liberated
     sfx.playMegamouth();
   }
 
+  /**
+   * Ends the *event*, not the animal.
+   *
+   * The arrival is what the event window covers - the warning, the sound, the spacing that keeps
+   * two of these from landing on top of each other. The megamouth itself outlives it and keeps
+   * swimming, so the rest of the level's weather can carry on around something that is still
+   * down there. Everything that drives it keys off `this.megamouth` rather than off the event
+   * for exactly this reason.
+   */
   private endMegamouth(): void {
-    this.clearMegamouth();
     this.activeEvent = null;
-    this.setStatus('Whatever it was has moved on');
+    if (this.megamouth) this.setStatus('It is still circling out there');
   }
 
-  /** Holds its heading and crosses. Nothing it does depends on where the pod is. */
+  /**
+   * Two creatures in one.
+   *
+   * While there are sharks in the water it holds its heading and crosses, wrapping round: nothing
+   * it does depends on where the pod is. Once they are gone it knows it is the last thing here,
+   * and runs - three times the speed, breaking onto a new heading every second or so, always
+   * away from the pod (see Megamouth.pickEvasiveHeading).
+   */
   private updateMegamouth(now: number): void {
     const m = this.megamouth;
     if (!m) return;
+
+    if (!m.defensive && this.sharks.length === 0 && !this.levelCompleted) this.turnMegamouthDefensive();
+
+    if (m.defensive && now >= m.nextTurnAt) {
+      const target = this.player ?? { _x: m._x, _y: m._y };
+      m.pickEvasiveHeading(target._x, target._y, Math.random());
+      m.nextTurnAt = now + MEGAMOUTH_TURN_MIN_MS + Math.random() * (MEGAMOUTH_TURN_MAX_MS - MEGAMOUTH_TURN_MIN_MS);
+    }
+
+    const speed = m.speed * (m.defensive ? MEGAMOUTH_DEFENSIVE_SPEED_FACTOR : 1);
     m.lastX = m._x;
     m.lastY = m._y;
-    m._x += m.dirX * m.speed;
-    m._y = clampEntityY(m._y + m.dirY * m.speed, 6);
+    m._x += m.dirX * speed;
+    const wantY = m._y + m.dirY * speed;
+    const clampedY = clampEntityY(wantY, 6);
+    // Off the top and the bottom it bounces rather than being held there. Clamping a heading
+    // that runs into the ceiling eats the vertical half of it, so a creature told to move at
+    // three times its speed spent the frame crawling along the roof at a fraction of it - and
+    // read as stuck rather than as fleeing. Reflected, the speed is the speed, and being driven
+    // into a wall costs it the line it was running rather than its pace.
+    if (m.defensive && clampedY !== wantY) {
+      m.dirY = -m.dirY;
+      m._y = clampEntityY(m._y + m.dirY * speed, 6);
+    } else {
+      m._y = clampedY;
+    }
     // Round it goes. The margin is wide enough that it is fully off before it reappears, so it
     // never pops into existence halfway through its own body.
     if (m._x > SIZE_X + MEGAMOUTH_WRAP_MARGIN) m._x = -MEGAMOUTH_WRAP_MARGIN;
@@ -3988,6 +4054,132 @@ ${cleared.name} Zone Liberated
       }
       this.megamouthLights.alpha = photophorePulseAlpha(now, 991);
     }
+  }
+
+  /**
+   * The moment the water empties and it realises it is the one left.
+   *
+   * Announced without naming it, like everything else down here - the banner says what changed,
+   * not what it is - and the status line carries the two things the player now has to know, since
+   * nothing else in the game asks for a pod this size or for three hits.
+   */
+  private turnMegamouthDefensive(): void {
+    const m = this.megamouth;
+    if (!m) return;
+    m.defensive = true;
+    m.nextTurnAt = 0;
+    if (this.megamouthTurnedAnnounced) return;
+    this.megamouthTurnedAnnounced = true;
+    sfx.playMegamouth();
+    this.showBanner('It turns on you!', 'storm', 2200);
+    this.setStatus(`${MEGAMOUTH_POD_REQUIREMENT} dolphins and three Boosts will bring it down`);
+  }
+
+  /**
+   * Rams landing on the megamouth. Returns true on the blow that finishes it.
+   *
+   * A boosted pod of ten hurts it; anything less is swept aside by the branch below that costs a
+   * dolphin, which is the same contact read the other way. A landed ram deliberately shares the
+   * pod's hit cooldown, so a hit is never also a loss - swimming into it at speed with the pod
+   * behind you is the answer to it, and it would be a strange answer that cost a dolphin a time.
+   */
+  private updateMegamouthCombat(): boolean {
+    const m = this.megamouth;
+    if (!m || !this.player) return false;
+    const now = Date.now();
+    if (now < this.megamouthHitCooldownUntil) return false;
+
+    const contact = this.dolphins.some(
+      (d) => (d.isPlayer || d.recruited) && m.distanceBetween(d) < MEGAMOUTH_HIT_RADIUS,
+    );
+    if (!contact) return false;
+
+    const meetsPod = this.getPodSize() >= MEGAMOUTH_POD_REQUIREMENT;
+    if (!meetsPod || !this.sprinting) {
+      if (this.gameTime - this.lastBoostNudgeTime > 2) {
+        this.lastBoostNudgeTime = this.gameTime;
+        this.setStatus(
+          meetsPod ? 'Boost into it!' : `You need ${MEGAMOUTH_POD_REQUIREMENT} dolphins to hurt it`,
+        );
+      }
+      return false;
+    }
+
+    this.megamouthHitCooldownUntil = now + MEGAMOUTH_HIT_COOLDOWN_MS;
+    this.playerHitCooldownUntil = Math.max(this.playerHitCooldownUntil, now + MEGAMOUTH_HIT_COOLDOWN_MS);
+    m.hitsTaken++;
+
+    const scale = WORLD_SCALE;
+    this.particles.emit('hit', m._x * scale + scale / 2, m._y * scale + scale / 2, 20, { speed: 3.5, life: 0.7 });
+    this.triggerBigKillFeedback('matriarch');
+
+    if (m.hitsTaken >= MEGAMOUTH_HITS_REQUIRED) {
+      this.destroyMegamouth();
+      return true;
+    }
+    this.flashMegamouthHit();
+    this.setStatus(`The megamouth reels! (${m.hitsTaken}/${MEGAMOUTH_HITS_REQUIRED})`);
+    this.showBanner('Direct Hit!', 'storm', 900);
+    return false;
+  }
+
+  /** Flashes its sprite on a ram that didn't finish it - the same acknowledgement the Matriarch gets. */
+  private flashMegamouthHit(): void {
+    const sprite = this.megamouthSprite;
+    const fish = sprite?.getChildByName('fish') as unknown as { tint: number } | undefined;
+    if (!fish) return;
+    [0xff4444, 0x14161f, 0xff4444, 0x14161f].forEach((tint, i) => {
+      setTimeout(() => {
+        if (this.megamouthSprite === sprite) fish.tint = tint;
+      }, i * 90);
+    });
+  }
+
+  /** The finishing blow: the lights go out first, then the body flashes and fades. */
+  private destroyMegamouth(): void {
+    const sprite = this.megamouthSprite;
+    this.sharksKilled++;
+    this.registerKillSound();
+    this.setStatus('The megamouth is beaten');
+    this.showBanner('Megamouth Beaten!', 'victory', 2000);
+    // Cleared first so nothing keeps driving it, then the sprite is animated out on its own -
+    // the same send-off a large shark gets, against a container this code now owns.
+    this.megamouth = null;
+    this.megamouthSprite = null;
+    if (this.megamouthLights) {
+      this.lightsContainer.removeChild(this.megamouthLights);
+      this.megamouthLights.destroy({ children: true });
+      this.megamouthLights = null;
+    }
+    if (!sprite) return;
+
+    const fish = sprite.getChildByName('fish') as unknown as { tint: number } | null;
+    const baseScaleX = sprite.scale.x;
+    const baseScaleY = sprite.scale.y;
+    const start = performance.now();
+    const DURATION = 900;
+    let lastFlash = 0;
+    let flashOn = false;
+
+    const animate = (now: number) => {
+      const elapsed = now - start;
+      const t = Math.min(1, elapsed / DURATION);
+      if (fish && elapsed - lastFlash >= 70) {
+        lastFlash = elapsed;
+        flashOn = !flashOn;
+        fish.tint = flashOn ? 0xffffff : 0xff2222;
+      }
+      const burst = 1 + Math.sin(t * Math.PI) * 0.35;
+      sprite.scale.set(baseScaleX * burst, baseScaleY * burst);
+      sprite.alpha = 1 - t;
+      if (t < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        this.entityContainer.removeChild(sprite);
+        sprite.destroy({ children: true });
+      }
+    };
+    requestAnimationFrame(animate);
   }
 
   private clearKraken(): void {
@@ -4325,7 +4517,11 @@ ${cleared.name} Zone Liberated
     const allowed: GameEventType[] = [];
     if (this.stormsAllowed()) allowed.push('storm');
     if (this.jellyfishAllowed()) allowed.push('jellyfish');
-    if (this.deepEventsAllowed()) allowed.push('kraken', 'megamouth');
+    if (this.deepEventsAllowed()) {
+      allowed.push('kraken');
+      // One megamouth at a time: see the guard in updateEvents.
+      if (!this.megamouth) allowed.push('megamouth');
+    }
 
     const roll = Math.random();
     this.pendingEvent =
@@ -4397,7 +4593,10 @@ ${cleared.name} Zone Liberated
       } else if (this.pendingEvent === 'kraken') {
         this.startKraken();
       } else if (this.pendingEvent === 'megamouth') {
-        this.startMegamouth();
+        // Never two. A second arrival would call clearMegamouth on the first and quietly delete
+        // a creature the level is waiting on - along with whatever damage had been done to it -
+        // so while one is still in the water the roll simply passes.
+        if (!this.megamouth) this.startMegamouth();
       }
       this.nextEventCheckTime += isSandboxLevel(this.currentLevel) ? BENCH_EVENT_INTERVAL : EVENT_CHECK_INTERVAL;
       this.planNextEvent();
@@ -4727,9 +4926,12 @@ ${cleared.name} Zone Liberated
         }
       }
       this.sharks = survivingSharks;
+      this.updateMegamouthCombat();
       if (matriarchJustDefeated) {
         this.finishMatriarchWithMegaPod();
-      } else if (this.sharks.length === 0 && !this.levelCompleted) {
+      } else if (this.sharks.length === 0 && !this.megamouth && !this.levelCompleted) {
+        // A megamouth in the water holds the level open. It is the only thing here that is not in
+        // `sharks` and still has to be dealt with, so the clear check has to name it.
         this.levelComplete();
       } else if (this.matriarch && !this.sharks.includes(this.matriarch) && !this.levelCompleted) {
         this.sharksKilled += this.sharks.length;
@@ -4814,18 +5016,17 @@ ${cleared.name} Zone Liberated
     // swarm, these two run alongside the sharks rather than instead of them: a swarm fills the
     // whole arena, while an arm closes a lane and a megamouth occupies a line, and there is still
     // room to be hunted in between.
-    if (this.player && (this.activeEvent?.type === 'kraken' || this.activeEvent?.type === 'megamouth')) {
-      const hits = (d: Dolphin): boolean => {
-        if (this.activeEvent?.type === 'kraken') return this.tentacles.some((arm) => this.tentacleHits(arm, d));
-        return !!this.megamouth && this.megamouth.distanceBetween(d) < MEGAMOUTH_HIT_RADIUS;
-      };
+    const krakenOut = this.activeEvent?.type === 'kraken';
+    if (this.player && (krakenOut || this.megamouth)) {
+      const grabbed = (d: Dolphin): boolean => krakenOut && this.tentacles.some((arm) => this.tentacleHits(arm, d));
+      const swept = (d: Dolphin): boolean => !!this.megamouth && this.megamouth.distanceBetween(d) < MEGAMOUTH_HIT_RADIUS;
       const now = Date.now();
       if (now >= this.playerHitCooldownUntil && now >= this.ghostUntil) {
         const victim = this.dolphins.find(
-          (d) => (d.isPlayer || d.recruited) && now >= d.invulnerableUntil && hits(d),
+          (d) => (d.isPlayer || d.recruited) && now >= d.invulnerableUntil && (grabbed(d) || swept(d)),
         );
         if (victim) {
-          const caught = this.activeEvent.type === 'kraken' ? 'Grabbed!' : 'Swept aside!';
+          const caught = grabbed(victim) ? 'Grabbed!' : 'Swept aside!';
           this.playerHitCooldownUntil = now + 1000;
           sfx.playBite();
           if (victim.isPlayer) {
@@ -4916,9 +5117,9 @@ ${cleared.name} Zone Liberated
       this.updateJellyfish();
     } else if (this.activeEvent?.type === 'kraken') {
       this.updateKraken(Date.now());
-    } else if (this.activeEvent?.type === 'megamouth') {
-      this.updateMegamouth(Date.now());
     }
+    // Not tied to the event window: the arrival is the event, the animal stays until it is beaten.
+    if (this.megamouth) this.updateMegamouth(Date.now());
 
     // Nothing swims into a kraken. The water is cleared of sharks for it, and a lone dolphin
     // wandering in to be recruited while the arms are out reads as the sea not having noticed -
@@ -4990,7 +5191,9 @@ ${cleared.name} Zone Liberated
     const spawnCount = Math.max(0, this.nextDolphinSpawnTime - this.gameTime);
     this.statSpawn.textContent = spawnCount.toFixed(1) + 's';
     this.statDolphins.textContent = String(this.dolphins.length);
-    this.statSharks.textContent = String(this.sharks.length);
+    // The megamouth is not a shark and is not in the list, but it is the thing standing between
+    // the pod and the end of the level - a HUD reading 0 while it circles would be a lie.
+    this.statSharks.textContent = String(this.sharks.length + (this.megamouth ? 1 : 0));
     this.updateLastLifeHeart();
   }
 
