@@ -98,27 +98,3 @@ export function bindSecretTaps(el: HTMLElement, handler: () => void): void {
   el.style.cursor = 'default';
   el.addEventListener('pointerdown', handler);
 }
-
-/**
- * Picks one of `options` in proportion to its weight.
- *
- * An even pick over a list is only fair when everything on it costs the player the same, and
- * weather does not: some of it is a shape to swim around and some of it takes the arena away for
- * most of a minute. Weighting lets the heavy ones stay rare without being dropped from the list,
- * which is the difference between an event that is a surprise and one that is a fixture.
- *
- * `roll` is 0..1 and is passed in rather than drawn here, so a pick can be tested. Returns null
- * when there is nothing to pick or every weight is zero.
- */
-export function weightedPick<T>(options: readonly T[], weightOf: (option: T) => number, roll: number): T | null {
-  const weight = (option: T): number => Math.max(0, weightOf(option));
-  const total = options.reduce((sum, option) => sum + weight(option), 0);
-  if (total <= 0) return null;
-  let target = Math.min(Math.max(roll, 0), 1) * total;
-  for (const option of options) {
-    target -= weight(option);
-    if (target < 0) return option;
-  }
-  // Only reachable on a roll of exactly 1, which lands on the far end of the last slice.
-  return options[options.length - 1] ?? null;
-}

@@ -39,7 +39,7 @@ import {
   zoneNumber,
 } from './levels';
 import { CANVAS_H, CANVAS_W, SIZE_X, SIZE_Y, WORLD_SCALE } from './constants';
-import { clampEntityY, directionDelta, sweptDistance, weightedPick, wrapX } from './utils';
+import { clampEntityY, directionDelta, sweptDistance, wrapX } from './utils';
 import { Dolphin, Shark, Jellyfish, Megamouth, Tentacle } from './entities';
 import type { ConsumableId, Inventory } from './inventory';
 import { getInventory, magicShrimpHeld, useConsumable } from './inventory';
@@ -107,29 +107,20 @@ const EVENT_CHECK_INTERVAL = 60;
 const EVENT_CHANCE = 0.1;
 const EVENT_DURATION = 30;
 /**
- * How often each event comes up, against the others allowed at that depth.
+ * The Mesopelagic's one megamouth, and where in the zone it turns up.
  *
- * They used to share the roll evenly, which quietly made the kraken the most frequent thing in
- * the Mesopelagic to actually interrupt a level: a swarm is something to swim around and a
- * megamouth is something to swim past, but a kraken empties the water of sharks, holds the
- * dolphin spawns and closes two lanes of the arena for forty seconds. Three of those an hour is
- * a set piece; one every couple of minutes is the level. At half the weight of its neighbours it
- * goes from a third of the zone's weather to a fifth.
- */
-const EVENT_WEIGHTS: Record<GameEventType, number> = {
-  storm: 2,
-  jellyfish: 2,
-  megamouth: 2,
-  kraken: 1,
-};
-/**
- * The least time between one kraken starting and the next being allowed to, in seconds of play.
+ * It is not weather any more. A creature that has to be beaten before the level will end is a
+ * set piece, and a set piece that can happen twice in a descent - or not at all - is neither
+ * rare nor reliable. One is rolled onto a level somewhere in the zone at the start of a run, and
+ * once it has been fought that is the run's encounter spent.
  *
- * The weight above sets the rate; this sets the spacing. Two independent rolls a minute apart can
- * both come up kraken however rare each one is, and back-to-back is what "too often" actually
- * feels like - so however the dice land, the arena gets four minutes off between them.
+ * Forty-five seconds in, rather than on the ordinary minute, so the level is properly under way
+ * but nowhere near finished: it has to arrive while there are still sharks in the water, because
+ * everything interesting about it is what happens when there are not.
  */
-const KRAKEN_MIN_GAP = 240;
+const MEGAMOUTH_ENCOUNTER_FIRST_LEVEL = 11;
+const MEGAMOUTH_ENCOUNTER_LAST_LEVEL = 19;
+const MEGAMOUTH_ENCOUNTER_AT = 45;
 const JELLYFISH_SWARM_DURATION = 45;
 /** The deepest level a jellyfish swarm can appear at; boss levels are excluded separately. */
 const JELLYFISH_MAX_LEVEL = 19;
@@ -600,8 +591,13 @@ export class Game {
    * asked to dodge and cannot see. Split, the arm is a shape half-glimpsed in the dark and a row
    * of lights that carries - which is the same bargain every deep-water shark down here strikes.
    */
-  /** When the last kraken began, in seconds of play. Reset with the level - see KRAKEN_MIN_GAP. */
-  private lastKrakenAt = -KRAKEN_MIN_GAP;
+  /** The level this run's one megamouth is rolled onto, or null outside a run. */
+  private megamouthRunLevel: number | null = null;
+  /** Set once the run's encounter has been fought and won, so it is never dealt again. */
+  private megamouthDone = false;
+  /** Whether this level is the one carrying the encounter, and whether it has arrived yet. */
+  private megamouthEncounterScheduled = false;
+  private megamouthAppearedThisLevel = false;
   private krakenContainer!: Container;
   private tentacles: Tentacle[] = [];
   private tentacleGfx = new Map<Tentacle, Graphics>();
@@ -1968,6 +1964,12 @@ export class Game {
       this.seenLargeSharkKinds = new Set<SharkKind>();
       this.seenLargeSharkVariety = false;
       this.retries = 0;
+      // One megamouth a descent, on a level rolled here at the top of the run so the zone is
+      // never quite the same shape twice.
+      this.megamouthRunLevel =
+        MEGAMOUTH_ENCOUNTER_FIRST_LEVEL +
+        Math.floor(Math.random() * (MEGAMOUTH_ENCOUNTER_LAST_LEVEL - MEGAMOUTH_ENCOUNTER_FIRST_LEVEL + 1));
+      this.megamouthDone = false;
       this.totalRecruited = 0;
       this.totalLost = 0;
       this.sharksKilled = 0;
@@ -2065,8 +2067,17 @@ export class Game {
     this.benchEventIndex = 0;
     this.pendingEvent = null;
     this.eventWarningShown = false;
-    this.lastKrakenAt = -KRAKEN_MIN_GAP;
     this.planNextEvent();
+    // The run's one megamouth is dealt here rather than rolled for, so it lands on a known level
+    // at a known time instead of waiting on the weather - see MEGAMOUTH_ENCOUNTER_AT.
+    this.megamouthAppearedThisLevel = false;
+    this.megamouthEncounterScheduled = this.megamouthEncounterDue(config.level);
+    if (this.megamouthEncounterScheduled) {
+      this.nextEventCheckTime = MEGAMOUTH_ENCOUNTER_AT;
+      this.pendingEvent = 'megamouth';
+      this.nextEventWarningTime = MEGAMOUTH_ENCOUNTER_AT - 5;
+      this.eventWarningShown = false;
+    }
     this.clearJellyfish();
     // Both hold sprites of their own, so a level that ends mid-event would otherwise leave an arm
     // hanging in the water or a megamouth parked in the next level's arena.
@@ -2722,6 +2733,9 @@ ${zone.depth}`, 'levelup', duration + 1400);
 
   private levelComplete(): void {
     this.levelCompleted = true;
+    // Clearing the level it appeared on is the only thing that spends the run's encounter. The
+    // level cannot be cleared with it alive, so reaching here means it was beaten.
+    if (this.megamouthEncounterScheduled && this.megamouthAppearedThisLevel) this.megamouthDone = true;
     this.resetKillCombo();
     if (this.lostThisLevel === 0) this.tryUnlock('flawlessLevel');
     if (this.mode === 'campaign' && this.currentLevel === 5) this.tryUnlock('halfwayThere');
@@ -4001,6 +4015,7 @@ ${cleared.name} Zone Liberated
     this.megamouthLights = createPhotophores(MEGAMOUTH_PHOTOPHORES, 0x93c5fd);
     this.lightsContainer.addChild(this.megamouthLights);
 
+    this.megamouthAppearedThisLevel = true;
     this.setStatus('Something vast is moving through the dark');
     sfx.playMegamouth();
   }
@@ -4312,7 +4327,6 @@ ${cleared.name} Zone Liberated
 
   private startKraken(): void {
     this.activeEvent = { type: 'kraken', endsAt: this.gameTime + KRAKEN_DURATION };
-    this.lastKrakenAt = this.gameTime;
     this.clearKraken();
     const maxReach = SIZE_X * TENTACLE_REACH_SHARE;
     const now = Date.now();
@@ -4548,20 +4562,20 @@ ${cleared.name} Zone Liberated
       return;
     }
 
+    // Two events at every depth, sharing the roll evenly, so a kraken in the Mesopelagic comes up
+    // exactly as often as a storm does in the sunlit water: the zones differ in what the weather
+    // is, not in how much of it there is. The megamouth is deliberately not on this list - it is
+    // dealt once a run rather than rolled for. See MEGAMOUTH_ENCOUNTER_FIRST_LEVEL.
     const allowed: GameEventType[] = [];
     if (this.stormsAllowed()) allowed.push('storm');
     if (this.jellyfishAllowed()) allowed.push('jellyfish');
-    if (this.deepEventsAllowed()) {
-      // Measured against the check this plan is for rather than against now, since the plan is
-      // made a full interval before the event it decides.
-      if (this.nextEventCheckTime >= this.lastKrakenAt + KRAKEN_MIN_GAP) allowed.push('kraken');
-      // One megamouth at a time: see the guard in updateEvents.
-      if (!this.megamouth) allowed.push('megamouth');
-    }
+    if (this.deepEventsAllowed()) allowed.push('kraken');
 
     const roll = Math.random();
     this.pendingEvent =
-      roll < EVENT_CHANCE * 2 ? weightedPick(allowed, (type) => EVENT_WEIGHTS[type], Math.random()) : null;
+      allowed.length > 0 && roll < EVENT_CHANCE * 2
+        ? allowed[Math.floor(Math.random() * allowed.length)]
+        : null;
 
     this.nextEventWarningTime = this.nextEventCheckTime - 5;
     this.eventWarningShown = false;
@@ -4599,16 +4613,34 @@ ${cleared.name} Zone Liberated
   }
 
   /**
-   * The kraken and the megamouth: the Mesopelagic only, and never on a boss level.
+   * The kraken: the Mesopelagic only, and never on a boss level.
    *
-   * Both are built around the zone's darkness - one is read by the lane it closes, the other by
-   * the lights it arrives with - so neither would mean much in lit water. With these two joining
-   * the jellyfish, the zone now picks evenly between three events rather than repeating one, on
-   * the same roll it always had.
+   * It is built around the zone's darkness - what you read is the lane it closes, not the arm
+   * that closes it - so it would mean little in lit water. Paired with the jellyfish it takes
+   * the slot the storm holds higher up, on the same roll and at the same rate: half the zone's
+   * weather, which is exactly a storm's share of levels 1-9.
+   *
+   * The megamouth used to be gated here too. It is dealt once a run now rather than rolled for -
+   * see megamouthEncounterDue.
    */
   private deepEventsAllowed(): boolean {
     if (!isMesopelagicLevel(this.currentLevel)) return false;
     return !getLevelConfig(this.currentLevel).matriarch;
+  }
+
+  /**
+   * Whether this level carries the run's one megamouth.
+   *
+   * The rolled level is where it is *due*, not the only place it can happen: a level can end
+   * before forty-five seconds are up, and a player who bought their way to a depth past the roll
+   * should not have the encounter silently skipped. So it lands on the first level of the zone
+   * at or after the roll, and only a fought-and-won encounter spends it.
+   */
+  private megamouthEncounterDue(level: number): boolean {
+    if (this.megamouthDone || this.megamouthRunLevel === null) return false;
+    if (isSandboxLevel(level) || !isMesopelagicLevel(level)) return false;
+    if (getLevelConfig(level).matriarch) return false;
+    return level >= this.megamouthRunLevel;
   }
 
   /** Which bench event comes next. Advanced by planNextEvent, reset with the level. */
