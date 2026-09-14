@@ -520,13 +520,52 @@ export function makeVignetteTexture(size: number, color: string): Texture {
   return Texture.from(c);
 }
 
-export function createJellyfishSprite(): Container {
+/** What one jellyfish is made of, so a swarm can look like the water it is drifting through. */
+export interface JellyfishLook {
+  bell: number;
+  rim: number;
+  tentacle: number;
+  glow: number;
+  glowAlpha: number;
+  /** Whether the glow is added to what is behind it rather than laid over it. */
+  luminous: boolean;
+}
+
+/** Sunlit water: a translucent purple bell, lit from outside rather than from within. */
+export const SHALLOW_JELLYFISH: JellyfishLook = {
+  bell: 0xc084fc,
+  rim: 0x7e22ce,
+  tentacle: 0xe9d5ff,
+  glow: 0xc084fc,
+  glowAlpha: 0.2,
+  luminous: false,
+};
+
+/**
+ * Twilight water: a near-black red body carrying a light of its own.
+ *
+ * Dark red is what deep-sea jellyfish actually are, and for a good reason - red light does not
+ * reach down there, so a red animal is a black one. That is the half of it that hides. The other
+ * half is the glow, which is added to the water rather than laid over it, so the body stays a
+ * dark shape and the light is the only part that carries: the same read as every other deep-water
+ * species down here, where you find things by what they are lit with.
+ */
+export const DEEP_JELLYFISH: JellyfishLook = {
+  bell: 0x6b111b,
+  rim: 0x2c0308,
+  tentacle: 0x8c1c2b,
+  glow: 0xff3b4a,
+  glowAlpha: 0.5,
+  luminous: true,
+};
+
+export function createJellyfishSprite(look: JellyfishLook = SHALLOW_JELLYFISH): Container {
   const container = new Container();
 
   const bell = new Graphics();
   bell.ellipse(0, -4, 7, 5);
-  bell.fill({ color: 0xc084fc, alpha: 0.8 });
-  bell.stroke({ width: 1, color: 0x7e22ce, alpha: 0.9 });
+  bell.fill({ color: look.bell, alpha: 0.8 });
+  bell.stroke({ width: 1, color: look.rim, alpha: 0.9 });
   container.addChild(bell);
 
   const tentacles = new Graphics();
@@ -536,12 +575,19 @@ export function createJellyfishSprite(): Container {
   tentacles.lineTo(0, 8);
   tentacles.moveTo(4, -2);
   tentacles.lineTo(5, 7);
-  tentacles.stroke({ width: 1.2, color: 0xe9d5ff, alpha: 0.7 });
+  tentacles.stroke({ width: 1.2, color: look.tentacle, alpha: 0.7 });
   container.addChild(tentacles);
 
   const glow = new Graphics();
   glow.ellipse(0, -4, 9, 7);
-  glow.fill({ color: 0xc084fc, alpha: 0.2 });
+  glow.fill({ color: look.glow, alpha: look.glowAlpha });
+  if (look.luminous) {
+    // A wider, fainter halo under the core, so it reads as light in the water rather than as a
+    // second ellipse drawn on top of the first.
+    glow.ellipse(0, -4, 14, 11);
+    glow.fill({ color: look.glow, alpha: look.glowAlpha * 0.35 });
+    glow.blendMode = 'add';
+  }
   container.addChild(glow);
 
   return container;

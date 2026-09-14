@@ -12,6 +12,8 @@ import {
   createDolphinSprite,
   createEyes,
   createJellyfishSprite,
+  DEEP_JELLYFISH,
+  SHALLOW_JELLYFISH,
   createPhotophores,
   createSharkSprite,
   makeDolphinBodyCanvas,
@@ -4808,11 +4810,13 @@ ${cleared.name} Zone Liberated
     this.lostAtSwarmStart = this.totalLost;
     this.swarmClearSince = 0;
     this.clearJellyfish();
+    // Down in the twilight the swarm is a different animal: dark red and carrying its own light.
+    const look = isMesopelagicLevel(this.currentLevel) ? DEEP_JELLYFISH : SHALLOW_JELLYFISH;
     for (let i = 0; i < JELLYFISH_COUNT; i++) {
       const y = 2 + Math.random() * (SIZE_Y - 4);
       const jelly = new Jellyfish(i, y);
       this.jellyfish.push(jelly);
-      const sprite = createJellyfishSprite();
+      const sprite = createJellyfishSprite(look);
       this.jellyfishContainer.addChild(sprite);
       this.jellyfishSprites.set(jelly, sprite);
     }
