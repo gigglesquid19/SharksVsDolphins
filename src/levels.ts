@@ -41,9 +41,9 @@ export const LEVELS: LevelConfig[] = [
   { level: 2, sharkKinds: TIGER, normalSharkCount: 4, largeSharkCount: 0, maxDolphins: 8, sharkSpeedMultiplier: 1.03 },
   { level: 3, sharkKinds: TIGER, normalSharkCount: 4, largeSharkCount: 1, maxDolphins: 10, sharkSpeedMultiplier: 1.06 },
   { level: 4, sharkKinds: TIGER_GREAT_WHITE, normalSharkCount: 5, largeSharkCount: 1, maxDolphins: 12, sharkSpeedMultiplier: 1.09 },
-  { level: 5, sharkKinds: TIGER_GREAT_WHITE, normalSharkCount: 5, largeSharkCount: 2, maxDolphins: 12, sharkSpeedMultiplier: 1.12 },
+  { level: 5, sharkKinds: TIGER_GREAT_WHITE, normalSharkCount: 5, largeSharkCount: 1, maxDolphins: 12, sharkSpeedMultiplier: 1.12 },
   { level: 6, sharkKinds: ALL_KINDS, normalSharkCount: 6, largeSharkCount: 2, maxDolphins: 12, sharkSpeedMultiplier: 1.15 },
-  { level: 7, sharkKinds: ALL_KINDS, normalSharkCount: 6, largeSharkCount: 3, maxDolphins: 12, sharkSpeedMultiplier: 1.18 },
+  { level: 7, sharkKinds: ALL_KINDS, normalSharkCount: 6, largeSharkCount: 2, maxDolphins: 12, sharkSpeedMultiplier: 1.18 },
   { level: 8, sharkKinds: ALL_KINDS, normalSharkCount: 7, largeSharkCount: 3, maxDolphins: 13, sharkSpeedMultiplier: 1.21 },
   { level: 9, sharkKinds: ALL_KINDS, normalSharkCount: 7, largeSharkCount: 4, maxDolphins: 14, sharkSpeedMultiplier: 1.24 },
   { level: 10, sharkKinds: ALL_KINDS, normalSharkCount: 8, largeSharkCount: 4, maxDolphins: 15, sharkSpeedMultiplier: 1.27, matriarch: true }
@@ -193,7 +193,7 @@ export const SANDBOX_LEVELS: Record<number, Partial<LevelConfig>> = {
  * Past the campaign every level was the same three shallow-water species in slowly growing
  * numbers, so the two deep-water sharks existed only on a test bench and the zone that should
  * have introduced them never did. These ten run the curve levels 1-10 run - the same counts
- * (3,4,4,5,5,6,6,7,7,8 small against 0,0,1,1,2,2,3,3,4,4 large), a new species folded in twice
+ * (3,4,4,5,5,6,6,7,7,8 small against 0,0,1,1,1,2,2,3,4,4 large), a new species folded in twice
  * along the way, and a Matriarch at the end - but starting from the frilled shark and the
  * cookiecutter rather than from tigers.
  *
@@ -204,9 +204,13 @@ export const SANDBOX_LEVELS: Record<number, Partial<LevelConfig>> = {
  * come back at all; see MESO_CC_FRILLED for why.
  *
  * The pool's order carries weight. Large sharks restart the deal at the first entry, so listing
- * the cookiecutter first means the single large at 13 and 14 is a large cookiecutter at 8 pod,
- * and the large frilled - 12 pod, against a cap of 15 - only arrives at 15, where there are two
- * larges and the player has had two levels of warning.
+ * the cookiecutter first means the single large on 13, 14 and 15 is a large cookiecutter at 8 pod
+ * rather than a large frilled at 12, against a pod capped at 15.
+ *
+ * That does mean the large frilled now waits for 16, where it is one of two larges drawn at
+ * random rather than dealt - so it is no longer guaranteed an introduction of its own. The three
+ * single-large levels match the campaign's own run of three, which is the curve this zone is
+ * built to mirror, and the mirror was judged worth more than the guarantee.
  *
  * These are partial configs merged over the endless curve, like the sandboxes, so speed keeps
  * climbing on the same derived line as every level past them rather than forking its own.
@@ -242,9 +246,9 @@ export const MESOPELAGIC_LEVELS: Record<number, Partial<LevelConfig>> = {
   12: { sharkKinds: MESO_CC_FRILLED, normalSharkCount: 4, largeSharkCount: 0, dealKindsInTurn: true },
   13: { sharkKinds: MESO_CC_FRILLED, normalSharkCount: 4, largeSharkCount: 1, dealKindsInTurn: true },
   14: { sharkKinds: MESO_CC_FRILLED, normalSharkCount: 5, largeSharkCount: 1, dealKindsInTurn: true },
-  15: { sharkKinds: MESO_CC_FRILLED, normalSharkCount: 5, largeSharkCount: 2, dealKindsInTurn: true },
+  15: { sharkKinds: MESO_CC_FRILLED, normalSharkCount: 5, largeSharkCount: 1, dealKindsInTurn: true },
   16: { sharkKinds: MESO_PLUS_HAMMER, normalSharkCount: 6, largeSharkCount: 2 },
-  17: { sharkKinds: MESO_PLUS_HAMMER, normalSharkCount: 6, largeSharkCount: 3 },
+  17: { sharkKinds: MESO_PLUS_HAMMER, normalSharkCount: 6, largeSharkCount: 2 },
   18: { sharkKinds: MESO_PLUS_HAMMER, normalSharkCount: 7, largeSharkCount: 3 },
   19: { sharkKinds: MESO_ALL, normalSharkCount: 7, largeSharkCount: 4 },
   20: { sharkKinds: MESO_ALL, normalSharkCount: 8, largeSharkCount: 4 },

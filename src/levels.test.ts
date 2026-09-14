@@ -260,14 +260,16 @@ describe('the authored Mesopelagic, levels 11-20', () => {
   });
 
   it('holds the first large to the cheaper species, so 12 pod is never the only option', () => {
-    // Large sharks restart the deal at the pool's first entry, so the single large on 13 and 14
-    // is a cookiecutter at 8 pod; the large frilled at 12 waits for 15, where there are two.
-    for (const level of [13, 14]) {
+    // Large sharks restart the deal at the pool's first entry, so every single-large level in the
+    // dealt stretch fields a cookiecutter at 8 pod rather than a frilled at 12.
+    for (const level of [13, 14, 15]) {
       const config = getLevelConfig(level);
       expect(config.largeSharkCount).toBe(1);
       expect(config.sharkKinds[0]).toBe('cookiecutter');
     }
-    expect(getLevelConfig(15).largeSharkCount).toBe(2);
+    // The large frilled waits for 16, the first level with two, where the pool is drawn at random.
+    expect(getLevelConfig(16).largeSharkCount).toBe(2);
+    expect(getLevelConfig(16).dealKindsInTurn).toBeUndefined();
   });
 
   it('darkens steadily from level 10s daylight to the zone floor', () => {
