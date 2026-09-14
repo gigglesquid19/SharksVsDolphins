@@ -474,6 +474,16 @@ export interface SharkArt {
   stretchY: number;
   /** How big this one is drawn against a small tiger, which is the roster's smallest. */
   scale: number;
+  /**
+   * Lights along the belly, in the strip's own frame coordinates - the same space the sprite
+   * places them in, so they land on the animal at whatever size it is drawn.
+   *
+   * Only the three deep-water species carry any. They are most of how those three are recognised
+   * in the water, where the body itself is often not visible at all, so a picture of one without
+   * its lights is a picture of the wrong animal.
+   */
+  photophores?: { x: number; y: number }[];
+  photophoreColor?: number;
 }
 
 /**
@@ -489,7 +499,13 @@ export function specialSharkArt(special: 'matriarch' | 'megamouth'): SharkArt {
   if (special === 'matriarch') {
     return { ...base, scale: SHARK_KIND_SCALE.greatWhite * LARGE_SHARK_SIZE_MULTIPLIER * 2 };
   }
-  return { ...base, tint: 0x14161f, scale: SHARK_KIND_SCALE.greatWhite * MEGAMOUTH_SIZE };
+  return {
+    ...base,
+    tint: 0x14161f,
+    scale: SHARK_KIND_SCALE.greatWhite * MEGAMOUTH_SIZE,
+    photophores: MEGAMOUTH_PHOTOPHORES,
+    photophoreColor: 0x93c5fd,
+  };
 }
 
 /** The art for one entry in the book: a species at a size. */
@@ -502,6 +518,8 @@ export function sharkArt(kind: SharkKind, large: boolean): SharkArt {
     stretchX: look.stretchX,
     stretchY: look.stretchY,
     scale: SHARK_KIND_SCALE[kind] * size,
+    photophores: look.photophores,
+    photophoreColor: look.photophoreColor,
   };
 }
 

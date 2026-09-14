@@ -111,10 +111,57 @@ function ruler(): { w: number; h: number } {
   );
 }
 
+/**
+ * Lays the belly lights over a painted shark.
+ *
+ * The spots are in the strip's own frame coordinates, exactly as the sprite places them, so the
+ * same numbers land on the same part of the animal at whatever size the card draws it. Painted
+ * additively in three rings - a bright core inside a wide soft halo - which is the shape the
+ * sprite's own lights are built from, and the reason they read as something lit rather than as a
+ * dot someone put there.
+ *
+ * The dot grows with the animal but not all the way: on a juvenile cookiecutter, drawn barely
+ * forty pixels across, lights in true proportion would be a speck, and the lights are how that
+ * shark is recognised at all.
+ */
+function paintLights(
+  ctx: CanvasRenderingContext2D,
+  art: Pick<SharkArt, 'photophores' | 'photophoreColor'>,
+  box: { x: number; y: number; w: number; h: number },
+  frameW: number,
+  frameH: number,
+): void {
+  const spots = art.photophores;
+  if (!spots || spots.length === 0) return;
+  const colour = `#${(art.photophoreColor ?? 0xffffff).toString(16).padStart(6, '0')}`;
+  const perX = box.w / frameW;
+  const perY = box.h / frameH;
+  const core = Math.min(3.2, Math.max(1.5, perX * 1.9));
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.fillStyle = colour;
+  for (const spot of spots) {
+    const cx = box.x + box.w / 2 + spot.x * perX;
+    const cy = box.y + box.h / 2 + spot.y * perY;
+    for (const [radius, alpha] of [
+      [core * 4.6, 0.2],
+      [core * 2.3, 0.5],
+      [core, 1],
+    ] as const) {
+      ctx.globalAlpha = alpha;
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
 function paint(
   canvas: HTMLCanvasElement,
   img: HTMLImageElement,
-  art: Pick<SharkArt, 'tint' | 'stretchX' | 'stretchY' | 'scale'>,
+  art: Pick<SharkArt, 'tint' | 'stretchX' | 'stretchY' | 'scale' | 'photophores' | 'photophoreColor'>,
   shadow: boolean,
   largestScale: { w: number; h: number },
 ): void {
@@ -157,6 +204,10 @@ function paint(
     ctx.drawImage(img, 0, 0, frameW, frameH, x, y, w, h);
   }
   ctx.globalCompositeOperation = 'source-over';
+
+  // Lights last, and never on a shadow: which species carries them, and where, is exactly the
+  // sort of thing an unmet card must not give away.
+  if (!shadow) paintLights(ctx, art, { x, y, w, h }, frameW, frameH);
 }
 
 function card(entry: SharkopediaEntry, met: boolean, largestScale: { w: number; h: number }): HTMLElement {
