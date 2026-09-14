@@ -39,7 +39,7 @@ import {
   zoneNumber,
 } from './levels';
 import { CANVAS_H, CANVAS_W, SIZE_X, SIZE_Y, WORLD_SCALE } from './constants';
-import { clampEntityY, directionDelta, sweptDistance, wrapX } from './utils';
+import { clampEntityY, directionDelta, sweptDistance, weightedPick, wrapX } from './utils';
 import { Dolphin, Shark, Jellyfish, Megamouth, Tentacle } from './entities';
 import type { ConsumableId, Inventory } from './inventory';
 import { getInventory, magicShrimpHeld, useConsumable } from './inventory';
@@ -106,6 +106,30 @@ const DEV_DOLPHIN_SPAWN_INTERVAL = 10;
 const EVENT_CHECK_INTERVAL = 60;
 const EVENT_CHANCE = 0.1;
 const EVENT_DURATION = 30;
+/**
+ * How often each event comes up, against the others allowed at that depth.
+ *
+ * They used to share the roll evenly, which quietly made the kraken the most frequent thing in
+ * the Mesopelagic to actually interrupt a level: a swarm is something to swim around and a
+ * megamouth is something to swim past, but a kraken empties the water of sharks, holds the
+ * dolphin spawns and closes two lanes of the arena for forty seconds. Three of those an hour is
+ * a set piece; one every couple of minutes is the level. At half the weight of its neighbours it
+ * goes from a third of the zone's weather to a fifth.
+ */
+const EVENT_WEIGHTS: Record<GameEventType, number> = {
+  storm: 2,
+  jellyfish: 2,
+  megamouth: 2,
+  kraken: 1,
+};
+/**
+ * The least time between one kraken starting and the next being allowed to, in seconds of play.
+ *
+ * The weight above sets the rate; this sets the spacing. Two independent rolls a minute apart can
+ * both come up kraken however rare each one is, and back-to-back is what "too often" actually
+ * feels like - so however the dice land, the arena gets four minutes off between them.
+ */
+const KRAKEN_MIN_GAP = 240;
 const JELLYFISH_SWARM_DURATION = 45;
 /** The deepest level a jellyfish swarm can appear at; boss levels are excluded separately. */
 const JELLYFISH_MAX_LEVEL = 19;
@@ -135,7 +159,13 @@ const BENCH_FIRST_EVENT_AT = 12;
  * gap has to clear 52 seconds with five to spare for the warning, or the megamouth arrives
  * unannounced and the bench fails to demonstrate the one thing worth checking about it.
  */
-const BENCH_EVENT_INTERVAL = 50;
+/**
+ * Raised from 50. The bench alternates the two deep events, so the gap between krakens is twice
+ * this - and at 50 that was one every hundred seconds, which is the cadence that made them feel
+ * constant in a playtest. The megamouth is also skipped now whenever an undefeated one is still
+ * in the water, and every skipped turn used to mean the next thing fired was another kraken.
+ */
+const BENCH_EVENT_INTERVAL = 110;
 const BENCH_EVENT_ORDER: GameEventType[] = ['kraken', 'megamouth'];
 
 const KRAKEN_DURATION = 40;
@@ -570,6 +600,8 @@ export class Game {
    * asked to dodge and cannot see. Split, the arm is a shape half-glimpsed in the dark and a row
    * of lights that carries - which is the same bargain every deep-water shark down here strikes.
    */
+  /** When the last kraken began, in seconds of play. Reset with the level - see KRAKEN_MIN_GAP. */
+  private lastKrakenAt = -KRAKEN_MIN_GAP;
   private krakenContainer!: Container;
   private tentacles: Tentacle[] = [];
   private tentacleGfx = new Map<Tentacle, Graphics>();
@@ -2033,6 +2065,7 @@ export class Game {
     this.benchEventIndex = 0;
     this.pendingEvent = null;
     this.eventWarningShown = false;
+    this.lastKrakenAt = -KRAKEN_MIN_GAP;
     this.planNextEvent();
     this.clearJellyfish();
     // Both hold sprites of their own, so a level that ends mid-event would otherwise leave an arm
@@ -4279,6 +4312,7 @@ ${cleared.name} Zone Liberated
 
   private startKraken(): void {
     this.activeEvent = { type: 'kraken', endsAt: this.gameTime + KRAKEN_DURATION };
+    this.lastKrakenAt = this.gameTime;
     this.clearKraken();
     const maxReach = SIZE_X * TENTACLE_REACH_SHARE;
     const now = Date.now();
@@ -4518,16 +4552,16 @@ ${cleared.name} Zone Liberated
     if (this.stormsAllowed()) allowed.push('storm');
     if (this.jellyfishAllowed()) allowed.push('jellyfish');
     if (this.deepEventsAllowed()) {
-      allowed.push('kraken');
+      // Measured against the check this plan is for rather than against now, since the plan is
+      // made a full interval before the event it decides.
+      if (this.nextEventCheckTime >= this.lastKrakenAt + KRAKEN_MIN_GAP) allowed.push('kraken');
       // One megamouth at a time: see the guard in updateEvents.
       if (!this.megamouth) allowed.push('megamouth');
     }
 
     const roll = Math.random();
     this.pendingEvent =
-      allowed.length > 0 && roll < EVENT_CHANCE * 2
-        ? allowed[Math.floor(Math.random() * allowed.length)]
-        : null;
+      roll < EVENT_CHANCE * 2 ? weightedPick(allowed, (type) => EVENT_WEIGHTS[type], Math.random()) : null;
 
     this.nextEventWarningTime = this.nextEventCheckTime - 5;
     this.eventWarningShown = false;
