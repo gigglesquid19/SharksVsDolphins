@@ -4,8 +4,7 @@ import {
   DEPTH_ZONES,
   GREAT_WHITE_PAIR_FROM_LEVEL,
   LEVELS,
-  CAMPAIGN_EXTRA_LARGE_SHARKS,
-  CAMPAIGN_HARDER_FROM_LEVEL,
+  CAMPAIGN_LARGE_SHARK_COUNTS,
   SMALL_BEFORE_LARGE_UNTIL_LEVEL,
   dealLargeSharkKinds,
   getLevelConfigForMode,
@@ -492,23 +491,27 @@ describe('the campaign against Endless, over the same ten levels', () => {
     for (const config of LEVELS) expect(endless(config.level)).toEqual(config);
   });
 
-  it('runs identically up to the level the campaign starts pulling ahead', () => {
-    for (let level = 1; level < CAMPAIGN_HARDER_FROM_LEVEL; level++) {
-      expect(campaign(level)).toEqual(endless(level));
+  it('is a level ahead of the baseline at 5 and at 7, and level with it everywhere else', () => {
+    for (const config of LEVELS) {
+      const ahead = campaign(config.level).largeSharkCount - endless(config.level).largeSharkCount;
+      expect(ahead).toBe(config.level === 5 || config.level === 7 ? 1 : 0);
     }
   });
 
-  it('gives the campaign one more large shark from there on, boss level aside', () => {
-    for (let level = CAMPAIGN_HARDER_FROM_LEVEL; level <= LEVELS.length; level++) {
-      const expected =
-        endless(level).largeSharkCount + (getLevelConfig(level).matriarch ? 0 : CAMPAIGN_EXTRA_LARGE_SHARKS);
-      expect(campaign(level).largeSharkCount).toBe(expected);
+  it('never runs the campaign easier than Endless at the same depth', () => {
+    for (const config of LEVELS) {
+      expect(campaign(config.level).largeSharkCount).toBeGreaterThanOrEqual(endless(config.level).largeSharkCount);
     }
   });
 
   it('leaves the boss level identical in both modes', () => {
     const boss = LEVELS.find((c) => c.matriarch)!;
     expect(campaign(boss.level)).toEqual(endless(boss.level));
+  });
+
+  it('climbs without ever stepping back down', () => {
+    const counts = LEVELS.map((c) => campaign(c.level).largeSharkCount);
+    for (let i = 1; i < counts.length; i++) expect(counts[i]).toBeGreaterThanOrEqual(counts[i - 1]);
   });
 
   it('changes nothing else about the water', () => {
@@ -519,11 +522,13 @@ describe('the campaign against Endless, over the same ten levels', () => {
     }
   });
 
-  it('runs the curve 0,0,1,1,2,3,3,4,4,4 against Endless 0,0,1,1,1,2,2,3,3,4', () => {
+  it('runs the curve 0,0,1,1,2,2,3,3,3,4 against Endless 0,0,1,1,1,2,2,3,3,4', () => {
     const curve = (pick: (level: number) => { largeSharkCount: number }) =>
       LEVELS.map((c) => pick(c.level).largeSharkCount);
     expect(curve(endless)).toEqual([0, 0, 1, 1, 1, 2, 2, 3, 3, 4]);
-    expect(curve(campaign)).toEqual([0, 0, 1, 1, 2, 3, 3, 4, 4, 4]);
+    expect(curve(campaign)).toEqual([0, 0, 1, 1, 2, 2, 3, 3, 3, 4]);
+    // The authored table and what the resolver actually hands out must not drift apart.
+    expect(curve(campaign)).toEqual([...CAMPAIGN_LARGE_SHARK_COUNTS]);
   });
 
   it('stops at the end of the campaign, since past ten is Endless only', () => {

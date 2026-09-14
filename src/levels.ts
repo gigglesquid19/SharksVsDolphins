@@ -295,27 +295,27 @@ export function getLevelConfig(level: number): LevelConfig {
 }
 
 /**
- * The first campaign level that runs harder than the same-numbered level in Endless, and by how
- * much.
+ * The campaign's own large-shark curve, level 1 to 10.
  *
- * The two modes share levels 1-10 but not what the player brings to them. The campaign hands out
- * a Mega Shrimp pick after every level it clears - vitality, speed, charisma or boost - so by
- * level 5 a campaign pod is several upgrades deep, while an Endless run at level 5 is still on
- * whatever the Store sold it before the run began and gets nothing further. The same water is
- * therefore not the same fight, and identical numbers made the campaign the easier of the two
- * exactly where it was supposed to be building.
+ * The two modes share these ten levels but not what the player brings to them. The campaign hands
+ * out a Mega Shrimp pick after every level it clears - vitality, speed, charisma or boost - so a
+ * campaign pod partway down is several upgrades deep, while an Endless run at the same depth is
+ * still on whatever the Store sold it before the run began and gets nothing further. The same
+ * water is therefore not the same fight, and identical numbers left the campaign the easier of
+ * the two exactly where it should have been building.
  *
- * One extra large shark from 5 on, applied on top of the authored config rather than written into
- * it, so LEVELS stays the shared baseline that Endless and the Mesopelagic's mirror both read.
+ * Written out in full rather than as a rule with exceptions, because that is what it is: the
+ * campaign is a level ahead of the baseline at 5 and at 7, and level with it everywhere else,
+ * including the boss level - where the Matriarch summons great whites of her own as the fight
+ * runs, so the escort count is only half of what ends up in the water anyway.
  *
- * The boss level is left out, and by its own flag rather than by number. Level 10 is a fight
- * about the Matriarch: she summons great whites of her own as it runs, so the escort count is
- * already only half of what is in the water, and a mode that arrived there better equipped does
- * not need the arena stacked as well. Any boss level added later is covered without this having
- * to be remembered.
+ *   Endless   0,0,1,1,1,2,2,3,3,4
+ *   Campaign  0,0,1,1,2,2,3,3,3,4
+ *
+ * Held here rather than written into LEVELS, which stays the shared baseline that Endless reads
+ * directly and the Mesopelagic mirrors level for level.
  */
-export const CAMPAIGN_HARDER_FROM_LEVEL = 5;
-export const CAMPAIGN_EXTRA_LARGE_SHARKS = 1;
+export const CAMPAIGN_LARGE_SHARK_COUNTS: readonly number[] = [0, 0, 1, 1, 2, 2, 3, 3, 3, 4];
 
 /**
  * A level as the given mode should actually play it.
@@ -328,9 +328,9 @@ export const CAMPAIGN_EXTRA_LARGE_SHARKS = 1;
 export function getLevelConfigForMode(level: number, mode: 'campaign' | 'endless'): LevelConfig {
   const config = getLevelConfig(level);
   if (mode !== 'campaign') return config;
-  if (level < CAMPAIGN_HARDER_FROM_LEVEL || level > LEVELS.length) return config;
-  if (config.matriarch) return config;
-  return { ...config, largeSharkCount: config.largeSharkCount + CAMPAIGN_EXTRA_LARGE_SHARKS };
+  const large = CAMPAIGN_LARGE_SHARK_COUNTS[level - 1];
+  if (large === undefined || large === config.largeSharkCount) return config;
+  return { ...config, largeSharkCount: large };
 }
 
 /**
