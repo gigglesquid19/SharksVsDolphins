@@ -498,10 +498,17 @@ describe('the campaign against Endless, over the same ten levels', () => {
     }
   });
 
-  it('gives the campaign one more large shark from there to the end of the descent', () => {
+  it('gives the campaign one more large shark from there on, boss level aside', () => {
     for (let level = CAMPAIGN_HARDER_FROM_LEVEL; level <= LEVELS.length; level++) {
-      expect(campaign(level).largeSharkCount).toBe(endless(level).largeSharkCount + CAMPAIGN_EXTRA_LARGE_SHARKS);
+      const expected =
+        endless(level).largeSharkCount + (getLevelConfig(level).matriarch ? 0 : CAMPAIGN_EXTRA_LARGE_SHARKS);
+      expect(campaign(level).largeSharkCount).toBe(expected);
     }
+  });
+
+  it('leaves the boss level identical in both modes', () => {
+    const boss = LEVELS.find((c) => c.matriarch)!;
+    expect(campaign(boss.level)).toEqual(endless(boss.level));
   });
 
   it('changes nothing else about the water', () => {
@@ -512,11 +519,11 @@ describe('the campaign against Endless, over the same ten levels', () => {
     }
   });
 
-  it('runs the curve 0,0,1,1,2,3,3,4,5,5 against Endless 0,0,1,1,1,2,2,3,4,4', () => {
+  it('runs the curve 0,0,1,1,2,3,3,4,4,4 against Endless 0,0,1,1,1,2,2,3,3,4', () => {
     const curve = (pick: (level: number) => { largeSharkCount: number }) =>
       LEVELS.map((c) => pick(c.level).largeSharkCount);
-    expect(curve(endless)).toEqual([0, 0, 1, 1, 1, 2, 2, 3, 4, 4]);
-    expect(curve(campaign)).toEqual([0, 0, 1, 1, 2, 3, 3, 4, 5, 5]);
+    expect(curve(endless)).toEqual([0, 0, 1, 1, 1, 2, 2, 3, 3, 4]);
+    expect(curve(campaign)).toEqual([0, 0, 1, 1, 2, 3, 3, 4, 4, 4]);
   });
 
   it('stops at the end of the campaign, since past ten is Endless only', () => {
@@ -528,6 +535,6 @@ describe('the campaign against Endless, over the same ten levels', () => {
   it('leaves the shared baseline alone, so the Mesopelagic still mirrors it', () => {
     // The bump is applied over the authored config rather than written into it - if it were
     // written in, the zone that mirrors LEVELS would have quietly inherited it.
-    expect(LEVELS.map((c) => c.largeSharkCount)).toEqual([0, 0, 1, 1, 1, 2, 2, 3, 4, 4]);
+    expect(LEVELS.map((c) => c.largeSharkCount)).toEqual([0, 0, 1, 1, 1, 2, 2, 3, 3, 4]);
   });
 });

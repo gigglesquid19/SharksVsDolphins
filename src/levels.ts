@@ -45,7 +45,7 @@ export const LEVELS: LevelConfig[] = [
   { level: 6, sharkKinds: ALL_KINDS, normalSharkCount: 6, largeSharkCount: 2, maxDolphins: 12, sharkSpeedMultiplier: 1.15 },
   { level: 7, sharkKinds: ALL_KINDS, normalSharkCount: 6, largeSharkCount: 2, maxDolphins: 12, sharkSpeedMultiplier: 1.18 },
   { level: 8, sharkKinds: ALL_KINDS, normalSharkCount: 7, largeSharkCount: 3, maxDolphins: 13, sharkSpeedMultiplier: 1.21 },
-  { level: 9, sharkKinds: ALL_KINDS, normalSharkCount: 7, largeSharkCount: 4, maxDolphins: 14, sharkSpeedMultiplier: 1.24 },
+  { level: 9, sharkKinds: ALL_KINDS, normalSharkCount: 7, largeSharkCount: 3, maxDolphins: 14, sharkSpeedMultiplier: 1.24 },
   { level: 10, sharkKinds: ALL_KINDS, normalSharkCount: 8, largeSharkCount: 4, maxDolphins: 15, sharkSpeedMultiplier: 1.27, matriarch: true }
 ];
 
@@ -193,7 +193,7 @@ export const SANDBOX_LEVELS: Record<number, Partial<LevelConfig>> = {
  * Past the campaign every level was the same three shallow-water species in slowly growing
  * numbers, so the two deep-water sharks existed only on a test bench and the zone that should
  * have introduced them never did. These ten run the curve levels 1-10 run - the same counts
- * (3,4,4,5,5,6,6,7,7,8 small against 0,0,1,1,1,2,2,3,4,4 large), a new species folded in twice
+ * (3,4,4,5,5,6,6,7,7,8 small against 0,0,1,1,1,2,2,3,3,4 large), a new species folded in twice
  * along the way, and a Matriarch at the end - but starting from the frilled shark and the
  * cookiecutter rather than from tigers.
  *
@@ -250,7 +250,7 @@ export const MESOPELAGIC_LEVELS: Record<number, Partial<LevelConfig>> = {
   16: { sharkKinds: MESO_PLUS_HAMMER, normalSharkCount: 6, largeSharkCount: 2 },
   17: { sharkKinds: MESO_PLUS_HAMMER, normalSharkCount: 6, largeSharkCount: 2 },
   18: { sharkKinds: MESO_PLUS_HAMMER, normalSharkCount: 7, largeSharkCount: 3 },
-  19: { sharkKinds: MESO_ALL, normalSharkCount: 7, largeSharkCount: 4 },
+  19: { sharkKinds: MESO_ALL, normalSharkCount: 7, largeSharkCount: 3 },
   20: { sharkKinds: MESO_ALL, normalSharkCount: 8, largeSharkCount: 4 },
 };
 
@@ -305,8 +305,14 @@ export function getLevelConfig(level: number): LevelConfig {
  * therefore not the same fight, and identical numbers made the campaign the easier of the two
  * exactly where it was supposed to be building.
  *
- * One extra large shark from 5 on: applied on top of the authored config rather than written into
+ * One extra large shark from 5 on, applied on top of the authored config rather than written into
  * it, so LEVELS stays the shared baseline that Endless and the Mesopelagic's mirror both read.
+ *
+ * The boss level is left out, and by its own flag rather than by number. Level 10 is a fight
+ * about the Matriarch: she summons great whites of her own as it runs, so the escort count is
+ * already only half of what is in the water, and a mode that arrived there better equipped does
+ * not need the arena stacked as well. Any boss level added later is covered without this having
+ * to be remembered.
  */
 export const CAMPAIGN_HARDER_FROM_LEVEL = 5;
 export const CAMPAIGN_EXTRA_LARGE_SHARKS = 1;
@@ -323,6 +329,7 @@ export function getLevelConfigForMode(level: number, mode: 'campaign' | 'endless
   const config = getLevelConfig(level);
   if (mode !== 'campaign') return config;
   if (level < CAMPAIGN_HARDER_FROM_LEVEL || level > LEVELS.length) return config;
+  if (config.matriarch) return config;
   return { ...config, largeSharkCount: config.largeSharkCount + CAMPAIGN_EXTRA_LARGE_SHARKS };
 }
 
