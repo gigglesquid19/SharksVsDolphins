@@ -280,6 +280,14 @@ describe('the authored Mesopelagic, levels 11-20', () => {
     }
   });
 
+  it('is the stretch that game.ts turns weather off over', () => {
+    // Game.levelHasWeather keys off exactly this, so the two have to agree on where the zone is:
+    // a storm is a visibility mechanic and the zone already runs its own darkness.
+    for (let level = 11; level <= 20; level++) expect(isMesopelagicLevel(level)).toBe(true);
+    expect(isMesopelagicLevel(10)).toBe(false);
+    expect(isMesopelagicLevel(21)).toBe(false);
+  });
+
   it('ends the zone on a Matriarch, the way level 10 ends the campaign', () => {
     expect(getLevelConfig(20).matriarch).toBe(true);
     for (let level = 11; level <= 19; level++) expect(getLevelConfig(level).matriarch).toBe(false);

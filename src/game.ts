@@ -30,6 +30,7 @@ import {
   LevelConfig,
   getLevelBackground,
   getLevelConfig,
+  isMesopelagicLevel,
   isSandboxLevel,
   zoneClearedAt,
   zoneEnteredAt,
@@ -89,7 +90,7 @@ function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 }
 
-const DOLPHIN_SPAWN_INTERVAL = 15;
+const DOLPHIN_SPAWN_INTERVAL = 12;
 /**
  * What that interval becomes with developer mode on: a third off the ordinary 15, so a pod comes
  * together fast enough to actually get at the deep levels' sharks.
@@ -223,8 +224,12 @@ const SHARK_KIND_SCALE: Record<SharkKind, number> = {
  * is the behaviour this is after: not a chase, but one committed run at one dolphin. The warning
  * is the whole of the counterplay - the run is aimed once, when the warning ends, and never
  * corrected, so moving the pod off that line is a dodge rather than a postponement.
+ *
+ * Forty-five seconds between runs, not the thirty it started at. One arriving every half minute
+ * meant the warning was always either on screen or about to be, and something that constant is
+ * read as the weather rather than as a threat - the gap is what makes the banner mean anything.
  */
-const LOCK_INTERVAL_MS = 30000;
+const LOCK_INTERVAL_MS = 45000;
 /**
  * How long a level gets before the first one. Without it the cooldown starts at zero and the
  * strike lands on the opening tick, so a level could open with a dolphin already being run down
@@ -3815,7 +3820,7 @@ ${cleared.name} Zone Liberated
 
   private planNextEvent(): void {
     const roll = Math.random();
-    if (roll < EVENT_CHANCE * 2) {
+    if (this.levelHasWeather() && roll < EVENT_CHANCE * 2) {
       if (this.currentLevel <= 5) {
         this.pendingEvent = Math.random() < 0.5 ? 'storm' : 'jellyfish';
       } else {
@@ -3826,6 +3831,22 @@ ${cleared.name} Zone Liberated
     }
     this.nextStormWarningTime = this.nextEventCheckTime - 5;
     this.stormWarningShown = false;
+  }
+
+  /**
+   * Whether this depth gets weather at all.
+   *
+   * The Mesopelagic does not. A storm is a visibility mechanic - it cuts sight to
+   * STORM_VISIBILITY_RADIUS - and the zone already runs its own darkness, climbing from 0.35 to
+   * 0.62, with the photophores and Echolocation built around reading it. Laying a storm over that
+   * changes almost nothing except to take the tool the zone hands you and make it briefly useless,
+   * and a thunderstorm a thousand metres down was never a thing anyone was going to believe.
+   *
+   * Jellyfish are already absent from here: planNextEvent only rolls them at level 5 or shallower,
+   * so from level 6 down every event was a storm. Turning storms off leaves the zone with none.
+   */
+  private levelHasWeather(): boolean {
+    return !isMesopelagicLevel(this.currentLevel);
   }
 
   private updateEvents(): void {
