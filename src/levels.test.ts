@@ -280,6 +280,13 @@ describe('the authored Mesopelagic, levels 11-20', () => {
     }
   });
 
+  it('marks its last level as a boss, which is what keeps jellyfish off it', () => {
+    // Game.jellyfishAllowed excludes any level whose config carries a Matriarch, rather than
+    // naming 10 and 20, so this flag is what the exclusion actually rests on.
+    expect(getLevelConfig(20).matriarch).toBe(true);
+    expect(LEVELS[9].matriarch).toBe(true);
+  });
+
   it('is the stretch that game.ts turns storms off over', () => {
     // Game.stormsAllowed keys off exactly this, so the two have to agree on where the zone is:
     // a storm is a visibility mechanic and the zone already runs its own darkness. Jellyfish are

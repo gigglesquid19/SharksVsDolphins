@@ -105,7 +105,7 @@ const EVENT_CHECK_INTERVAL = 60;
 const EVENT_CHANCE = 0.1;
 const EVENT_DURATION = 30;
 const JELLYFISH_SWARM_DURATION = 45;
-/** The deepest level a jellyfish swarm can appear at - see Game.jellyfishAllowed. */
+/** The deepest level a jellyfish swarm can appear at; boss levels are excluded separately. */
 const JELLYFISH_MAX_LEVEL = 19;
 const JELLYFISH_COUNT = 50;
 const STORM_VISIBILITY_RADIUS = 18;
@@ -3856,16 +3856,21 @@ ${cleared.name} Zone Liberated
   }
 
   /**
-   * Jellyfish: level 19 and shallower, which is nearly everywhere a player will spend time.
+   * Jellyfish: level 19 and shallower, and never on a level with a Matriarch in it.
    *
    * They used to stop after level 5, so from level 6 down every event was a storm. A swarm is a
    * hazard to swim around rather than a fog to see through, which is the one kind of weather that
    * still means something in dark water - so it is the event the Mesopelagic keeps while storms
-   * are off there. It stops at 19 rather than 20 so the zone's Matriarch is fought in clear
-   * water: one boss and a swarm at once is two things asking for the same attention.
+   * are off there.
+   *
+   * The boss levels are excluded by reading the level's own matriarch flag rather than by naming
+   * 10 and 20, so any boss level added later is covered without this having to be remembered. A
+   * Matriarch and a swarm at once are two things asking for the same attention, and the fight is
+   * the thing the level is for.
    */
   private jellyfishAllowed(): boolean {
-    return this.currentLevel <= JELLYFISH_MAX_LEVEL;
+    if (this.currentLevel > JELLYFISH_MAX_LEVEL) return false;
+    return !getLevelConfig(this.currentLevel).matriarch;
   }
 
   private updateEvents(): void {
