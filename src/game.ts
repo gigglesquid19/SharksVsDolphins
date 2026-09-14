@@ -117,7 +117,7 @@ const SHARK_FEED_COOLDOWN_MS = 4000;
  * What that interval becomes with developer mode on: a couple of seconds off the ordinary 12, so
  * a pod comes together fast enough to actually get at the deep levels' sharks.
  *
- * A frilled shark asks for eight dolphins and a large one twelve, against a cap of fifteen, so
+ * A frilled shark asks for seven dolphins and a large one twelve, against a cap of fifteen, so
  * at the stock rate most of a testing run is spent waiting for a pod rather than using it. It
  * also pins the number: level 10 otherwise halves the interval on its own, which would leave the
  * one level most worth testing spawning on a different clock from every other.
@@ -691,11 +691,13 @@ const SHARK_KIND_LOOK: Record<SharkKind, SharkLook> = {
      *
      * At 1.3 it outran every other species - a hammerhead is 1.15 and everything else 1.0 - and
      * being both the hardest to see and the fastest to arrive left very little to do about one.
-     * Level with the hammerhead it still reads as quick, which is the whole of its character,
-     * without being the reason a level is lost. The lock-on run scales off this too, so the
-     * strike came down with it.
+     * Down again from 1.15, which had it level with the hammerhead: on a level fielding several
+     * at once they arrived together and there was no gap in which to deal with any one of them.
+     * Barely above the field now, and still the quickest thing there, which is the whole of its
+     * character - it simply no longer beats you to every piece of water. The lock-on run scales
+     * off this too, so the strike comes down with it.
      */
-    speed: 1.15,
+    speed: 1.02,
     // One, and green, like the real animal's. A single point moving fast is all the warning a
     // player gets of one of these.
     photophores: [{ x: 1, y: 5 }],
@@ -719,7 +721,7 @@ const SHARK_INTRO_INFO: Partial<Record<SharkKind, { name: string; description: s
   frilled: {
     name: 'Frilled Shark',
     description:
-      'A long eel of a shark from the twilight water. It is slower than anything else down here, it comes round at you from the side rather than straight on, and it never stops. Eight dolphins would see one off; you are meant to outswim it, not outfight it.',
+      'A long eel of a shark from the twilight water. It is slower than anything else down here, it comes round at you from the side rather than straight on, and it never stops. Seven dolphins would see one off; you are meant to outswim it, not outfight it.',
   },
   cookiecutter: {
     name: 'Cookiecutter Shark',
@@ -3726,6 +3728,13 @@ ${cleared.name} Zone Liberated
    */
   private updateLockOnStrikes(now: number): void {
     if (!this.player) return;
+    // Not while there are still small sharks in the water. A lock-on asks the player to move the
+    // whole pod off one line at one moment, and that is not something they can give while they
+    // are also being worried at from every other direction - level 14 fields six smalls beside
+    // its large, and the run that is meant to be a set piece arrives as one more thing at once.
+    // A strike already in flight still lands; only the next one waits. This is the rule the large
+    // tiger's cloak already runs on, for the same reason - see canCloak.
+    const smallSharksLeft = this.sharks.some((s) => !s.large);
     for (const shark of this.sharks) {
       if (shark.kind !== 'cookiecutter' || !shark.large) continue;
 
@@ -3771,6 +3780,7 @@ ${cleared.name} Zone Liberated
         continue;
       }
       if (now < shark.lockCooldownEnd) continue;
+      if (smallSharksLeft) continue;
       if (this.levelGloom > 0 && shark.cloaked) continue;
       const candidates = this.podMembers().filter(
         (d) => this.distanceBetweenEntities(shark, d) <= LOCK_RANGE && now >= d.invulnerableUntil,
