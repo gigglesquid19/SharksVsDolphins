@@ -70,7 +70,7 @@ export const UPGRADES: Record<UpgradeId, UpgradeDef> = {
   charisma: { name: 'Charisma', desc: '+1 starting pod dolphin', prices: [100, 220, 400, 640, 950, 1350] },
   boost: { name: 'Boost Cooldown', desc: '-0.75s between boosts', prices: [90, 170, 300, 480, 720, 1030] },
   boostDuration: { name: 'Boost Duration', desc: '+0.1s per boost', prices: [100, 200, 340, 520, 760, 1080] },
-  echoDuration: { name: 'Echo Duration', desc: '+1.5s of vision', prices: [120, 220, 360, 540, 780, 1090] },
+  echoDuration: { name: 'Echo Duration', desc: 'Longer pings, and longer again each level', prices: [120, 220, 360, 540, 780, 1090] },
   echoRadius: { name: 'Echo Range', desc: '+6 units of vision', prices: [120, 220, 360, 540, 780, 1090] },
   /**
    * The only upgrade that changes the shape of the pod rather than a number on the dolphin.
@@ -326,16 +326,37 @@ export function equippedSkinId(): string {
 /** Base Echolocation numbers before upgrades. Cooldown is deliberately not upgradeable: it is
  *  what stops the ability becoming permanent vision once duration is maxed. */
 export const ECHO_BASE_DURATION_MS = 4000;
-export const ECHO_DURATION_PER_LEVEL_MS = 1500;
+/**
+ * What a level of Echo Duration is worth, and what each level after it adds on top.
+ *
+ * A flat 1500 a level made the upgrade feel like nothing by the middle of the tree: three levels
+ * bought 4.5 seconds against an eighteen-second wait, so the water was dark for three quarters of
+ * the time whatever had been spent. The gain now grows as the tree does, which is what a player
+ * putting a third and fourth level into one line is paying for.
+ *
+ *   level   1     2     3     4      5      6
+ *   total  6.0s  8.4s  11.0s 13.8s  16.8s  20.0s
+ *
+ * Six is deliberately past the cooldown: the last level of the deepest sight upgrade in the game
+ * should be the point at which the dark stops being a thing you wait out.
+ */
+export const ECHO_DURATION_PER_LEVEL_MS = 2000;
+export const ECHO_DURATION_ACCEL_MS = 200;
 export const ECHO_BASE_RADIUS = 24;
 export const ECHO_RADIUS_PER_LEVEL = 6;
 export const ECHO_COOLDOWN_MS = 18000;
 
 /** Echolocation duration and radius at the levels currently bought. */
+/** The duration curve above, as a function: linear per level with a little more on each one. */
+export function echoDurationFor(level: number): number {
+  const n = Math.max(0, Math.floor(level));
+  return ECHO_BASE_DURATION_MS + n * ECHO_DURATION_PER_LEVEL_MS + ((n * (n - 1)) / 2) * ECHO_DURATION_ACCEL_MS;
+}
+
 export function echolocationStats(): { durationMs: number; radius: number; cooldownMs: number } {
   const s = load().upgrades;
   return {
-    durationMs: ECHO_BASE_DURATION_MS + s.echoDuration * ECHO_DURATION_PER_LEVEL_MS,
+    durationMs: echoDurationFor(s.echoDuration),
     radius: ECHO_BASE_RADIUS + s.echoRadius * ECHO_RADIUS_PER_LEVEL,
     cooldownMs: ECHO_COOLDOWN_MS,
   };

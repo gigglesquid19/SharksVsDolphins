@@ -1640,6 +1640,26 @@ export class Game {
     return GLOOM_SIGHT_LIT - (GLOOM_SIGHT_LIT - GLOOM_SIGHT_DARK) * this.levelGloom;
   }
 
+  /**
+   * How far a particular shark can be made out, which is not the same for all of them.
+   *
+   * The sight radius used to be flat, so at depth a grown hammerhead and a juvenile cookiecutter
+   * appeared at exactly the same distance - and since the shallow-water species carry no
+   * photophores, the big ones arrived out of nothing with no warning at all. A large shark is a
+   * far bigger object; it should resolve out of the dark sooner, the way it would.
+   *
+   * Scaled by the square root of how large it is drawn, so the advantage grows with size but
+   * never runs away with it, and bounded at both ends: nothing is visible less than four fifths
+   * of the way out, and nothing is visible more than twice. On level 17, where the pod sees about
+   * sixteen units, a grown hammerhead now resolves at about thirty - a warning rather than a
+   * bite - while a juvenile cookiecutter still has to get to twelve, which is its whole character.
+   */
+  private sharkSightRadius(shark: Shark): number {
+    const drawScale = SHARK_KIND_SCALE[shark.kind] * shark.sizeMultiplier;
+    const size = Math.max(0.8, Math.min(2, Math.sqrt(drawScale)));
+    return this.gloomSightRadius() * size;
+  }
+
   getSprintCooldownFraction(): number {
     const now = Date.now();
     if (now >= this.sprintCooldownEnd) return 1;
@@ -6018,7 +6038,7 @@ ${cleared.name} Zone Liberated
         bodySeen = revealed || shark.distanceBetween(this.player) <= STORM_VISIBILITY_RADIUS;
       } else if (this.levelGloom > 0 && this.player) {
         // At depth a shark is only there if it is inside the pod's light or inside a ping.
-        bodySeen = revealed || this.distanceToPlayer(shark) <= this.gloomSightRadius();
+        bodySeen = revealed || this.distanceToPlayer(shark) <= this.sharkSightRadius(shark);
       } else {
         bodySeen = true;
       }
