@@ -305,17 +305,18 @@ export function getLevelConfig(level: number): LevelConfig {
  * the two exactly where it should have been building.
  *
  * Written out in full rather than as a rule with exceptions, because that is what it is: the
- * campaign is a level ahead of the baseline at 5 and at 7, and level with it everywhere else,
- * including the boss level - where the Matriarch summons great whites of her own as the fight
- * runs, so the escort count is only half of what ends up in the water anyway.
+ * campaign is a large shark ahead of the baseline at 5, 7 and 9 - the odd-numbered steps, so each
+ * one arrives a level early and the baseline catches up the level after - and level with it
+ * everywhere else, including the boss level, where the Matriarch summons great whites of her own
+ * as the fight runs and the escort count is only half of what ends up in the water anyway.
  *
  *   Endless   0,0,1,1,1,2,2,3,3,4
- *   Campaign  0,0,1,1,2,2,3,3,3,4
+ *   Campaign  0,0,1,1,2,2,3,3,4,4
  *
  * Held here rather than written into LEVELS, which stays the shared baseline that Endless reads
  * directly and the Mesopelagic mirrors level for level.
  */
-export const CAMPAIGN_LARGE_SHARK_COUNTS: readonly number[] = [0, 0, 1, 1, 2, 2, 3, 3, 3, 4];
+export const CAMPAIGN_LARGE_SHARK_COUNTS: readonly number[] = [0, 0, 1, 1, 2, 2, 3, 3, 4, 4];
 
 /**
  * A level as the given mode should actually play it.

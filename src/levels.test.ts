@@ -491,10 +491,11 @@ describe('the campaign against Endless, over the same ten levels', () => {
     for (const config of LEVELS) expect(endless(config.level)).toEqual(config);
   });
 
-  it('is a level ahead of the baseline at 5 and at 7, and level with it everywhere else', () => {
+  it('is a large shark ahead of the baseline at 5, 7 and 9, and level with it everywhere else', () => {
+    const ahead = [5, 7, 9];
     for (const config of LEVELS) {
-      const ahead = campaign(config.level).largeSharkCount - endless(config.level).largeSharkCount;
-      expect(ahead).toBe(config.level === 5 || config.level === 7 ? 1 : 0);
+      const gap = campaign(config.level).largeSharkCount - endless(config.level).largeSharkCount;
+      expect(gap).toBe(ahead.includes(config.level) ? 1 : 0);
     }
   });
 
@@ -522,11 +523,11 @@ describe('the campaign against Endless, over the same ten levels', () => {
     }
   });
 
-  it('runs the curve 0,0,1,1,2,2,3,3,3,4 against Endless 0,0,1,1,1,2,2,3,3,4', () => {
+  it('runs the curve 0,0,1,1,2,2,3,3,4,4 against Endless 0,0,1,1,1,2,2,3,3,4', () => {
     const curve = (pick: (level: number) => { largeSharkCount: number }) =>
       LEVELS.map((c) => pick(c.level).largeSharkCount);
     expect(curve(endless)).toEqual([0, 0, 1, 1, 1, 2, 2, 3, 3, 4]);
-    expect(curve(campaign)).toEqual([0, 0, 1, 1, 2, 2, 3, 3, 3, 4]);
+    expect(curve(campaign)).toEqual([0, 0, 1, 1, 2, 2, 3, 3, 4, 4]);
     // The authored table and what the resolver actually hands out must not drift apart.
     expect(curve(campaign)).toEqual([...CAMPAIGN_LARGE_SHARK_COUNTS]);
   });
