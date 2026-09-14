@@ -4,8 +4,11 @@ import {
   DEPTH_ZONES,
   GREAT_WHITE_PAIR_FROM_LEVEL,
   LEVELS,
+  CAMPAIGN_EXTRA_LARGE_SHARKS,
+  CAMPAIGN_HARDER_FROM_LEVEL,
   SMALL_BEFORE_LARGE_UNTIL_LEVEL,
   dealLargeSharkKinds,
+  getLevelConfigForMode,
   largeKindPool,
   MAX_ENDLESS_SHARK_SPEED,
   SHARK_SPEED_CAP_LEVEL,
@@ -478,5 +481,53 @@ describe('a campaign played straight through', () => {
       const level4 = playThrough().find((l) => l.level === 4)!;
       expect(level4.largeKinds).toEqual(['tiger']);
     }
+  });
+});
+
+describe('the campaign against Endless, over the same ten levels', () => {
+  const campaign = (level: number) => getLevelConfigForMode(level, 'campaign');
+  const endless = (level: number) => getLevelConfigForMode(level, 'endless');
+
+  it('leaves Endless exactly as the levels are authored', () => {
+    for (const config of LEVELS) expect(endless(config.level)).toEqual(config);
+  });
+
+  it('runs identically up to the level the campaign starts pulling ahead', () => {
+    for (let level = 1; level < CAMPAIGN_HARDER_FROM_LEVEL; level++) {
+      expect(campaign(level)).toEqual(endless(level));
+    }
+  });
+
+  it('gives the campaign one more large shark from there to the end of the descent', () => {
+    for (let level = CAMPAIGN_HARDER_FROM_LEVEL; level <= LEVELS.length; level++) {
+      expect(campaign(level).largeSharkCount).toBe(endless(level).largeSharkCount + CAMPAIGN_EXTRA_LARGE_SHARKS);
+    }
+  });
+
+  it('changes nothing else about the water', () => {
+    for (let level = 1; level <= LEVELS.length; level++) {
+      const { largeSharkCount: _c, ...campaignRest } = campaign(level);
+      const { largeSharkCount: _e, ...endlessRest } = endless(level);
+      expect(campaignRest).toEqual(endlessRest);
+    }
+  });
+
+  it('runs the curve 0,0,1,1,2,3,3,4,5,5 against Endless 0,0,1,1,1,2,2,3,4,4', () => {
+    const curve = (pick: (level: number) => { largeSharkCount: number }) =>
+      LEVELS.map((c) => pick(c.level).largeSharkCount);
+    expect(curve(endless)).toEqual([0, 0, 1, 1, 1, 2, 2, 3, 4, 4]);
+    expect(curve(campaign)).toEqual([0, 0, 1, 1, 2, 3, 3, 4, 5, 5]);
+  });
+
+  it('stops at the end of the campaign, since past ten is Endless only', () => {
+    for (const level of [LEVELS.length + 1, 15, 30]) {
+      expect(campaign(level)).toEqual(getLevelConfig(level));
+    }
+  });
+
+  it('leaves the shared baseline alone, so the Mesopelagic still mirrors it', () => {
+    // The bump is applied over the authored config rather than written into it - if it were
+    // written in, the zone that mirrors LEVELS would have quietly inherited it.
+    expect(LEVELS.map((c) => c.largeSharkCount)).toEqual([0, 0, 1, 1, 1, 2, 2, 3, 4, 4]);
   });
 });

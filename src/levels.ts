@@ -295,6 +295,38 @@ export function getLevelConfig(level: number): LevelConfig {
 }
 
 /**
+ * The first campaign level that runs harder than the same-numbered level in Endless, and by how
+ * much.
+ *
+ * The two modes share levels 1-10 but not what the player brings to them. The campaign hands out
+ * a Mega Shrimp pick after every level it clears - vitality, speed, charisma or boost - so by
+ * level 5 a campaign pod is several upgrades deep, while an Endless run at level 5 is still on
+ * whatever the Store sold it before the run began and gets nothing further. The same water is
+ * therefore not the same fight, and identical numbers made the campaign the easier of the two
+ * exactly where it was supposed to be building.
+ *
+ * One extra large shark from 5 on: applied on top of the authored config rather than written into
+ * it, so LEVELS stays the shared baseline that Endless and the Mesopelagic's mirror both read.
+ */
+export const CAMPAIGN_HARDER_FROM_LEVEL = 5;
+export const CAMPAIGN_EXTRA_LARGE_SHARKS = 1;
+
+/**
+ * A level as the given mode should actually play it.
+ *
+ * Everything that builds a level to be played goes through here; everything that only wants to
+ * know what a depth *is* - which music it plays, whether it holds a Matriarch, what the Depthless
+ * level-select card should say - can keep reading getLevelConfig, since the campaign's extra
+ * shark changes none of that.
+ */
+export function getLevelConfigForMode(level: number, mode: 'campaign' | 'endless'): LevelConfig {
+  const config = getLevelConfig(level);
+  if (mode !== 'campaign') return config;
+  if (level < CAMPAIGN_HARDER_FROM_LEVEL || level > LEVELS.length) return config;
+  return { ...config, largeSharkCount: config.largeSharkCount + CAMPAIGN_EXTRA_LARGE_SHARKS };
+}
+
+/**
  * The first level allowed to field more than one large great white at a time.
  *
  * A large great white asks for a pod of ten (twelve past level 5 - see Game.sharkPodRequirement),

@@ -34,6 +34,7 @@ import {
   getLevelBackground,
   largeKindPool,
   getLevelConfig,
+  getLevelConfigForMode,
   isMesopelagicLevel,
   isSandboxLevel,
   zoneClearedAt,
@@ -1111,7 +1112,9 @@ export class Game {
   private getSelectedLevelConfig(): LevelConfig {
     if (this.mode === 'endless') return getLevelConfig(this.depthlessStartLevel);
     const level = parseInt(this.levelSelect?.value ?? '1', 10);
-    return LEVELS[level - 1] ?? LEVELS[0];
+    // Bounded to the campaign's own ten before the mode's difficulty is applied on top.
+    const campaignLevel = level >= 1 && level <= LEVELS.length ? level : 1;
+    return getLevelConfigForMode(campaignLevel, 'campaign');
   }
 
   /** Sets which mode a fresh start/reset begins in. Campaign: pick a level 1-10, saves/resumes, ends at level 10. Endless: always starts at level 1, no free resume, continues past level 10 until death. */
@@ -1509,7 +1512,7 @@ export class Game {
     // level could be farmed for a leaderboard score indefinitely - which is the opposite of what
     // the board is for, and undid the rule that keeps bought starting depths off it.
     const freshRun = this.sessionStartTime === 0 || this.mode === 'endless';
-    const config = freshRun ? this.getSelectedLevelConfig() : getLevelConfig(this.currentLevel);
+    const config = freshRun ? this.getSelectedLevelConfig() : getLevelConfigForMode(this.currentLevel, this.mode);
     if (!this.initModel(config, !freshRun)) return;
     if (freshRun) this.sessionStartTime = Date.now();
     else this.retries++;
@@ -1542,7 +1545,7 @@ export class Game {
     this.seenLargeSharkKinds = new Set(checkpoint.seenLargeSharkKinds);
     this.seenLargeSharkVariety = checkpoint.seenLargeSharkVariety;
 
-    if (!this.initModel(getLevelConfig(checkpoint.level), true)) return false;
+    if (!this.initModel(getLevelConfigForMode(checkpoint.level, 'campaign'), true)) return false;
     this.sessionStartTime = Date.now();
     this.runElapsed = checkpoint.elapsedSeconds;
     this.running = true;
@@ -3315,7 +3318,7 @@ ${cleared.name} Zone Liberated
       if (this.currentLevel >= 25) this.tryUnlock('abyssal');
       if (this.currentLevel >= 40) this.tryUnlock('intoTheTrench');
     }
-    const config = getLevelConfig(this.currentLevel);
+    const config = getLevelConfigForMode(this.currentLevel, this.mode);
 
     this.setStatus(`Level ${this.currentLevel}: hunt the sharks!`);
     this.announceLevel(2500);
