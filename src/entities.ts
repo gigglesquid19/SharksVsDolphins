@@ -533,10 +533,10 @@ export class Megamouth {
   defensive = false;
   /** Set once it has taken the hits the level asks for. Still in the water, no longer in the way. */
   beaten = false;
+  /** Set when it has reached the bottom and stopped. Beaten but still sinking is not yet settled. */
+  settled = false;
   /** Boosted rams landed on it so far, against MEGAMOUTH_HITS_REQUIRED. */
   hitsTaken = 0;
-  /** Timestamp (ms) of the next heading change while defensive. */
-  nextTurnAt = 0;
 
   constructor(x: number, y: number, dirX: number, dirY: number, speed: number) {
     this._x = x;

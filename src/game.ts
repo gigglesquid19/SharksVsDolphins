@@ -255,6 +255,17 @@ const MEGAMOUTH_HOMING_STRENGTH = 0.55;
 /** How close to the side walls it may get before turning off them, in world units. */
 const MEGAMOUTH_WALL_MARGIN = 10;
 /**
+ * Where a beaten one comes to rest, how fast it goes down, and how often it bleeds.
+ *
+ * High enough off the floor that the body sits on the bottom rather than half through it - it is
+ * drawn three times a large great white, so its middle is a long way from its belly. It sinks at
+ * something under its cruising speed: this is a thing giving up, not a thing diving.
+ */
+const MEGAMOUTH_SETTLE_Y = SIZE_Y - 13;
+const MEGAMOUTH_SINK_SPEED = 0.55;
+const MEGAMOUTH_TRAIL_MS = 260;
+const MEGAMOUTH_BLEED_MS = 500;
+/**
  * Lights along its underside, in the strip's own frame coordinates - the same space the sharks'
  * photophores are given in. Spaced unevenly on purpose: an even row reads as something made,
  * and the one thing this has to read as is alive.
@@ -4170,6 +4181,7 @@ ${cleared.name} Zone Liberated
     }
     this.megamouth = null;
     this.megamouthHitCooldownUntil = 0;
+    this.megamouthBleedAt = 0;
     this.megamouthTurnedAnnounced = false;
   }
 
@@ -4255,6 +4267,12 @@ ${cleared.name} Zone Liberated
     const m = this.megamouth;
     if (!m) return;
 
+    if (m.beaten) {
+      this.sinkMegamouth(m, now);
+      this.drawMegamouth(m, now);
+      return;
+    }
+
     if (!m.defensive && this.sharks.length === 0 && !this.levelCompleted) this.turnMegamouthDefensive();
 
     // One correction a tick, toward the pod, and only while the pod is close enough to be worth
@@ -4308,31 +4326,84 @@ ${cleared.name} Zone Liberated
       else if (m._x < -MEGAMOUTH_WRAP_MARGIN) m._x = SIZE_X + MEGAMOUTH_WRAP_MARGIN;
     }
 
+    this.drawMegamouth(m, now);
+  }
+
+  /**
+   * Beaten, and going down.
+   *
+   * It sinks to the floor rather than swimming off, trailing blood the whole way, and once it is
+   * on the bottom it stops entirely and simply bleeds. Nothing about it is a threat any more -
+   * the level is already won by this point - so what is left is a decision rather than a fight:
+   * one Boost finishes it, or it can be left where it lies.
+   */
+  private sinkMegamouth(m: Megamouth, now: number): void {
     const scale = WORLD_SCALE;
+    const px = m._x * scale + scale / 2;
+    const py = m._y * scale + scale / 2;
+    m.lastX = m._x;
+    m.lastY = m._y;
+
+    if (!m.settled) {
+      m._y = Math.min(MEGAMOUTH_SETTLE_Y, m._y + MEGAMOUTH_SINK_SPEED);
+      // Still carrying the way it was going, but barely - it is falling more than it is swimming.
+      m._x = Math.max(
+        MEGAMOUTH_WALL_MARGIN,
+        Math.min(SIZE_X - MEGAMOUTH_WALL_MARGIN, m._x + m.dirX * MEGAMOUTH_SINK_SPEED * 0.3),
+      );
+      if (now >= this.megamouthBleedAt) {
+        this.megamouthBleedAt = now + MEGAMOUTH_TRAIL_MS;
+        this.particles.emit('blood', px, py, 3, { speed: 0.3, life: 2.6, grow: 2.2 });
+      }
+      if (m._y >= MEGAMOUTH_SETTLE_Y) {
+        m.settled = true;
+        m.dirY = 0;
+        // Everything it has left, at once, so the moment it touches down is the moment the water
+        // goes red rather than a cloud that creeps up on the player.
+        this.particles.emit('blood', px, py, 26, { speed: 1.1, life: 4, grow: 3 });
+        this.setStatus('It settles on the bottom. Finish it, or leave it');
+        this.showBanner('It Settles', 'storm', 2200);
+      }
+      return;
+    }
+
+    if (now >= this.megamouthBleedAt) {
+      this.megamouthBleedAt = now + MEGAMOUTH_BLEED_MS;
+      this.particles.emit('blood', px, py, 4, { speed: 0.4, life: 3, grow: 2.6 });
+    }
+  }
+
+  /** Puts the sprite and its lights wherever the animal now is. */
+  private drawMegamouth(m: Megamouth, now: number): void {
+    const scale = WORLD_SCALE;
+    const base = SHARK_BASE_SCALE * SHARK_KIND_SCALE.greatWhite * MEGAMOUTH_SIZE;
+    const facing = m.dirX >= 0 ? 1 : -1;
     if (this.megamouthSprite) {
       this.megamouthSprite.x = m._x * scale + scale / 2;
       this.megamouthSprite.y = m._y * scale + scale / 2;
+      // Nose down once it is beaten, and further once it is on the bottom: a thing lying on the
+      // floor of the ocean does not lie level.
+      this.megamouthSprite.rotation = m.beaten ? facing * (m.settled ? 0.16 : 0.09) : 0;
       const fish = this.megamouthSprite.getChildByName('fish') as Container | null;
-      if (fish) {
-        const base = SHARK_BASE_SCALE * SHARK_KIND_SCALE.greatWhite * MEGAMOUTH_SIZE;
-        fish.scale.set(base * (m.dirX >= 0 ? 1 : -1), base);
-      }
+      if (fish) fish.scale.set(base * facing, base);
     }
     if (this.megamouthLights) {
       this.megamouthLights.position.set(m._x * scale + scale / 2, m._y * scale + scale / 2);
+      this.megamouthLights.rotation = this.megamouthSprite?.rotation ?? 0;
       // createPhotophores builds the dots but leaves placing them to the caller, exactly as the
       // shark draw loop does - so each one is put at its spot in the strip's own frame, scaled by
       // how big this thing is drawn and mirrored with whichever way it is swimming.
-      const drawScale = SHARK_BASE_SCALE * SHARK_KIND_SCALE.greatWhite * MEGAMOUTH_SIZE;
-      const facing = m.dirX >= 0 ? 1 : -1;
       for (let i = 0; i < this.megamouthLights.children.length; i++) {
         const dot = this.megamouthLights.children[i];
         const spot = MEGAMOUTH_PHOTOPHORES[i];
         if (!spot) continue;
-        dot.position.set(spot.x * drawScale * facing, spot.y * drawScale);
+        dot.position.set(spot.x * base * facing, spot.y * base);
         dot.scale.set(1.9);
       }
-      this.megamouthLights.alpha = photophorePulseAlpha(now, 991);
+      // The lights go out as it does - down to a fraction of themselves once it is on the floor,
+      // which is the only part of it still saying anything.
+      const pulse = photophorePulseAlpha(now, 991);
+      this.megamouthLights.alpha = m.beaten ? pulse * (m.settled ? 0.3 : 0.6) : pulse;
     }
   }
 
@@ -4347,7 +4418,6 @@ ${cleared.name} Zone Liberated
     const m = this.megamouth;
     if (!m) return;
     m.defensive = true;
-    m.nextTurnAt = 0;
     if (this.megamouthTurnedAnnounced) return;
     this.megamouthTurnedAnnounced = true;
     sfx.playMegamouth();
@@ -4423,8 +4493,10 @@ ${cleared.name} Zone Liberated
     const m = this.megamouth;
     if (!m) return;
     m.beaten = true;
+    m.settled = false;
+    this.megamouthBleedAt = 0;
     this.flashMegamouthHit();
-    this.setStatus('It breaks off - Boost into it once more to finish it');
+    this.setStatus('It breaks off and goes down');
     this.showBanner('It Breaks Off!', 'victory', 2200);
   }
 
@@ -4909,6 +4981,9 @@ ${cleared.name} Zone Liberated
   /** Which bench event comes next. Advanced by planNextEvent, reset with the level. */
   private benchEventIndex = 0;
 
+  /** When the beaten megamouth next lets go of a cloud of blood. */
+  private megamouthBleedAt = 0;
+
   /** Level 5's one cry from below: whether it has been heard yet, and how long the water holds. */
   private deepCryDone = false;
   private deepCryUntil = 0;
@@ -5382,9 +5457,11 @@ ${cleared.name} Zone Liberated
     // whole arena, while an arm closes a lane and a megamouth occupies a line, and there is still
     // room to be hunted in between.
     const krakenOut = this.activeEvent?.type === 'kraken';
-    if (this.player && (krakenOut || this.megamouth)) {
+    if (this.player && (krakenOut || (this.megamouth && !this.megamouth.beaten))) {
       const grabbed = (d: Dolphin): boolean => krakenOut && this.tentacles.some((arm) => this.tentacleHits(arm, d));
-      const swept = (d: Dolphin): boolean => !!this.megamouth && this.megamouth.distanceBetween(d) < MEGAMOUTH_HIT_RADIUS;
+      // A beaten one takes nobody. It is bleeding out on the floor, not crossing the arena.
+      const swept = (d: Dolphin): boolean =>
+        !!this.megamouth && !this.megamouth.beaten && this.megamouth.distanceBetween(d) < MEGAMOUTH_HIT_RADIUS;
       const now = Date.now();
       if (now >= this.playerHitCooldownUntil && now >= this.ghostUntil) {
         const victim = this.dolphins.find(

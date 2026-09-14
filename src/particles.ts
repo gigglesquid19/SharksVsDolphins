@@ -1,6 +1,6 @@
 import { Container, Texture, Sprite } from 'pixi.js';
 
-export type ParticleType = 'bubble' | 'wake' | 'hit' | 'sparkle';
+export type ParticleType = 'bubble' | 'wake' | 'hit' | 'sparkle' | 'blood';
 
 interface Particle {
   sprite: Sprite;
@@ -40,10 +40,25 @@ export class ParticleSystem {
       wake: makeSoftCircleTexture(24, 'rgba(34, 211, 238, 0.55)'),
       hit: makeSoftCircleTexture(48, 'rgba(248, 113, 113, 0.75)'),
       sparkle: makeSoftCircleTexture(32, 'rgba(250, 204, 21, 0.85)'),
+      // Big and soft and low in alpha, because blood in water is not a splash - it is a stain
+      // that spreads. Several of these overlapping make the cloud; any one on its own is barely
+      // there.
+      blood: makeSoftCircleTexture(96, 'rgba(190, 28, 36, 0.8)'),
     };
   }
 
-  emit(type: ParticleType, x: number, y: number, count: number, options?: { speed?: number; life?: number }): void {
+  /**
+   * `grow` is what a particle's scale ends at, against what it started at. Everything here
+   * shrinks away by default, which is right for a spark and wrong for a stain: blood in water
+   * billows out as it thins, so it wants to end several times the size it began.
+   */
+  emit(
+    type: ParticleType,
+    x: number,
+    y: number,
+    count: number,
+    options?: { speed?: number; life?: number; grow?: number },
+  ): void {
     const speed = options?.speed ?? 1;
     const life = options?.life ?? 1;
 
@@ -52,7 +67,7 @@ export class ParticleSystem {
       const spread = Math.random() * speed;
       const vx = Math.cos(angle) * spread;
       const vy = Math.sin(angle) * spread;
-      this.spawn(type, x, y, vx, vy, 0.5 + Math.random() * life);
+      this.spawn(type, x, y, vx, vy, 0.5 + Math.random() * life, options?.grow);
     }
   }
 
@@ -69,7 +84,15 @@ export class ParticleSystem {
     }
   }
 
-  private spawn(type: ParticleType, x: number, y: number, vx: number, vy: number, lifeSeconds: number): void {
+  private spawn(
+    type: ParticleType,
+    x: number,
+    y: number,
+    vx: number,
+    vy: number,
+    lifeSeconds: number,
+    grow?: number,
+  ): void {
     let particle = this.pool.pop();
     if (!particle) {
       const sprite = new Sprite(this.textures[type]);
@@ -90,7 +113,7 @@ export class ParticleSystem {
     particle.life = lifeSeconds;
     particle.maxLife = lifeSeconds;
     particle.startScale = particle.sprite.scale.x;
-    particle.endScale = 0.1;
+    particle.endScale = grow === undefined ? 0.1 : particle.startScale * grow;
 
     this.active.push(particle);
   }
