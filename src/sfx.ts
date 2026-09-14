@@ -311,6 +311,34 @@ class SfxEngine {
   }
 
   /**
+   * The kraken arriving: a long, low groan of moving water with nothing sharp in it.
+   *
+   * Deliberately not a sting. The hazard is slow and positional, and the sound is the cue to start
+   * choosing a lane rather than to flinch - a sharp attack would ask for the wrong reaction.
+   */
+  playKraken(): void {
+    const ctx = this.ensureContext();
+    const now = ctx.currentTime;
+
+    this.tone(ctx, 58, now, 2.2, { type: 'sine', gain: 0.2, glideTo: 38 });
+    this.tone(ctx, 87, now + 0.15, 1.9, { type: 'triangle', gain: 0.1, glideTo: 52 });
+    this.tone(ctx, 150, now + 0.3, 1.4, { type: 'sine', gain: 0.06, glideTo: 90 });
+  }
+
+  /**
+   * The megamouth passing: a slow rising swell, more presence than threat.
+   *
+   * It climbs where the kraken's falls, because this one is not closing on anybody - it is simply
+   * enormous and going somewhere, and the sound should read as something surfacing into view.
+   */
+  playMegamouth(): void {
+    const ctx = this.ensureContext();
+    const now = ctx.currentTime;
+
+    this.tone(ctx, 44, now, 2.4, { type: 'sine', gain: 0.18, glideTo: 70 });
+    this.tone(ctx, 132, now + 0.25, 1.8, { type: 'sine', gain: 0.07, glideTo: 190 });
+  }
+  /**
    * A large cookiecutter has singled a dolphin out: two rising notes, repeated, over a low pulse.
    *
    * Deliberately unlike anything else down here. It is the only warning the player gets, and it

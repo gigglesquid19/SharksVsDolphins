@@ -417,3 +417,81 @@ export class Jellyfish {
     return Math.sqrt((this._x - other._x) ** 2 + (this._y - other._y) ** 2);
   }
 }
+
+/**
+ * One arm of the kraken, reaching in from a side of the arena.
+ *
+ * Data only, like Jellyfish: Game.updateKraken runs the phases and the draw loop builds the curve
+ * from `reach`. Each arm is anchored to a point on one edge and comes straight in along x, so the
+ * lane it closes is a horizontal band - what the player reads is which rows are about to be unsafe,
+ * which is legible in a way a tentacle wandering in two axes would not be.
+ */
+export class Tentacle {
+  id: number;
+  /** -1 for the left edge, 1 for the right. */
+  side: -1 | 1;
+  /** Where on that edge it is rooted, in world units. */
+  anchorY: number;
+  /** 0 (withdrawn) to 1 (fully across its reach). Driven by the phase machine. */
+  reach = 0;
+  phase: 'waiting' | 'telegraph' | 'reaching' | 'holding' | 'withdrawing' = 'waiting';
+  phaseEndsAt = 0;
+  /** How far across the arena this arm can get, in world units. */
+  maxReach: number;
+  /** Its own wave offset, so no two arms curl in step. */
+  wavePhase: number;
+
+  constructor(id: number, side: -1 | 1, anchorY: number, maxReach: number) {
+    this.id = id;
+    this.side = side;
+    this.anchorY = anchorY;
+    this.maxReach = maxReach;
+    this.wavePhase = Math.random() * Math.PI * 2;
+  }
+
+  /**
+   * How far into the arena the tip has got.
+   *
+   * `side` says which edge the arm is rooted to, NOT which way it grows - an arm on the left edge
+   * reaches rightward, and one on the right reaches left. Reading `side` as a direction puts the
+   * tip outside the arena, which is a miss that never registers rather than a visible mistake.
+   */
+  tipX(): number {
+    const from = this.side === -1 ? 0 : SIZE_X;
+    const inward = this.side === -1 ? 1 : -1;
+    return from + inward * this.maxReach * this.reach;
+  }
+}
+
+/**
+ * The megamouth: an enormous filter feeder that has no interest in the pod.
+ *
+ * It never steers at anyone - it holds a heading and crosses the arena - but it is big enough
+ * that being where it is going costs a dolphin. The threat is entirely positional, which is the
+ * point of it: everything else down here is hunting you, and this is the one thing that simply
+ * does not care.
+ */
+export class Megamouth {
+  _x: number;
+  _y: number;
+  lastX: number;
+  lastY: number;
+  /** Unit heading, fixed for the crossing. */
+  dirX: number;
+  dirY: number;
+  speed: number;
+
+  constructor(x: number, y: number, dirX: number, dirY: number, speed: number) {
+    this._x = x;
+    this._y = y;
+    this.lastX = x;
+    this.lastY = y;
+    this.dirX = dirX;
+    this.dirY = dirY;
+    this.speed = speed;
+  }
+
+  distanceBetween(other: { _x: number; _y: number }): number {
+    return Math.sqrt((this._x - other._x) ** 2 + (this._y - other._y) ** 2);
+  }
+}

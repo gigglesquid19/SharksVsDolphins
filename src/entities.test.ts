@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SIZE_X, SIZE_Y } from './constants';
-import { Dolphin, Jellyfish, Shark } from './entities';
+import { Tentacle, Dolphin, Jellyfish, Shark } from './entities';
 
 describe('Dolphin', () => {
   it('measures Euclidean distance between points', () => {
@@ -459,5 +459,43 @@ describe('Shark.move while stunned by a Pistol Shrimp', () => {
     const s = testShark(60, 50, { kind: 'greatWhite', large: true, stunnedUntil: NOW + 4000, stunDx: 1, stunDy: 0 });
     s.move(1, p, [s], true, NOW);
     expect(s.charging).toBe(false);
+  });
+});
+
+describe('Tentacle.tipX', () => {
+  // `side` is which edge the arm is rooted to, not which way it grows. Reading it as a direction
+  // sends the tip out of the arena, where nothing can ever touch it - a hazard that draws
+  // correctly and simply never connects, which is the hardest kind of bug to notice.
+  const REACH = 30;
+
+  it('grows inward from the left edge', () => {
+    const arm = new Tentacle(0, -1, 40, REACH);
+    expect(arm.tipX()).toBe(0);
+    arm.reach = 1;
+    expect(arm.tipX()).toBe(REACH);
+  });
+
+  it('grows inward from the right edge', () => {
+    const arm = new Tentacle(1, 1, 40, REACH);
+    expect(arm.tipX()).toBe(SIZE_X);
+    arm.reach = 1;
+    expect(arm.tipX()).toBe(SIZE_X - REACH);
+  });
+
+  it('never leaves the arena at any extension', () => {
+    for (const side of [-1, 1] as const) {
+      const arm = new Tentacle(2, side, 40, REACH);
+      for (let r = 0; r <= 1.0001; r += 0.1) {
+        arm.reach = Math.min(1, r);
+        expect(arm.tipX()).toBeGreaterThanOrEqual(0);
+        expect(arm.tipX()).toBeLessThanOrEqual(SIZE_X);
+      }
+    }
+  });
+
+  it('tracks reach proportionally, so the picture and the hit box cannot disagree', () => {
+    const arm = new Tentacle(3, -1, 40, REACH);
+    arm.reach = 0.5;
+    expect(arm.tipX()).toBeCloseTo(REACH / 2, 6);
   });
 });

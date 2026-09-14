@@ -339,6 +339,76 @@ export function createPhotophores(spots: Photophore[], color: number): Container
   return group;
 }
 
+/**
+ * Draws one kraken arm into an existing Graphics, from the edge to wherever it has reached.
+ *
+ * Redrawn every frame rather than being a sprite, because the thing that makes a tentacle read as
+ * a tentacle is that its length and its curl both change continuously - there is no single picture
+ * of it to hold. It is built as a chain of segments whose lateral offset is a sine travelling down
+ * the arm, so the curl runs outward from the root the way a real one does, and the width tapers to
+ * a point at the tip.
+ *
+ * @param lengthPx how far it currently reaches, in pixels
+ * @param dir      -1 reaching rightward from the left edge, 1 leftward from the right
+ * @param t        seconds, for the travelling wave
+ * @param phase    this arm's own wave offset, so a pair never curls in step
+ * @param menace   0 while it is only telegraphing, 1 once it can take a dolphin
+ */
+export function drawTentacle(
+  g: Graphics,
+  lengthPx: number,
+  dir: -1 | 1,
+  t: number,
+  phase: number,
+  menace: number,
+): void {
+  g.clear();
+  if (lengthPx <= 1) return;
+
+  const SEGMENTS = 22;
+  /**
+   * Thick at the root, and swinging a long way at the tip.
+   *
+   * Both were about half this to begin with, which drew something closer to a ribbon than an arm:
+   * at a couple of hundred pixels long a 13px root is a band, and a 16px swing over that distance
+   * is a straight line with a kink. An arm has to be visibly heavy where it meets the dark and
+   * visibly loose at the end.
+   */
+  const ROOT_WIDTH = 24;
+  const WAVE_PX = 34;
+
+  const points: { x: number; y: number; w: number }[] = [];
+  for (let i = 0; i <= SEGMENTS; i++) {
+    const along = i / SEGMENTS;
+    const x = dir * lengthPx * along;
+    // The wave grows along the arm and travels outward, so the tip writhes and the root holds.
+    const y = Math.sin(t * 2.2 - along * 3.4 + phase) * WAVE_PX * along * along;
+    // A gentler taper than linear, so it stays fleshy most of the way out and only draws to a
+    // point near the tip - taper too hard and the far half is a hair rather than an arm.
+    points.push({ x, y, w: ROOT_WIDTH * (1 - along ** 1.9) ** 0.7 });
+  }
+
+  // One closed outline down one side of the chain and back up the other, so the taper is a shape
+  // rather than a stroke that cannot change width.
+  g.moveTo(points[0].x, points[0].y - points[0].w);
+  for (const p of points) g.lineTo(p.x, p.y - p.w);
+  for (let i = points.length - 1; i >= 0; i--) g.lineTo(points[i].x, points[i].y + points[i].w);
+  g.closePath();
+  // Light enough to read against dark water. This is a hazard the player is asked to dodge, and
+  // the zone it appears in runs at up to 0.62 gloom - a tentacle the colour of the background is
+  // not atmospheric, it is unfair.
+  g.fill({ color: 0x5b2f73, alpha: 0.72 + 0.28 * menace });
+  g.stroke({ width: 2, color: 0xc084fc, alpha: 0.55 + 0.45 * menace });
+
+  // Suckers down the underside: the detail that says tentacle rather than tail, and they fade in
+  // with the menace so a telegraphing arm is visibly not yet the dangerous thing.
+  for (let i = 2; i < SEGMENTS; i += 2) {
+    const p = points[i];
+    g.circle(p.x, p.y + p.w * 0.35, Math.max(0.8, p.w * 0.24));
+    g.fill({ color: 0xf5d0fe, alpha: 0.45 + 0.45 * menace });
+  }
+}
+
 export function makeRadialGradientTexture(size: number, color: string): Texture {
   const c = document.createElement('canvas');
   c.width = size;

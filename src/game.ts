@@ -15,6 +15,7 @@ import {
   createSharkSprite,
   makeDolphinBodyCanvas,
   makeRadialGradientTexture,
+  drawTentacle,
   makeVignetteTexture,
   photophorePulseAlpha,
   sliceSharkStrip,
@@ -38,7 +39,7 @@ import {
 } from './levels';
 import { CANVAS_H, CANVAS_W, SIZE_X, SIZE_Y, WORLD_SCALE } from './constants';
 import { clampEntityY, directionDelta, sweptDistance, wrapX } from './utils';
-import { Dolphin, Shark, Jellyfish } from './entities';
+import { Dolphin, Shark, Jellyfish, Megamouth, Tentacle } from './entities';
 import type { ConsumableId, Inventory } from './inventory';
 import { getInventory, magicShrimpHeld, useConsumable } from './inventory';
 import {
@@ -107,6 +108,53 @@ const EVENT_DURATION = 30;
 const JELLYFISH_SWARM_DURATION = 45;
 /** The deepest level a jellyfish swarm can appear at; boss levels are excluded separately. */
 const JELLYFISH_MAX_LEVEL = 19;
+
+/**
+ * The kraken: arms reaching in from the sides on their own cycles.
+ *
+ * Each arm telegraphs before it can hurt anyone, so what the player reads is which rows are about
+ * to close rather than where a tentacle happens to be. The phases are deliberately slower than a
+ * shark's strike - this is the arena narrowing, not something lunging, and the counterplay is
+ * choosing a lane early rather than reacting late.
+ */
+const KRAKEN_DURATION = 40;
+const KRAKEN_ARMS = 3;
+const TENTACLE_TELEGRAPH_MS = 600;
+const TENTACLE_REACH_MS = 1200;
+const TENTACLE_HOLD_MS = 800;
+const TENTACLE_WITHDRAW_MS = 1000;
+/** Longest wait between one arm withdrawing and reaching again, so the arena is never fully shut. */
+const TENTACLE_WAIT_MS = 2600;
+/** How far across a single arm can get, as a share of the arena's width. */
+const TENTACLE_REACH_SHARE = 0.45;
+/** How close to the arm counts as contact, in world units. */
+const TENTACLE_HIT_RADIUS = 3.2;
+
+/**
+ * The megamouth: a filter feeder that crosses the arena and ignores everyone in it.
+ *
+ * Twice the size of a large great white, black, and lit only by its own photophores - so what the
+ * player sees coming is a row of lights, the same read the deep-water sharks taught them, on
+ * something far too big to ram. It never steers: the danger is entirely about where it is going.
+ */
+const MEGAMOUTH_DURATION = 35;
+const MEGAMOUTH_SIZE = 2;
+const MEGAMOUTH_SPEED = 0.42;
+/** Its own reach, in world units - it is enormous, and the hit box has to say so. */
+const MEGAMOUTH_HIT_RADIUS = 9;
+/**
+ * Lights along its underside, in the strip's own frame coordinates - the same space the sharks'
+ * photophores are given in. Spaced unevenly on purpose: an even row reads as something made,
+ * and the one thing this has to read as is alive.
+ */
+const MEGAMOUTH_PHOTOPHORES = [
+  { x: -23, y: 13 },
+  { x: -13, y: 15 },
+  { x: -2, y: 14 },
+  { x: 9, y: 15 },
+  { x: 18, y: 13 },
+  { x: 24, y: 10 },
+];
 const JELLYFISH_COUNT = 50;
 const STORM_VISIBILITY_RADIUS = 18;
 /**
@@ -420,7 +468,7 @@ const LARGE_SHARK_INTRO_INFO: Partial<Record<SharkKind, { name: string; descript
   },
 };
 
-type GameEventType = 'storm' | 'jellyfish';
+type GameEventType = 'storm' | 'jellyfish' | 'kraken' | 'megamouth';
 
 export class Game {
   private canvas: HTMLCanvasElement;
@@ -458,6 +506,20 @@ export class Game {
   private stormWarningShown = false;
   private jellyfish: Jellyfish[] = [];
   private jellyfishContainer!: Container;
+  /**
+   * The kraken's arms, drawn above the gloom.
+   *
+   * Above it deliberately: at 0.62 gloom a dark tentacle below the overlay would be a hazard the
+   * player is asked to dodge and cannot see. Reading it as lit by its own bioluminescence is both
+   * the honest fix and the one that suits the depth.
+   */
+  private krakenContainer!: Container;
+  private tentacles: Tentacle[] = [];
+  private tentacleGfx = new Map<Tentacle, Graphics>();
+  /** The megamouth, if one is crossing. Never in `sharks` - see startMegamouth. */
+  private megamouth: Megamouth | null = null;
+  private megamouthSprite: Container | null = null;
+  private megamouthLights: Container | null = null;
   private jellyfishSprites = new Map<Jellyfish, Container>();
   private matriarch: Shark | null = null;
   private matriarchWarningTime = 0;
@@ -855,6 +917,9 @@ export class Game {
      * still drawn below.
      */
     this.lightsContainer = new Container();
+    this.krakenContainer = new Container();
+    this.stage.addChild(this.krakenContainer);
+
     this.stage.addChild(this.lightsContainer);
 
     this.stormOverlay = new Graphics();
@@ -1903,6 +1968,10 @@ export class Game {
     this.stormWarningShown = false;
     this.planNextEvent();
     this.clearJellyfish();
+    // Both hold sprites of their own, so a level that ends mid-event would otherwise leave an arm
+    // hanging in the water or a megamouth parked in the next level's arena.
+    this.clearKraken();
+    this.clearMegamouth();
     this.stormOverlay.clear();
     sfx.stopStormRumble();
     if (this.levelCompleteTimer) {
@@ -3767,6 +3836,216 @@ ${cleared.name} Zone Liberated
     this.jellyfish = [];
   }
 
+  private clearMegamouth(): void {
+    if (this.megamouthSprite) {
+      this.entityContainer.removeChild(this.megamouthSprite);
+      this.megamouthSprite.destroy({ children: true });
+      this.megamouthSprite = null;
+    }
+    if (this.megamouthLights) {
+      this.lightsContainer.removeChild(this.megamouthLights);
+      this.megamouthLights.destroy({ children: true });
+      this.megamouthLights = null;
+    }
+    this.megamouth = null;
+  }
+
+  /**
+   * Sends one megamouth across the arena.
+   *
+   * Built from the great white's own strip - blacked out with a tint and drawn at twice a large
+   * one's size - rather than from new artwork, which is the same trick the frilled shark and the
+   * cookiecutter are made with. Its photophores go in the lights layer with every other shark's,
+   * so in dark water it arrives as a row of lights on something enormous, which is exactly the
+   * read the zone has spent ten levels teaching.
+   *
+   * It is deliberately not pushed into `sharks`: the level-complete check counts that list, and a
+   * creature the pod cannot kill must never be the thing a run is waiting on.
+   */
+  private startMegamouth(): void {
+    this.activeEvent = { type: 'megamouth', endsAt: this.gameTime + MEGAMOUTH_DURATION };
+    this.clearMegamouth();
+
+    // Crosses on a shallow diagonal, entering off one side at a random height.
+    const fromLeft = Math.random() < 0.5;
+    const x = fromLeft ? -12 : SIZE_X + 12;
+    const y = SIZE_Y * (0.25 + Math.random() * 0.5);
+    const dirY = (Math.random() - 0.5) * 0.5;
+    const len = Math.hypot(1, dirY) || 1;
+    this.megamouth = new Megamouth(x, y, ((fromLeft ? 1 : -1) as number) / len, dirY / len, MEGAMOUTH_SPEED);
+
+    const textureSet = this.sharkTextureSets.greatWhite;
+    const container = new Container();
+    if (textureSet) {
+      const fish = createSharkSprite(textureSet);
+      fish.name = 'fish';
+      // Near-black rather than pure: a flat 0x000000 tint kills the strip's shading entirely and
+      // leaves a silhouette with no body in it.
+      fish.tint = 0x14161f;
+      fish.scale.set(SHARK_BASE_SCALE * SHARK_KIND_SCALE.greatWhite * MEGAMOUTH_SIZE);
+      container.addChild(fish);
+    }
+    this.entityContainer.addChild(container);
+    this.megamouthSprite = container;
+
+    this.megamouthLights = createPhotophores(MEGAMOUTH_PHOTOPHORES, 0x93c5fd);
+    this.lightsContainer.addChild(this.megamouthLights);
+
+    this.setStatus('A megamouth is passing through');
+    this.showBanner('Megamouth!', 'storm', 2500);
+    sfx.playMegamouth();
+  }
+
+  private endMegamouth(): void {
+    this.clearMegamouth();
+    this.activeEvent = null;
+    this.setStatus('The megamouth has passed');
+  }
+
+  /** Holds its heading and crosses. Nothing it does depends on where the pod is. */
+  private updateMegamouth(now: number): void {
+    const m = this.megamouth;
+    if (!m) return;
+    m.lastX = m._x;
+    m.lastY = m._y;
+    m._x += m.dirX * m.speed;
+    m._y = clampEntityY(m._y + m.dirY * m.speed, 6);
+
+    const scale = WORLD_SCALE;
+    if (this.megamouthSprite) {
+      this.megamouthSprite.x = m._x * scale + scale / 2;
+      this.megamouthSprite.y = m._y * scale + scale / 2;
+      const fish = this.megamouthSprite.getChildByName('fish') as Container | null;
+      if (fish) {
+        const base = SHARK_BASE_SCALE * SHARK_KIND_SCALE.greatWhite * MEGAMOUTH_SIZE;
+        fish.scale.set(base * (m.dirX >= 0 ? 1 : -1), base);
+      }
+    }
+    if (this.megamouthLights) {
+      this.megamouthLights.position.set(m._x * scale + scale / 2, m._y * scale + scale / 2);
+      // createPhotophores builds the dots but leaves placing them to the caller, exactly as the
+      // shark draw loop does - so each one is put at its spot in the strip's own frame, scaled by
+      // how big this thing is drawn and mirrored with whichever way it is swimming.
+      const drawScale = SHARK_BASE_SCALE * SHARK_KIND_SCALE.greatWhite * MEGAMOUTH_SIZE;
+      const facing = m.dirX >= 0 ? 1 : -1;
+      for (let i = 0; i < this.megamouthLights.children.length; i++) {
+        const dot = this.megamouthLights.children[i];
+        const spot = MEGAMOUTH_PHOTOPHORES[i];
+        if (!spot) continue;
+        dot.position.set(spot.x * drawScale * facing, spot.y * drawScale);
+        dot.scale.set(1.9);
+      }
+      this.megamouthLights.alpha = photophorePulseAlpha(now, 991);
+    }
+  }
+
+  /** True once it has crossed clean out of the arena, so the event can end early. */
+  private megamouthHasLeft(): boolean {
+    const m = this.megamouth;
+    if (!m) return false;
+    return m._x < -20 || m._x > SIZE_X + 20;
+  }
+
+  private clearKraken(): void {
+    this.krakenContainer.removeChildren();
+    for (const g of this.tentacleGfx.values()) g.destroy();
+    this.tentacleGfx.clear();
+    this.tentacles = [];
+  }
+
+  private startKraken(): void {
+    this.activeEvent = { type: 'kraken', endsAt: this.gameTime + KRAKEN_DURATION };
+    this.clearKraken();
+    const maxReach = SIZE_X * TENTACLE_REACH_SHARE;
+    const now = Date.now();
+    for (let i = 0; i < KRAKEN_ARMS; i++) {
+      // Alternating sides, spread down the arena, so the arms never all close the same rows.
+      const side: -1 | 1 = i % 2 === 0 ? -1 : 1;
+      const band = SIZE_Y / (KRAKEN_ARMS + 1);
+      const anchorY = band * (i + 1) + (Math.random() - 0.5) * band * 0.5;
+      const arm = new Tentacle(i, side, anchorY, maxReach);
+      // Staggered starts, so the first reach is not three arms at once.
+      arm.phaseEndsAt = now + Math.random() * TENTACLE_WAIT_MS;
+      this.tentacles.push(arm);
+      const g = new Graphics();
+      this.krakenContainer.addChild(g);
+      this.tentacleGfx.set(arm, g);
+    }
+    this.setStatus('Something enormous is reaching into the water');
+    this.showBanner('Kraken!', 'storm', 2500);
+    sfx.playKraken();
+  }
+
+  private endKraken(): void {
+    this.clearKraken();
+    this.activeEvent = null;
+    this.setStatus('The arms withdraw');
+  }
+
+  /**
+   * Runs each arm's cycle: wait, telegraph, reach, hold, withdraw.
+   *
+   * `reach` is what both the drawing and the contact check read, so an arm is dangerous exactly as
+   * far as it is drawn - there is no separate hit box to fall out of step with the picture.
+   */
+  private updateKraken(now: number): void {
+    for (const arm of this.tentacles) {
+      if (now < arm.phaseEndsAt) {
+        // Mid-phase: move `reach` along for the two phases that travel.
+        const left = arm.phaseEndsAt - now;
+        if (arm.phase === 'reaching') arm.reach = Math.max(0, Math.min(1, 1 - left / TENTACLE_REACH_MS));
+        else if (arm.phase === 'withdrawing') arm.reach = Math.max(0, Math.min(1, left / TENTACLE_WITHDRAW_MS));
+        continue;
+      }
+      switch (arm.phase) {
+        case 'waiting':
+          arm.phase = 'telegraph';
+          arm.phaseEndsAt = now + TENTACLE_TELEGRAPH_MS;
+          break;
+        case 'telegraph':
+          arm.phase = 'reaching';
+          arm.phaseEndsAt = now + TENTACLE_REACH_MS;
+          break;
+        case 'reaching':
+          arm.reach = 1;
+          arm.phase = 'holding';
+          arm.phaseEndsAt = now + TENTACLE_HOLD_MS;
+          break;
+        case 'holding':
+          arm.phase = 'withdrawing';
+          arm.phaseEndsAt = now + TENTACLE_WITHDRAW_MS;
+          break;
+        case 'withdrawing':
+          arm.reach = 0;
+          arm.phase = 'waiting';
+          arm.phaseEndsAt = now + TENTACLE_WAIT_MS * (0.4 + Math.random() * 0.6);
+          break;
+      }
+    }
+  }
+
+  /** An arm only bites once it is past telegraphing - the warning has to be worth something. */
+  private tentacleIsDangerous(arm: Tentacle): boolean {
+    return arm.reach > 0.02 && arm.phase !== 'telegraph' && arm.phase !== 'waiting';
+  }
+
+  /**
+   * Whether a point is inside an arm, measured along the arm rather than to its tip.
+   *
+   * The whole length hurts, not just the end: closest approach to the segment from the edge to the
+   * tip is what the shape actually occupies, and testing only the tip would let a dolphin sit
+   * inside a tentacle untouched.
+   */
+  private tentacleHits(arm: Tentacle, d: { _x: number; _y: number }): boolean {
+    if (!this.tentacleIsDangerous(arm)) return false;
+    const rootX = arm.side === -1 ? 0 : SIZE_X;
+    const tipX = arm.tipX();
+    const lo = Math.min(rootX, tipX);
+    const hi = Math.max(rootX, tipX);
+    if (d._x < lo - TENTACLE_HIT_RADIUS || d._x > hi + TENTACLE_HIT_RADIUS) return false;
+    return Math.abs(d._y - arm.anchorY) <= TENTACLE_HIT_RADIUS;
+  }
+
   private startJellyfishSwarm(): void {
     this.activeEvent = { type: 'jellyfish', endsAt: this.gameTime + JELLYFISH_SWARM_DURATION };
     this.lostAtSwarmStart = this.totalLost;
@@ -3810,6 +4089,31 @@ ${cleared.name} Zone Liberated
     this.jellyfish = alive;
   }
 
+  /**
+   * Redraws every arm from its current reach.
+   *
+   * The picture is built from the same `reach` the contact check reads, so an arm can never be
+   * dangerous somewhere it is not drawn - the one thing a hazard like this must not do. Menace
+   * fades in with the phase, so a telegraphing arm is visibly not yet the thing that hurts.
+   */
+  private drawKraken(now: number): void {
+    if (this.tentacles.length === 0) return;
+    const scale = WORLD_SCALE;
+    const t = now / 1000;
+    for (const arm of this.tentacles) {
+      const g = this.tentacleGfx.get(arm);
+      if (!g) continue;
+      const rootX = arm.side === -1 ? 0 : SIZE_X;
+      g.position.set(rootX * scale, arm.anchorY * scale + scale / 2);
+      const lengthPx = arm.maxReach * arm.reach * scale;
+      const menace = this.tentacleIsDangerous(arm) ? 1 : 0.25;
+      // The direction alone does the mirroring: an arm rooted on the left grows into +x, one on
+      // the right into -x. Flipping the Graphics as well would cancel on one side and double on
+      // the other, which put every right-hand arm outside the arena.
+      drawTentacle(g, lengthPx, arm.side === -1 ? 1 : -1, t, arm.wavePhase, menace);
+    }
+  }
+
   private drawJellyfish(): void {
     const scale = WORLD_SCALE;
     for (const [jelly, sprite] of this.jellyfishSprites) {
@@ -3834,6 +4138,12 @@ ${cleared.name} Zone Liberated
       this.stormOverlay.clear();
       sfx.stopStormRumble();
       this.tryUnlock('stormSurvivor');
+    } else if (this.activeEvent?.type === 'kraken') {
+      this.endKraken();
+      return;
+    } else if (this.activeEvent?.type === 'megamouth') {
+      this.endMegamouth();
+      return;
     } else if (this.activeEvent?.type === 'jellyfish') {
       this.endJellyfishSwarm();
       return;
@@ -3852,6 +4162,7 @@ ${cleared.name} Zone Liberated
     const allowed: GameEventType[] = [];
     if (this.stormsAllowed()) allowed.push('storm');
     if (this.jellyfishAllowed()) allowed.push('jellyfish');
+    if (this.deepEventsAllowed()) allowed.push('kraken', 'megamouth');
 
     const roll = Math.random();
     this.pendingEvent =
@@ -3894,6 +4205,19 @@ ${cleared.name} Zone Liberated
     return !getLevelConfig(this.currentLevel).matriarch;
   }
 
+  /**
+   * The kraken and the megamouth: the Mesopelagic only, and never on a boss level.
+   *
+   * Both are built around the zone's darkness - one is read by the lane it closes, the other by
+   * the lights it arrives with - so neither would mean much in lit water. With these two joining
+   * the jellyfish, the zone now picks evenly between three events rather than repeating one, on
+   * the same roll it always had.
+   */
+  private deepEventsAllowed(): boolean {
+    if (!isMesopelagicLevel(this.currentLevel)) return false;
+    return !getLevelConfig(this.currentLevel).matriarch;
+  }
+
   private updateEvents(): void {
     if (this.activeEvent) {
       if (this.gameTime >= this.activeEvent.endsAt) this.endEvent();
@@ -3904,6 +4228,10 @@ ${cleared.name} Zone Liberated
         this.startEvent('storm');
       } else if (this.pendingEvent === 'jellyfish') {
         this.startJellyfishSwarm();
+      } else if (this.pendingEvent === 'kraken') {
+        this.startKraken();
+      } else if (this.pendingEvent === 'megamouth') {
+        this.startMegamouth();
       }
       this.nextEventCheckTime += EVENT_CHECK_INTERVAL;
       this.planNextEvent();
@@ -4286,6 +4614,49 @@ ${cleared.name} Zone Liberated
       }
     }
 
+    // The kraken and the megamouth take a dolphin the same way a sting does, and go through the
+    // same hit cooldown, so no hazard can strip a pod faster than one member a second. Unlike the
+    // swarm, these two run alongside the sharks rather than instead of them: a swarm fills the
+    // whole arena, while an arm closes a lane and a megamouth occupies a line, and there is still
+    // room to be hunted in between.
+    if (this.player && (this.activeEvent?.type === 'kraken' || this.activeEvent?.type === 'megamouth')) {
+      const hits = (d: Dolphin): boolean => {
+        if (this.activeEvent?.type === 'kraken') return this.tentacles.some((arm) => this.tentacleHits(arm, d));
+        return !!this.megamouth && this.megamouth.distanceBetween(d) < MEGAMOUTH_HIT_RADIUS;
+      };
+      const now = Date.now();
+      if (now >= this.playerHitCooldownUntil && now >= this.ghostUntil) {
+        const victim = this.dolphins.find(
+          (d) => (d.isPlayer || d.recruited) && now >= d.invulnerableUntil && hits(d),
+        );
+        if (victim) {
+          const caught = this.activeEvent.type === 'kraken' ? 'Grabbed!' : 'Swept aside!';
+          this.playerHitCooldownUntil = now + 1000;
+          sfx.playBite();
+          if (victim.isPlayer) {
+            if (this.vitalityLives > 0) {
+              this.vitalityLives -= 1;
+              this.player.invulnerableUntil = now + 3000;
+              this.setStatus('Extra life used!');
+              this.showBanner('Extra Life!', 'recruited', 2000);
+            } else {
+              this.gameOver();
+              return;
+            }
+          } else {
+            this.particles.emit('hit', victim._x * scale + scale / 2, victim._y * scale + scale / 2, 14, { speed: 2, life: 0.6 });
+            this.removeDolphinSprite(victim);
+            this.dolphins = this.dolphins.filter((d) => d !== victim);
+            this.totalLost++;
+            this.lostThisLevel++;
+            this.resetKillCombo();
+            this.setStatus('A dolphin was taken');
+            this.showBanner(caught, 'lost', 1800);
+          }
+        }
+      }
+    }
+
     if (this.activeEvent?.type === 'jellyfish' && this.player) {
       for (const jelly of this.jellyfish) {
         let victim: Dolphin | undefined;
@@ -4348,6 +4719,12 @@ ${cleared.name} Zone Liberated
 
     if (this.activeEvent?.type === 'jellyfish') {
       this.updateJellyfish();
+    } else if (this.activeEvent?.type === 'kraken') {
+      this.updateKraken(Date.now());
+    } else if (this.activeEvent?.type === 'megamouth') {
+      this.updateMegamouth(Date.now());
+      // It can cross clean out before its timer runs down; no reason to hold an empty event open.
+      if (this.megamouthHasLeft()) this.endMegamouth();
     }
 
     if (this.gameTime >= this.nextDolphinSpawnTime && this.dolphins.length < this.maxDolphins) {
@@ -4605,6 +4982,7 @@ ${cleared.name} Zone Liberated
     }
 
     this.drawJellyfish();
+    this.drawKraken(now);
 
     this.stormOverlay.clear();
     if (this.activeEvent?.type === 'storm') {
