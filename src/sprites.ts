@@ -322,6 +322,22 @@ export function photophorePulseAlpha(nowMs: number, seed = 0): number {
   return PHOTOPHORE_ALPHA_REST + (PHOTOPHORE_ALPHA_PEAK - PHOTOPHORE_ALPHA_REST) * envelope;
 }
 
+/**
+ * An adult's lights, blinking rather than breathing.
+ *
+ * The deep-water species are told apart by their lights before anything else is visible, and the
+ * lights now carry two facts: how many there are says which species, and whether they blink says
+ * how big it is. A juvenile holds a slow swell (photophorePulseAlpha); an adult goes on and off,
+ * which is the one thing the eye picks out of a dark screen without being asked to.
+ *
+ * Seeded off the shark's id so a shoal of adults never blinks in time with itself.
+ */
+export const PHOTOPHORE_FLASH_PERIOD_MS = 1150;
+export function photophoreFlashAlpha(now: number, seed: number): number {
+  const t = (now + seed * 263) % PHOTOPHORE_FLASH_PERIOD_MS;
+  return t < PHOTOPHORE_FLASH_PERIOD_MS * 0.55 ? PHOTOPHORE_ALPHA_PEAK : PHOTOPHORE_ALPHA_REST * 0.5;
+}
+
 export function createPhotophores(spots: Photophore[], color: number): Container {
   const group = new Container();
   for (let i = 0; i < spots.length; i++) {

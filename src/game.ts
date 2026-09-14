@@ -22,6 +22,7 @@ import {
   drawTentacle,
   drawTentacleLights,
   makeVignetteTexture,
+  photophoreFlashAlpha,
   photophorePulseAlpha,
   sliceSharkStrip,
   SharkFishSprite,
@@ -261,8 +262,16 @@ const MEGAMOUTH_HITS_REQUIRED = 3;
 const MEGAMOUTH_FINISHER_PEARLS = 15;
 /** Spacing between rams, so one pass through it cannot land the whole fight. */
 const MEGAMOUTH_HIT_COOLDOWN_MS = 900;
-/** Its speed once it turns defensive. Past the pod's cruise, short of a Boost - so only a dash catches it. */
-const MEGAMOUTH_DEFENSIVE_SPEED_FACTOR = 3;
+/**
+ * Its speed once it turns defensive: past the pod's cruise, short of a Boost, so a dash is still
+ * what catches it.
+ *
+ * Down from three. At three it outran an unupgraded pod by a quarter and the fight was a chase
+ * the player could not join - every approach had to be a Boost, and a missed Boost meant ten
+ * seconds of watching it leave. Just over cruising speed instead, so the pod can shadow it and
+ * pick the moment, which is the fight that was wanted rather than a pursuit.
+ */
+const MEGAMOUTH_DEFENSIVE_SPEED_FACTOR = 2.5;
 /**
  * How near the pod has to be before it starts steering at them, in world units, and how hard it
  * turns when they are right under its nose.
@@ -507,6 +516,19 @@ const POD_TURN_PER_LEVEL = 0.02;
 const POD_BASE_SMOOTH = 0.22;
 const POD_SMOOTH_PER_LEVEL = 0.015;
 
+/**
+ * How the deep-water species are told apart at a glance, which is most of what the Mesopelagic
+ * asks of a player.
+ *
+ * The lights carry two facts. How many there are says which species it is - one for a
+ * cookiecutter, two for a frilled shark - and whether they blink says how big it is. Both had to
+ * be built, because until now every one of them drew at exactly the same dot size: the clamp that
+ * sized them spanned 1.1 to 1.5 and every deep shark in the game landed on 1.1, adult and
+ * juvenile alike.
+ */
+const PHOTOPHORE_DOT_JUVENILE = 1.05;
+const PHOTOPHORE_DOT_ADULT = 2;
+
 const SHARK_EYE_RANGE = 14;
 const SHARK_EYE_FADE = 6;
 
@@ -679,7 +701,9 @@ const SHARK_KIND_LOOK: Record<SharkKind, SharkLook> = {
       { x: -14, y: 5 },
       { x: 10, y: 5 },
     ],
-    photophoreColor: 0x67e8f9,
+    // Green, like the cookiecutter's. What tells the two apart is how many there are, not what
+    // colour they are: a player in dark water counts lights long before they can judge a hue.
+    photophoreColor: 0x4ade80,
     /**
      * And an eye on top of them, which is a different thing entirely: not an organ it lights the
      * water with but an eye catching what little light there is, only once you are close enough
@@ -5981,10 +6005,13 @@ ${cleared.name} Zone Liberated
       // glow and flare periodically, each shark seeded by its id so a shoal never flares in unison.
       // Both groups are siblings of the gloom rather than children of the shark, so each is
       // placed at the shark's own position here instead of inheriting it.
-      const place = (group: Container | null, spots: { x: number; y: number }[] | undefined): void => {
+      const place = (
+        group: Container | null,
+        spots: { x: number; y: number }[] | undefined,
+        dotScale: number,
+      ): void => {
         if (!group || !spots) return;
         group.position.set(sprite.x, sprite.y);
-        const dotScale = Math.min(1.5, Math.max(1.1, baseScale));
         for (let i = 0; i < group.children.length; i++) {
           const dot = group.children[i];
           const spot = spots[i];
@@ -5995,13 +6022,18 @@ ${cleared.name} Zone Liberated
       };
 
       const lights = this.sharkLights.get(sprite) ?? null;
-      place(lights, look.photophores);
-      if (lights) lights.alpha = photophorePulseAlpha(now, shark.id);
+      place(lights, look.photophores, shark.large ? PHOTOPHORE_DOT_ADULT : PHOTOPHORE_DOT_JUVENILE);
+      // An adult blinks; a juvenile breathes. See photophoreFlashAlpha.
+      if (lights) {
+        lights.alpha = shark.large ? photophoreFlashAlpha(now, shark.id) : photophorePulseAlpha(now, shark.id);
+      }
 
       // The eye keeps its own clock: no pulse, and nothing at all until the pod is close enough
       // to be looking at it.
       const eyes = this.sharkEyes.get(sprite) ?? null;
-      place(eyes, look.eyes);
+      // The eye keeps its own small size whatever the animal's - it is an eye, not an organ the
+      // shark lights the water with.
+      place(eyes, look.eyes, PHOTOPHORE_DOT_JUVENILE);
       if (eyes) eyes.alpha = this.sharkEyeAlpha(shark);
 
       if (fish instanceof SharkFishSprite) {

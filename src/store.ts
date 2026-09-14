@@ -71,7 +71,7 @@ export const UPGRADES: Record<UpgradeId, UpgradeDef> = {
   boost: { name: 'Boost Cooldown', desc: '-0.75s between boosts', prices: [90, 170, 300, 480, 720, 1030] },
   boostDuration: { name: 'Boost Duration', desc: '+0.1s per boost', prices: [100, 200, 340, 520, 760, 1080] },
   echoDuration: { name: 'Echo Duration', desc: 'Longer pings, and longer again each level', prices: [120, 220, 360, 540, 780, 1090] },
-  echoRadius: { name: 'Echo Range', desc: '+6 units of vision', prices: [120, 220, 360, 540, 780, 1090] },
+  echoRadius: { name: 'Echo Range', desc: 'Wider pings, and wider again each level', prices: [120, 220, 360, 540, 780, 1090] },
   /**
    * The only upgrade that changes the shape of the pod rather than a number on the dolphin.
    *
@@ -343,10 +343,29 @@ export const ECHO_BASE_DURATION_MS = 4000;
 export const ECHO_DURATION_PER_LEVEL_MS = 2000;
 export const ECHO_DURATION_ACCEL_MS = 200;
 export const ECHO_BASE_RADIUS = 24;
-export const ECHO_RADIUS_PER_LEVEL = 6;
+/**
+ * Echo Range, on the same growing curve as Echo Duration and for the same reason: a flat six
+ * units a level meant the third and fourth were barely worth the Pearls against a ring that
+ * already reached twenty-four.
+ *
+ *   level   1   2     3     4     5   6
+ *   units  31  38.8  47.5  57.1  67.6  79
+ *
+ * Seventy-nine at the top is about half the arena's diagonal, so a maxed ping from open water
+ * shows nearly all of it. That is the intended end of the sight tree - the same place the
+ * duration curve ends, where the dark stops being something a player waits out.
+ */
+export const ECHO_RADIUS_PER_LEVEL = 7;
+export const ECHO_RADIUS_ACCEL = 0.9;
 export const ECHO_COOLDOWN_MS = 18000;
 
 /** Echolocation duration and radius at the levels currently bought. */
+/** The radius curve above, on the same shape as the duration one. */
+export function echoRadiusFor(level: number): number {
+  const n = Math.max(0, Math.floor(level));
+  return ECHO_BASE_RADIUS + n * ECHO_RADIUS_PER_LEVEL + ((n * (n - 1)) / 2) * ECHO_RADIUS_ACCEL;
+}
+
 /** The duration curve above, as a function: linear per level with a little more on each one. */
 export function echoDurationFor(level: number): number {
   const n = Math.max(0, Math.floor(level));
@@ -357,7 +376,7 @@ export function echolocationStats(): { durationMs: number; radius: number; coold
   const s = load().upgrades;
   return {
     durationMs: echoDurationFor(s.echoDuration),
-    radius: ECHO_BASE_RADIUS + s.echoRadius * ECHO_RADIUS_PER_LEVEL,
+    radius: echoRadiusFor(s.echoRadius),
     cooldownMs: ECHO_COOLDOWN_MS,
   };
 }

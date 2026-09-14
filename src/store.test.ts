@@ -6,9 +6,11 @@ import type { UpgradeId } from './store';
 import {
   ECHOLOCATION_PRICE,
   ECHO_BASE_DURATION_MS,
+  ECHO_BASE_RADIUS,
   ECHO_COOLDOWN_MS,
   MAX_UPGRADE_LEVEL,
   echoDurationFor,
+  echoRadiusFor,
   UPGRADES,
   buyEcholocation,
   buySkin,
@@ -335,5 +337,29 @@ describe('the Echo Duration curve', () => {
   it('refuses nonsense rather than returning it', () => {
     expect(echoDurationFor(-4)).toBe(ECHO_BASE_DURATION_MS);
     expect(echoDurationFor(2.7)).toBe(echoDurationFor(2));
+  });
+});
+
+describe('the Echo Range curve', () => {
+  it('starts where an unupgraded ping does', () => {
+    expect(echoRadiusFor(0)).toBe(ECHO_BASE_RADIUS);
+  });
+
+  it('gives more with each level than the one before it', () => {
+    const steps = [1, 2, 3, 4, 5, 6].map((n) => echoRadiusFor(n) - echoRadiusFor(n - 1));
+    for (let i = 1; i < steps.length; i++) expect(steps[i]).toBeGreaterThan(steps[i - 1]);
+  });
+
+  it('beats the flat 6 a level it replaced at every level', () => {
+    for (let n = 1; n <= 6; n++) expect(echoRadiusFor(n)).toBeGreaterThan(ECHO_BASE_RADIUS + n * 6);
+  });
+
+  it('reaches about half the arena diagonal at the top of the tree', () => {
+    expect(echoRadiusFor(6)).toBeCloseTo(79.5, 1);
+  });
+
+  it('refuses nonsense rather than returning it', () => {
+    expect(echoRadiusFor(-2)).toBe(ECHO_BASE_RADIUS);
+    expect(echoRadiusFor(3.9)).toBe(echoRadiusFor(3));
   });
 });
