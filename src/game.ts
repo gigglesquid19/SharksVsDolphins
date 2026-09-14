@@ -143,23 +143,32 @@ const JELLYFISH_MAX_LEVEL = 19;
  */
 const BENCH_FIRST_EVENT_AT = 12;
 /**
- * Longer than the kraken lasts, deliberately.
+ * Longer than the kraken lasts, deliberately, and then some.
  *
  * updateEvents returns early while an event is running, so a warning due during one is never
- * given - the next event would simply appear. At 40 seconds of kraken from a start at 12, the
- * gap has to clear 52 seconds with five to spare for the warning, or the megamouth arrives
+ * given - the next event would simply appear. At 28 seconds of kraken from a start at 12 the gap
+ * has to clear 40 seconds with five to spare for the warning, or the megamouth arrives
  * unannounced and the bench fails to demonstrate the one thing worth checking about it.
- */
-/**
- * Raised from 50. The bench alternates the two deep events, so the gap between krakens is twice
- * this - and at 50 that was one every hundred seconds, which is the cadence that made them feel
- * constant in a playtest. The megamouth is also skipped now whenever an undefeated one is still
- * in the water, and every skipped turn used to mean the next thing fired was another kraken.
+ *
+ * It sits well past that floor at 110, which is about frequency rather than about the warning:
+ * the bench alternates the two deep events, so the gap between krakens is twice this, and at 50
+ * that was one every hundred seconds - the cadence that made them feel constant in a playtest.
+ * The megamouth is also skipped whenever an undefeated one is still in the water, and every
+ * skipped turn used to mean the next thing to fire was another kraken.
  */
 const BENCH_EVENT_INTERVAL = 110;
 const BENCH_EVENT_ORDER: GameEventType[] = ['kraken', 'megamouth'];
 
-const KRAKEN_DURATION = 40;
+/**
+ * How long the arms are out, in seconds. Down 30% from the 40 it opened at.
+ *
+ * The arena is at its most closed for this whole stretch: the sharks are gone, the dolphin spawns
+ * are held, and two of the three lanes are shutting and reopening on their own clocks. Forty
+ * seconds of that is long enough for the tension to flatten into waiting - the shape of it is
+ * read in the first few reaches and the rest is the same shape again. At 28 each arm still gets
+ * four to six reaches, so nothing about the pattern is lost; it simply stops before it repeats.
+ */
+const KRAKEN_DURATION = 28;
 const KRAKEN_ARMS = 3;
 const TENTACLE_TELEGRAPH_MS = 600;
 const TENTACLE_REACH_MS = 1200;
