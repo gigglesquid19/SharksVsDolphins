@@ -381,6 +381,14 @@ input[type="number"] {
 
 .hidden { display: none; }
 
+/* Both of these set `display`, which beats the plain `.hidden` rule above on source order alone -
+   the same trap `.sprint-btn-wrap` already carries a line for. Without them the two level-10
+   testing cheats sat visible and tickable on every level of the live build. */
+.start-with-pod-label.hidden,
+.dolphin-name-field.hidden {
+  display: none;
+}
+
 .start-with-pod-label {
   display: inline-flex;
   align-items: center;
