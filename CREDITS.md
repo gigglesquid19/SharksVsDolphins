@@ -106,9 +106,16 @@ crossing. Both also play five seconds earlier as the "strange noise from the
 deep" warning is a separate synthesized cue, so these two mark the arrival
 itself.
 
-Unlike the six above, both are served exactly as supplied: stereo, untrimmed and
-at their original bitrate, which is why they are several times the size of
-everything else here. That costs nothing at install - `mp3` is excluded from the
+`kraken.mp3` is trimmed from the 6.48s supplied to 4.85s, because it plays twice
+per event - once with the warning banner and again as the arms arrive, five
+seconds apart - and the full cut would have overlapped itself. What came off was
+the swell-in and the decay, both below -35dB and inaudible in play; the body of
+the sound, which peaks at -2.4dB, is untouched. Re-encoded stereo at 192kbps,
+118KB.
+
+`megamouth.mp3` is served exactly as supplied. Both are still stereo and at a
+far higher bitrate than the six above, which are mono at 96kbps, and so remain
+several times their size. That costs nothing at install - `mp3` is excluded from the
 precache and cached on first play instead (`vite.config.ts`) - but they are the
 obvious candidates if the served audio ever needs to come down: downmixing to
 mono at 96kbps, as the others are, would take roughly three quarters off each.

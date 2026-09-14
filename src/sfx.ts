@@ -34,10 +34,15 @@ const MATRIARCH_HIT_SAMPLE = 'matriarch-hit.mp3';
 const LEVEL_COMPLETE_SAMPLE = 'level-complete.mp3';
 const GAME_OVER_SAMPLE = 'game-over.mp3';
 /**
- * The two Mesopelagic events arriving. Recordings rather than oscillators because both are meant
- * to sound like a creature rather than a signal, and that is the line synthesis never quite gets
- * across - the synthesised versions are kept underneath as the fallback for the first play of a
- * session, before the file has finished downloading.
+ * The two Mesopelagic events. Recordings rather than oscillators because both are meant to sound
+ * like a creature rather than a signal, and that is the line synthesis never quite gets across -
+ * the synthesised versions are kept underneath as the fallback for the first play of a session,
+ * before the file has finished downloading.
+ *
+ * The kraken's plays twice per event: once with the warning banner and again as the arms arrive.
+ * It is trimmed to 4.85s for exactly that reason - the two are five seconds apart, and the supplied
+ * 6.48s cut would have overlapped itself. What came off was the sub-audible swell-in and decay,
+ * below -35dB at both ends; everything from the body of the sound is still there.
  */
 const KRAKEN_SAMPLE = 'kraken.mp3';
 const MEGAMOUTH_SAMPLE = 'megamouth.mp3';
@@ -320,24 +325,6 @@ class SfxEngine {
     this.tone(ctx, 440, now + 0.02, 1.3, { type: 'sine', gain: 0.12, glideTo: 300 });
   }
 
-  /**
-   * The strange noise from the deep: the five seconds of notice before a kraken or a megamouth.
-   *
-   * Distant on purpose - quiet, slow, and far down the register, with nothing in it that says
-   * which of the two is coming. It is the sound of something a long way off noticing you, and it
-   * has to sit apart from every other cue in the game, all of which mean a thing is happening now
-   * rather than shortly.
-   */
-  playDeepWarning(): void {
-    const ctx = this.ensureContext();
-    const now = ctx.currentTime;
-
-    this.tone(ctx, 41, now, 2.6, { type: 'sine', gain: 0.13, glideTo: 33 });
-    this.tone(ctx, 61, now + 0.5, 2.0, { type: 'sine', gain: 0.08, glideTo: 49 });
-    // A single far-off knock a beat in, so it reads as something making a noise rather than as
-    // the water simply moving.
-    this.tone(ctx, 96, now + 1.1, 0.5, { type: 'triangle', gain: 0.06, glideTo: 72 });
-  }
   /**
    * The kraken arriving: a long, low groan of moving water with nothing sharp in it.
    *

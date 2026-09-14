@@ -4107,8 +4107,9 @@ ${cleared.name} Zone Liberated
       this.tentacleLightGfx.set(arm, lights);
     }
     this.sendSharksAwayFromKraken();
-    // No banner, and nothing named. The five seconds of warning already said something was
-    // coming; what arrives is meant to be worked out from the water rather than read off a label.
+    // No banner, and nothing named: what arrives is meant to be worked out from the water rather
+    // than read off a label. The noise repeats though - it was distant five seconds ago and it is
+    // on top of you now.
     this.setStatus('The sharks are scattering');
     sfx.playKraken();
   }
@@ -4425,7 +4426,11 @@ ${cleared.name} Zone Liberated
     }
     this.setStatus('A strange noise came from the deep');
     this.showBanner('A strange noise came from the deep', 'storm', 2600);
-    sfx.playDeepWarning();
+    // The kraken recording is the noise from the deep, and the same one for either event - which
+    // is what keeps it a question rather than an announcement. It plays again when the arms
+    // actually arrive; the file is trimmed to 4.85s so the two never overlap across the five
+    // seconds between them.
+    sfx.playKraken();
   }
 
   private updateMatriarch(): void {
@@ -4915,7 +4920,13 @@ ${cleared.name} Zone Liberated
       this.updateMegamouth(Date.now());
     }
 
-    if (this.gameTime >= this.nextDolphinSpawnTime && this.dolphins.length < this.maxDolphins) {
+    // Nothing swims into a kraken. The water is cleared of sharks for it, and a lone dolphin
+    // wandering in to be recruited while the arms are out reads as the sea not having noticed -
+    // so the spawn clock is pushed along instead of firing, which also stops a backlog building
+    // up and emptying into the arena the moment the event ends.
+    if (this.activeEvent?.type === 'kraken') {
+      while (this.gameTime >= this.nextDolphinSpawnTime) this.nextDolphinSpawnTime += this.dolphinSpawnInterval;
+    } else if (this.gameTime >= this.nextDolphinSpawnTime && this.dolphins.length < this.maxDolphins) {
       const hasStray = this.dolphins.some((d) => !d.isPlayer && !d.recruited);
       if (!hasStray) {
         this.spawnRecruitableDolphin();
