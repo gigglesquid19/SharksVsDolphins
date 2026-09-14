@@ -289,3 +289,58 @@ export function getLevelConfig(level: number): LevelConfig {
   if (level >= 1 && level <= LEVELS.length) return LEVELS[level - 1];
   return getEndlessLevelConfig(level);
 }
+
+/**
+ * The first level allowed to field more than one large great white at a time.
+ *
+ * A large great white asks for a pod of ten (twelve past level 5 - see Game.sharkPodRequirement),
+ * and the early levels cap the pod at twelve. Two of them at once is therefore not twice the
+ * problem but a different one: the whole pod is committed to the first while the second hunts it,
+ * and there is no second pod to answer with. The species is meant to be the thing that teaches
+ * you to commit a Boost dash, and it cannot teach that while you are being asked to be in two
+ * places at once.
+ *
+ * Levels 5 to 8 are where this actually bit: two or three larges drawn at random from a pool with
+ * the great white in it. From 9 the pod is big enough, and the player practised enough, for a pair
+ * to be a difficulty step rather than a wall.
+ */
+export const GREAT_WHITE_PAIR_FROM_LEVEL = 9;
+
+/**
+ * Picks the kinds for a level's large sharks, holding the great white to one below
+ * GREAT_WHITE_PAIR_FROM_LEVEL.
+ *
+ * The deal starts over at the first entry of the pool, which is what makes the pool's *order*
+ * matter for the large sharks - see MESOPELAGIC_LEVELS. Levels with `dealKindsInTurn` take their
+ * kinds in turn; everything else draws at random.
+ *
+ * A capped great white is swapped for something else in the same pool rather than dropped, so the
+ * level keeps the number of large sharks it was authored with. If the pool holds nothing else the
+ * cap cannot be honoured and the great white stands: a level of nothing but great whites is asking
+ * for them.
+ *
+ * `roll` is injectable so the draw can be tested.
+ */
+export function dealLargeSharkKinds(
+  kinds: readonly SharkKind[],
+  count: number,
+  level: number,
+  dealInTurn: boolean,
+  roll: () => number = Math.random,
+): SharkKind[] {
+  if (kinds.length === 0) return [];
+  const limit = level >= GREAT_WHITE_PAIR_FROM_LEVEL ? Infinity : 1;
+  const others = kinds.filter((k) => k !== 'greatWhite');
+  const out: SharkKind[] = [];
+  let greatWhites = 0;
+
+  for (let i = 0; i < count; i++) {
+    const draw = (pool: readonly SharkKind[]): SharkKind =>
+      dealInTurn ? pool[i % pool.length] : pool[Math.floor(roll() * pool.length)];
+    let kind = draw(kinds);
+    if (kind === 'greatWhite' && greatWhites >= limit && others.length > 0) kind = draw(others);
+    if (kind === 'greatWhite') greatWhites += 1;
+    out.push(kind);
+  }
+  return out;
+}

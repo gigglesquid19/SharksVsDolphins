@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEPTH_ZONES,
+  GREAT_WHITE_PAIR_FROM_LEVEL,
   LEVELS,
+  dealLargeSharkKinds,
   MAX_ENDLESS_SHARK_SPEED,
   SHARK_SPEED_CAP_LEVEL,
   getEndlessLevelConfig,
@@ -308,5 +310,70 @@ describe('the authored Mesopelagic, levels 11-20', () => {
   it('ends the zone on a Matriarch, the way level 10 ends the campaign', () => {
     expect(getLevelConfig(20).matriarch).toBe(true);
     for (let level = 11; level <= 19; level++) expect(getLevelConfig(level).matriarch).toBe(false);
+  });
+});
+
+describe('dealLargeSharkKinds', () => {
+  const TIGER_GW = ['tiger', 'greatWhite'] as const;
+  const ALL = ['tiger', 'greatWhite', 'hammerhead'] as const;
+  /** A draw that always lands on the great white in TIGER_GW, and on whatever sits at index 1. */
+  const alwaysIndex1 = () => 0.5;
+
+  const countGreatWhites = (kinds: readonly string[]): number => kinds.filter((k) => k === 'greatWhite').length;
+
+  it('lets only one large great white through below the pair level', () => {
+    const dealt = dealLargeSharkKinds(TIGER_GW, 3, GREAT_WHITE_PAIR_FROM_LEVEL - 1, false, () => 0.9);
+    expect(dealt).toEqual(['greatWhite', 'tiger', 'tiger']);
+  });
+
+  it('stops capping from the pair level onwards', () => {
+    const dealt = dealLargeSharkKinds(TIGER_GW, 3, GREAT_WHITE_PAIR_FROM_LEVEL, false, () => 0.9);
+    expect(dealt).toEqual(['greatWhite', 'greatWhite', 'greatWhite']);
+  });
+
+  it('substitutes rather than drops, so the level keeps its large sharks', () => {
+    for (const level of [4, 8, 9, 20]) {
+      expect(dealLargeSharkKinds(ALL, 4, level, false, alwaysIndex1)).toHaveLength(4);
+    }
+  });
+
+  it('swaps a capped great white for something else in the same pool', () => {
+    const dealt = dealLargeSharkKinds(ALL, 3, 6, false, alwaysIndex1);
+    expect(dealt[0]).toBe('greatWhite');
+    expect(dealt.slice(1)).toEqual(['hammerhead', 'hammerhead']);
+  });
+
+  it('leaves a great white standing when the pool holds nothing else', () => {
+    // A level of nothing but great whites is asking for them; the cap cannot be honoured.
+    expect(dealLargeSharkKinds(['greatWhite'], 3, 5, false)).toEqual(['greatWhite', 'greatWhite', 'greatWhite']);
+  });
+
+  it('deals in turn from the first entry when the level asks it to', () => {
+    expect(dealLargeSharkKinds(ALL, 3, 20, true)).toEqual(['tiger', 'greatWhite', 'hammerhead']);
+  });
+
+  it('keeps the cap while dealing in turn', () => {
+    const dealt = dealLargeSharkKinds(TIGER_GW, 4, 5, true);
+    expect(countGreatWhites(dealt)).toBe(1);
+    expect(dealt).toHaveLength(4);
+  });
+
+  it('has nothing to deal from an empty pool', () => {
+    expect(dealLargeSharkKinds([], 3, 5, false)).toEqual([]);
+  });
+
+  it('never pairs them on any authored level below the pair level, over many draws', () => {
+    for (const config of LEVELS.filter((l) => l.level < GREAT_WHITE_PAIR_FROM_LEVEL)) {
+      for (let attempt = 0; attempt < 400; attempt++) {
+        const dealt = dealLargeSharkKinds(
+          config.sharkKinds,
+          config.largeSharkCount,
+          config.level,
+          config.dealKindsInTurn === true,
+        );
+        expect(dealt).toHaveLength(config.largeSharkCount);
+        expect(countGreatWhites(dealt)).toBeLessThanOrEqual(1);
+      }
+    }
   });
 });

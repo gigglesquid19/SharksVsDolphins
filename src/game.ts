@@ -30,6 +30,7 @@ import { sfx } from './sfx';
 import {
   LEVELS,
   LevelConfig,
+  dealLargeSharkKinds,
   getLevelBackground,
   getLevelConfig,
   isMesopelagicLevel,
@@ -3878,9 +3879,12 @@ ${cleared.name} Zone Liberated
       this.addSharkSprite(shark);
     }
 
+    // The large sharks are dealt as a set rather than one at a time, because the one rule they
+    // have is about the set: at most one large great white until GREAT_WHITE_PAIR_FROM_LEVEL.
+    const largeKinds = dealLargeSharkKinds(config.sharkKinds, config.largeSharkCount, config.level, dealInTurn);
     for (let i = 0; i < config.largeSharkCount; i++) {
       const shark = new Shark(id++);
-      shark.kind = pickKind(i);
+      shark.kind = largeKinds[i];
       shark.large = true;
       shark.sizeMultiplier = shark.kind === 'tiger' ? 2.5 : LARGE_SHARK_SIZE_MULTIPLIER;
       shark.speedMultiplier =
