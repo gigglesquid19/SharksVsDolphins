@@ -281,6 +281,8 @@ const REACH_COOLDOWN_MS = 20000;
 
 const HAMMERHEAD_SPEED_BONUS = 1.15;
 const GREAT_WHITE_LARGE_SPEED_BONUS = 1.25;
+/** What a large great white or hammerhead keeps of its speed in the dark - see mesopelagicLargeSpeedFactor. */
+const MESO_LARGE_SPEED_FACTOR = 0.84;
 
 /** Which loaded strip a kind is animated from. Three sheets, five species. */
 const SHARK_SPRITE_SOURCE: Record<SharkKind, 'greatWhite' | 'hammerhead' | 'tiger'> = {
@@ -3594,6 +3596,24 @@ ${cleared.name} Zone Liberated
     return HUNTING_MODE_POD_SIZE;
   }
 
+  /**
+   * How much a large shallow-water shark is slowed for being down in the Mesopelagic.
+   *
+   * The species that belong down there carry photophores, so however dark it gets you can track
+   * one by its lights. A great white or a hammerhead carries none, which is the whole of the
+   * problem: at 0.62 gloom they arrive out of nothing, and at their size they arrive fast. Taking
+   * a sixth off gives back the half-second it takes to read what has just appeared and turn the
+   * pod, without making either of them slow - a large great white still runs ahead of everything
+   * else in the water.
+   *
+   * Only the large ones, and only in this zone. A small hammerhead is not what anyone loses a pod
+   * to, and the shallows are lit well enough that seeing one coming was never the issue.
+   */
+  private mesopelagicLargeSpeedFactor(kind: SharkKind, level: number): number {
+    if (!isMesopelagicLevel(level)) return 1;
+    return kind === 'greatWhite' || kind === 'hammerhead' ? MESO_LARGE_SPEED_FACTOR : 1;
+  }
+
   private randomizeSharkSpawnPosition(shark: Shark): void {
     if (!this.player) return;
     let tries = 0;
@@ -3654,7 +3674,8 @@ ${cleared.name} Zone Liberated
       shark.speedMultiplier =
         config.sharkSpeedMultiplier *
         SHARK_KIND_LOOK[shark.kind].speed *
-        (shark.kind === 'greatWhite' ? GREAT_WHITE_LARGE_SPEED_BONUS : 1);
+        (shark.kind === 'greatWhite' ? GREAT_WHITE_LARGE_SPEED_BONUS : 1) *
+        this.mesopelagicLargeSpeedFactor(shark.kind, config.level);
       this.randomizeSharkSpawnPosition(shark);
       const margin = Math.ceil((24 * shark.sizeMultiplier) / WORLD_SCALE);
       shark._y = clampEntityY(shark._y, margin);

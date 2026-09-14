@@ -197,8 +197,9 @@ export const SANDBOX_LEVELS: Record<number, Partial<LevelConfig>> = {
  *
  * 11-15 are those two alone, dealt in turn so both are always in the water: a random draw over a
  * two-deep pool can hand you four of one kind, which is no way to introduce either. From 16 the
- * shallow-water sharks come back a species at a time and the pool is deep enough that a random
- * draw stays varied on its own.
+ * shallow-water sharks come back a species at a time - the hammerhead at 16, the great white at
+ * 19 - and the pool is deep enough that a random draw stays varied on its own. The tiger does not
+ * come back at all; see MESO_CC_FRILLED for why.
  *
  * The pool's order carries weight. Large sharks restart the deal at the first entry, so listing
  * the cookiecutter first means the single large at 13 and 14 is a large cookiecutter at 8 pod,
@@ -208,10 +209,18 @@ export const SANDBOX_LEVELS: Record<number, Partial<LevelConfig>> = {
  * These are partial configs merged over the endless curve, like the sandboxes, so speed keeps
  * climbing on the same derived line as every level past them rather than forking its own.
  */
+/**
+ * No tigers down here.
+ *
+ * The shallow-water species carry no photophores, so in water this dark they arrive with no tell
+ * at all - and a tiger is the one that cloaks on top of that, which made it a shark you could
+ * neither see nor anticipate. Losing it costs the zone nothing: the hammerhead covers the same
+ * role of a fast shallow-water shark coming back to trouble a build, and does it while being
+ * something you can at least watch for.
+ */
 const MESO_CC_FRILLED: SharkKind[] = ['cookiecutter', 'frilled'];
-const MESO_PLUS_TIGER: SharkKind[] = ['cookiecutter', 'frilled', 'tiger'];
-const MESO_PLUS_HAMMER: SharkKind[] = ['cookiecutter', 'frilled', 'tiger', 'hammerhead'];
-const MESO_ALL: SharkKind[] = ['cookiecutter', 'frilled', 'tiger', 'hammerhead', 'greatWhite'];
+const MESO_PLUS_HAMMER: SharkKind[] = ['cookiecutter', 'frilled', 'hammerhead'];
+const MESO_ALL: SharkKind[] = ['cookiecutter', 'frilled', 'hammerhead', 'greatWhite'];
 
 /**
  * Gloom climbs 0.35 -> 0.62 across the zone, a step of 0.03 a level. Level 10 ends in daylight,
@@ -232,7 +241,7 @@ export const MESOPELAGIC_LEVELS: Record<number, Partial<LevelConfig>> = {
   13: { sharkKinds: MESO_CC_FRILLED, normalSharkCount: 5, largeSharkCount: 1, dealKindsInTurn: true },
   14: { sharkKinds: MESO_CC_FRILLED, normalSharkCount: 6, largeSharkCount: 1, dealKindsInTurn: true },
   15: { sharkKinds: MESO_CC_FRILLED, normalSharkCount: 6, largeSharkCount: 2, dealKindsInTurn: true },
-  16: { sharkKinds: MESO_PLUS_TIGER, normalSharkCount: 7, largeSharkCount: 2 },
+  16: { sharkKinds: MESO_PLUS_HAMMER, normalSharkCount: 7, largeSharkCount: 2 },
   17: { sharkKinds: MESO_PLUS_HAMMER, normalSharkCount: 7, largeSharkCount: 3 },
   18: { sharkKinds: MESO_PLUS_HAMMER, normalSharkCount: 8, largeSharkCount: 3 },
   19: { sharkKinds: MESO_ALL, normalSharkCount: 8, largeSharkCount: 4 },

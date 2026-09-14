@@ -232,11 +232,18 @@ describe('the authored Mesopelagic, levels 11-20', () => {
   });
 
   it('folds the shallow-water sharks back in from 16, and stops dealing in turn', () => {
-    expect(getLevelConfig(16).sharkKinds).toContain('tiger');
-    expect(getLevelConfig(17).sharkKinds).toContain('hammerhead');
+    expect(getLevelConfig(16).sharkKinds).toContain('hammerhead');
     expect(getLevelConfig(19).sharkKinds).toContain('greatWhite');
     for (const level of [16, 17, 18, 19, 20]) {
       expect(getLevelConfig(level).dealKindsInTurn).toBeUndefined();
+    }
+  });
+
+  it('never fields a tiger, at any size', () => {
+    // Tigers carry no photophores and cloak on top of it, which in this much dark is a shark you
+    // can neither see nor anticipate. The zone drops them rather than tuning around them.
+    for (let level = 11; level <= 20; level++) {
+      expect(getLevelConfig(level).sharkKinds).not.toContain('tiger');
     }
   });
 
