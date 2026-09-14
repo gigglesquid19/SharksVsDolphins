@@ -254,6 +254,23 @@ const MEGAMOUTH_PHOTOPHORES = [
   { x: 18, y: 13 },
   { x: 24, y: 10 },
 ];
+/**
+ * The cry from below: one moment on level 5 where something enormous is heard and not seen.
+ *
+ * The kraken lives six levels further down and will not be met until the Mesopelagic, which is a
+ * long way to go on nothing. This is the whole of its foreshadowing - the same recording it
+ * arrives to, at a depth where there is no possible explanation for it - and the water's answer
+ * is the point of it: every shark in the level stops dead and listens. A player who learns that
+ * noise here knows exactly what the five-second warning means when it comes, and knows it before
+ * the arms do.
+ *
+ * Twenty-five seconds in, so the level is properly under way and the sharks are in the middle of
+ * hunting rather than still spreading out - stopping means nothing until there is something to
+ * stop. The hold is the length of the recording.
+ */
+const DEEP_CRY_LEVEL = 5;
+const DEEP_CRY_AT = 25;
+const DEEP_CRY_MS = 4800;
 const JELLYFISH_COUNT = 50;
 const STORM_VISIBILITY_RADIUS = 18;
 /**
@@ -2111,6 +2128,8 @@ export class Game {
     this.benchEventIndex = 0;
     this.pendingEvent = null;
     this.eventWarningShown = false;
+    this.deepCryDone = false;
+    this.deepCryUntil = 0;
     this.planNextEvent();
     // The run's one megamouth is dealt here rather than rolled for, so it lands on a known level
     // at a known time instead of waiting on the weather - see MEGAMOUTH_ENCOUNTER_AT.
@@ -4702,6 +4721,33 @@ ${cleared.name} Zone Liberated
   /** Which bench event comes next. Advanced by planNextEvent, reset with the level. */
   private benchEventIndex = 0;
 
+  /** Level 5's one cry from below: whether it has been heard yet, and how long the water holds. */
+  private deepCryDone = false;
+  private deepCryUntil = 0;
+
+  /**
+   * True while the cry is sounding, when nothing in the water hunts, hides, strikes or bites.
+   *
+   * Everything a shark does is suspended together rather than only its movement: a cloak that
+   * dropped, a cookiecutter that completed its run or a bite that landed in the middle of the
+   * arena holding still would each read as the pause being decorative. The pod is deliberately
+   * left free to swim - the stillness is meant to be something the player moves through.
+   */
+  private waterIsListening(now: number): boolean {
+    return now < this.deepCryUntil;
+  }
+
+  /** Sounds the cry, once, when level 5 reaches DEEP_CRY_AT. */
+  private updateDeepCry(): void {
+    if (this.deepCryDone) return;
+    if (this.currentLevel !== DEEP_CRY_LEVEL || this.gameTime < DEEP_CRY_AT) return;
+    this.deepCryDone = true;
+    this.deepCryUntil = Date.now() + DEEP_CRY_MS;
+    sfx.playKraken();
+    this.setStatus('Something sounded from the deep');
+    this.showBanner('Something sounded from the deep', 'storm', DEEP_CRY_MS);
+  }
+
   private updateEvents(): void {
     if (this.activeEvent) {
       if (this.gameTime >= this.activeEvent.endsAt) this.endEvent();
@@ -4904,7 +4950,8 @@ ${cleared.name} Zone Liberated
     }
     this.moveFollowers();
 
-    if (this.activeEvent?.type !== 'jellyfish') {
+    // Nothing hunts while the cry sounds - see waterIsListening.
+    if (this.activeEvent?.type !== 'jellyfish' && !this.waterIsListening(now)) {
       this.updateCloaks(now);
       // Once every remaining shark is large, none of them lose track any more: the end of a
       // level becomes a chase rather than hide-and-seek. Great whites and hammerheads already
@@ -5068,7 +5115,7 @@ ${cleared.name} Zone Liberated
       }
     }
 
-    if (this.activeEvent?.type !== 'jellyfish') {
+    if (this.activeEvent?.type !== 'jellyfish' && !this.waterIsListening(now)) {
       if (this.player && now >= this.playerHitCooldownUntil && now >= this.player.invulnerableUntil && now >= this.ghostUntil) {
         for (const shark of this.sharks) {
           // Still full from the last one. Checked before contact so a shark parked in the pod
@@ -5237,6 +5284,7 @@ ${cleared.name} Zone Liberated
     }
 
     this.updateEvents();
+    this.updateDeepCry();
     this.updateMatriarch();
 
     if (this.activeEvent?.type === 'jellyfish') {
