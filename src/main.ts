@@ -93,6 +93,11 @@ const updateSW = registerSW({
   },
 });
 
+// Which build this actually is, where a tester can read it out. See __BUILD_STAMP__ in
+// vite-env.d.ts for why that is worth a line on the title screen.
+const titleBuildEl = document.getElementById('titleBuild');
+if (titleBuildEl) titleBuildEl.textContent = `build ${__BUILD_STAMP__} UTC`;
+
 const canvas = document.getElementById('simCanvas') as HTMLCanvasElement;
 const canvasWrap = document.getElementById('canvasWrap') as HTMLDivElement;
 

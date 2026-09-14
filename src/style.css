@@ -2302,3 +2302,14 @@ button.mega-shrimp.green {
   color: #facc15;
   font-weight: 600;
 }
+
+/* The build stamp on the title screen. Deliberately quiet - it is for a tester who has been
+   asked for it, not something a player should be reading. */
+.title-build {
+  margin: 14px 0 0;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  color: rgba(148, 163, 184, 0.55);
+  text-align: center;
+  user-select: text;
+}
