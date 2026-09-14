@@ -139,6 +139,23 @@ const MEGAMOUTH_ENCOUNTER_FIRST_LEVEL = 11;
 const MEGAMOUTH_ENCOUNTER_LAST_LEVEL = 19;
 const MEGAMOUTH_ENCOUNTER_AT = 45;
 const JELLYFISH_SWARM_DURATION = 45;
+/**
+ * How the swarm ends early, once it has actually gone by.
+ *
+ * Forty-five seconds is how long it takes the slowest jellyfish to cross an empty arena, and that
+ * is the wrong thing to hold the player to. A swarm is a wall to be got through, and once the pod
+ * is through it the level is simply paused: the sharks do not hunt during a swarm, so what is
+ * left is half a minute of watching stragglers drift off an empty screen.
+ *
+ * The pod counts as through when every remaining jellyfish is behind it - they only ever drift
+ * one way, so this cannot be true at the start, when they spawn off the right-hand edge ahead of
+ * everybody. Hold that for a few seconds and the rest hurry off and the event closes. The margin
+ * is what "comfortably" means: a jellyfish a body length behind you is not yet behind you.
+ */
+const SWARM_CLEAR_MARGIN = 12;
+const SWARM_CLEAR_SECONDS = 6;
+/** How much faster the stragglers leave once the pod is clear of them. */
+const SWARM_CLEAR_SPEEDUP = 3;
 /** The deepest level a jellyfish swarm can appear at; boss levels are excluded separately. */
 const JELLYFISH_MAX_LEVEL = 19;
 
@@ -4789,6 +4806,7 @@ ${cleared.name} Zone Liberated
   private startJellyfishSwarm(): void {
     this.activeEvent = { type: 'jellyfish', endsAt: this.gameTime + JELLYFISH_SWARM_DURATION };
     this.lostAtSwarmStart = this.totalLost;
+    this.swarmClearSince = 0;
     this.clearJellyfish();
     for (let i = 0; i < JELLYFISH_COUNT; i++) {
       const y = 2 + Math.random() * (SIZE_Y - 4);
@@ -4804,15 +4822,50 @@ ${cleared.name} Zone Liberated
 
   private endJellyfishSwarm(): void {
     this.clearJellyfish();
+    this.swarmClearSince = 0;
     this.activeEvent = null;
     this.setStatus('The swarm has passed');
     if (this.totalLost === this.lostAtSwarmStart) this.tryUnlock('throughTheSwarm');
   }
 
+  /**
+   * Whether the swarm has gone by: every jellyfish left is a clear margin behind every pod member.
+   *
+   * They drift one way only, so at the start - when they are off the right-hand edge and the pod
+   * is in the arena - this is false by construction, and it cannot go true until the wall has
+   * actually passed. True either way the pod gets through, whether it swam across and left them
+   * behind or held still and let them wash over it.
+   */
+  private podIsClearOfSwarm(): boolean {
+    const pod = this.podMembers();
+    if (pod.length === 0) return false;
+    return this.jellyfish.every((jelly) => pod.every((d) => jelly._x < d._x - SWARM_CLEAR_MARGIN));
+  }
+
   private updateJellyfish(): void {
     const alive: Jellyfish[] = [];
+
+    // Nothing left to be through: close it now rather than running the clock down on an empty
+    // arena with the sharks still holding still.
+    if (this.jellyfish.length === 0) {
+      this.endJellyfishSwarm();
+      return;
+    }
+
+    const clear = this.podIsClearOfSwarm();
+    if (!clear) {
+      this.swarmClearSince = 0;
+    } else {
+      if (this.swarmClearSince === 0) this.swarmClearSince = this.gameTime;
+      if (this.gameTime - this.swarmClearSince >= SWARM_CLEAR_SECONDS) {
+        this.setStatus('The swarm drifts away');
+        this.endJellyfishSwarm();
+        return;
+      }
+    }
+
     const allPast = this.dolphins.length > 0 && this.dolphins.every((d) => d._x > 70);
-    const speedFactor = allPast ? 2 : 1;
+    const speedFactor = clear ? SWARM_CLEAR_SPEEDUP : allPast ? 2 : 1;
     for (const jelly of this.jellyfish) {
       jelly._x -= jelly.speed * speedFactor;
       if (jelly._x > -10) {
@@ -5001,6 +5054,9 @@ ${cleared.name} Zone Liberated
 
   /** When the beaten megamouth next lets go of a cloud of blood. */
   private megamouthBleedAt = 0;
+
+  /** When the pod first got clear of the swarm, in seconds of play. 0 while it is still in it. */
+  private swarmClearSince = 0;
 
   /** Level 5's one cry from below: when it is due, whether it has sounded, and how long it holds. */
   private deepCryAt = Infinity;
