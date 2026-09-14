@@ -10,6 +10,7 @@ import {
 import { ParticleSystem } from './particles';
 import {
   createDolphinSprite,
+  createEyes,
   createJellyfishSprite,
   createPhotophores,
   createSharkSprite,
@@ -288,12 +289,13 @@ const MEGAMOUTH_PHOTOPHORES = [
  * noise here knows exactly what the five-second warning means when it comes, and knows it before
  * the arms do.
  *
- * Twenty-five seconds in, so the level is properly under way and the sharks are in the middle of
- * hunting rather than still spreading out - stopping means nothing until there is something to
- * stop. The hold is the length of the recording.
+ * Thirty seconds into that level - counted from when the level opens, not from when the run
+ * began - so it is properly under way and the sharks are in the middle of hunting rather than
+ * still spreading out. Stopping means nothing until there is something to stop. The hold is the
+ * length of the recording.
  */
 const DEEP_CRY_LEVEL = 5;
-const DEEP_CRY_AT = 25;
+const DEEP_CRY_AT = 30;
 const DEEP_CRY_MS = 4800;
 const JELLYFISH_COUNT = 50;
 const STORM_VISIBILITY_RADIUS = 18;
@@ -523,6 +525,12 @@ export interface SharkArt {
    */
   photophores?: { x: number; y: number }[];
   photophoreColor?: number;
+  /**
+   * Eyes, which the book draws flat rather than lit - they are not lights the animal is making.
+   * A species can carry these as well as photophores; the frilled shark carries both.
+   */
+  eyes?: { x: number; y: number }[];
+  eyeColor?: number;
 }
 
 /**
@@ -557,10 +565,10 @@ export function sharkArt(kind: SharkKind, large: boolean): SharkArt {
     stretchX: look.stretchX,
     stretchY: look.stretchY,
     scale: SHARK_KIND_SCALE[kind] * size,
-    // Whatever lights the species carries. The frilled shark's are its eyes rather than belly
-    // photophores, and the book should show it the way the water does.
-    photophores: look.photophores ?? look.eyes,
-    photophoreColor: look.photophoreColor ?? look.eyeColor,
+    photophores: look.photophores,
+    photophoreColor: look.photophoreColor,
+    eyes: look.eyes,
+    eyeColor: look.eyeColor,
   };
 }
 
@@ -580,8 +588,8 @@ const SHARK_SPRITE_SOURCE: Record<SharkKind, SharkStrip> = {
 interface SharkLook {
   /**
    * Eyes that catch the light once the pod is inside SHARK_EYE_RANGE, in the strip's own frame
-   * coordinates. An alternative to photophores rather than an addition: lights you can see coming
-   * and a glint you cannot are opposite things to build a species around.
+   * coordinates. Carried alongside photophores rather than instead of them, and drawn plainly -
+   * see createEyes. An eye is not a light the animal is making.
    */
   eyes?: { x: number; y: number }[];
   eyeColor?: number;
@@ -630,14 +638,18 @@ const SHARK_KIND_LOOK: Record<SharkKind, SharkLook> = {
     glow: THREAT_GLOW,
     smallSize: 1.55,
     speed: 0.85,
+    // Two, well apart, so the pair reads as something long even when the body itself cannot be
+    // seen - the gap between the lights is the only measure of its size in the dark.
+    photophores: [
+      { x: -14, y: 5 },
+      { x: 10, y: 5 },
+    ],
+    photophoreColor: 0x67e8f9,
     /**
-     * No photophores. The frilled shark's tell is its eye, and only once it is close enough for
-     * the eye to catch what little light there is.
-     *
-     * Belly lights are a warning you can read from across the arena, which is what the
-     * cookiecutter and the megamouth are for. Taking them away and giving it this instead makes
-     * it the one thing down there you find by running into it - a long black shape that is not
-     * announced until it is already near, which is the whole of what the species is for.
+     * And an eye on top of them, which is a different thing entirely: not an organ it lights the
+     * water with but an eye catching what little light there is, only once you are close enough
+     * to be looking at it. The lights say something long is out there; the eye says it has seen
+     * you.
      */
     eyes: [{ x: 15, y: -4 }],
     eyeColor: 0x4ade80,
@@ -1007,6 +1019,8 @@ export class Game {
   private lightsContainer!: Container;
   /** Each shark sprite's photophore group, which lives in lightsContainer rather than on it. */
   private sharkLights = new Map<Container, Container>();
+  /** Eyes, kept apart from the lights above: a different look, and a different reason to be lit. */
+  private sharkEyes = new Map<Container, Container>();
   /** This level's darkness, 0 to 1, from its config. */
   private levelGloom = 0;
   private particles!: ParticleSystem;
@@ -2233,19 +2247,7 @@ export class Game {
     this.benchEventIndex = 0;
     this.pendingEvent = null;
     this.eventWarningShown = false;
-    this.deepCryDone = false;
-    this.deepCryUntil = 0;
     this.planNextEvent();
-    // The run's one megamouth is dealt here rather than rolled for, so it lands on a known level
-    // at a known time instead of waiting on the weather - see MEGAMOUTH_ENCOUNTER_AT.
-    this.megamouthAppearedThisLevel = false;
-    this.megamouthEncounterScheduled = this.megamouthEncounterDue(config.level);
-    if (this.megamouthEncounterScheduled) {
-      this.nextEventCheckTime = MEGAMOUTH_ENCOUNTER_AT;
-      this.pendingEvent = 'megamouth';
-      this.nextEventWarningTime = MEGAMOUTH_ENCOUNTER_AT - 5;
-      this.eventWarningShown = false;
-    }
     this.clearJellyfish();
     // Both hold sprites of their own, so a level that ends mid-event would otherwise leave an arm
     // hanging in the water or a megamouth parked in the next level's arena.
@@ -2511,11 +2513,13 @@ ${zone.depth}`, 'levelup', duration + 1400);
    * where the shark died.
    */
   private disposeSharkLights(sprite: Container): void {
-    const lights = this.sharkLights.get(sprite);
-    if (!lights) return;
-    this.lightsContainer.removeChild(lights);
-    lights.destroy({ children: true });
-    this.sharkLights.delete(sprite);
+    for (const group of [this.sharkLights, this.sharkEyes]) {
+      const lights = group.get(sprite);
+      if (!lights) continue;
+      this.lightsContainer.removeChild(lights);
+      lights.destroy({ children: true });
+      group.delete(sprite);
+    }
   }
 
   private removeSharkSprite(shark: Shark): void {
@@ -2647,11 +2651,15 @@ ${zone.depth}`, 'levelup', duration + 1400);
       container.addChild(lockTell);
     }
 
-    // Belly lights or eyes - the same dots either way, lit differently. A species has one or the
-    // other; see SharkLook.eyes.
-    const lightSpots = look.photophores ?? look.eyes;
-    if (lightSpots) {
-      const lights = createPhotophores(lightSpots, look.photophoreColor ?? look.eyeColor ?? 0x4ade80);
+    if (look.eyes) {
+      const eyes = createEyes(look.eyes, look.eyeColor ?? 0x4ade80);
+      eyes.name = 'eyes';
+      this.lightsContainer.addChild(eyes);
+      this.sharkEyes.set(container, eyes);
+    }
+
+    if (look.photophores) {
+      const lights = createPhotophores(look.photophores, look.photophoreColor ?? 0x4ade80);
       lights.name = 'photo';
       // Parented to the lights layer, not to the shark, so the gloom cannot cover it. It is
       // positioned from the shark each frame in drawSharks, and removed with it in removeShark.
@@ -4099,6 +4107,8 @@ ${cleared.name} Zone Liberated
       this.matriarchSpawnTime = 0;
     }
 
+    this.beginLevelSetPieces(config);
+
     if (this.huntingMode) this.onSchoolingChange?.(false);
     this.huntingMode = false;
     this.readyToSchool = false;
@@ -4974,7 +4984,8 @@ ${cleared.name} Zone Liberated
   /** When the beaten megamouth next lets go of a cloud of blood. */
   private megamouthBleedAt = 0;
 
-  /** Level 5's one cry from below: whether it has been heard yet, and how long the water holds. */
+  /** Level 5's one cry from below: when it is due, whether it has sounded, and how long it holds. */
+  private deepCryAt = Infinity;
   private deepCryDone = false;
   private deepCryUntil = 0;
 
@@ -4990,6 +5001,34 @@ ${cleared.name} Zone Liberated
     return now < this.deepCryUntil;
   }
 
+  /**
+   * The two things that are placed at a time rather than rolled for: level 5's cry from below,
+   * and the run's one megamouth.
+   *
+   * Both used to be set up in initModel, which turns out to be the wrong place: a fresh start and
+   * a retry go through it, and playing from one level to the next does not. So in an actual
+   * descent the megamouth was never dealt at all, and the cry fired on the first tick of level 5 -
+   * `gameTime` is a run clock rather than a level clock, so by the time a player had played four
+   * levels it was already long past the mark and the check was true the moment the level opened.
+   *
+   * Here instead, in the one function every level entry really does call, and measured forward
+   * from the current clock exactly the way the Matriarch's own timers above are.
+   */
+  private beginLevelSetPieces(config: LevelConfig): void {
+    this.deepCryDone = false;
+    this.deepCryUntil = 0;
+    this.deepCryAt = config.level === DEEP_CRY_LEVEL ? this.gameTime + DEEP_CRY_AT : Infinity;
+
+    this.megamouthAppearedThisLevel = false;
+    this.megamouthEncounterScheduled = this.megamouthEncounterDue(config.level);
+    if (this.megamouthEncounterScheduled) {
+      this.nextEventCheckTime = this.gameTime + MEGAMOUTH_ENCOUNTER_AT;
+      this.pendingEvent = 'megamouth';
+      this.nextEventWarningTime = this.nextEventCheckTime - 5;
+      this.eventWarningShown = false;
+    }
+  }
+
   /** Whether there is still a megamouth out there that the level is waiting on. */
   private megamouthHoldsTheLevel(): boolean {
     return !!this.megamouth && !this.megamouth.beaten;
@@ -4997,8 +5036,7 @@ ${cleared.name} Zone Liberated
 
   /** Sounds the cry, once, when level 5 reaches DEEP_CRY_AT. */
   private updateDeepCry(): void {
-    if (this.deepCryDone) return;
-    if (this.currentLevel !== DEEP_CRY_LEVEL || this.gameTime < DEEP_CRY_AT) return;
+    if (this.deepCryDone || this.gameTime < this.deepCryAt) return;
     this.deepCryDone = true;
     this.deepCryUntil = Date.now() + DEEP_CRY_MS;
     sfx.playKraken();
@@ -5756,29 +5794,30 @@ ${cleared.name} Zone Liberated
       // however the species has been reshaped, while the light itself keeps a near-constant size
       // on screen - a shark drawn small still has to be findable by its lights. They hold a low
       // glow and flare periodically, each shark seeded by its id so a shoal never flares in unison.
-      const lights = this.sharkLights.get(sprite) ?? null;
-      if (lights) {
-        // The group is a sibling of the gloom rather than a child of the shark, so it is placed
-        // at the shark's own position here instead of inheriting it.
-        lights.position.set(sprite.x, sprite.y);
-        const eyes = !look.photophores && look.eyes ? look.eyes : null;
-        const spots = look.photophores ?? look.eyes ?? [];
-        // An eye is a glint, not a lamp: half the size of a photophore, and it stays on the head
-        // rather than being read from across the arena.
-        const dotScale = Math.min(1.5, Math.max(1.1, baseScale)) * (eyes ? 0.5 : 1);
-        for (let i = 0; i < lights.children.length; i++) {
-          const dot = lights.children[i];
+      // Both groups are siblings of the gloom rather than children of the shark, so each is
+      // placed at the shark's own position here instead of inheriting it.
+      const place = (group: Container | null, spots: { x: number; y: number }[] | undefined): void => {
+        if (!group || !spots) return;
+        group.position.set(sprite.x, sprite.y);
+        const dotScale = Math.min(1.5, Math.max(1.1, baseScale));
+        for (let i = 0; i < group.children.length; i++) {
+          const dot = group.children[i];
           const spot = spots[i];
           if (!spot) continue;
           dot.position.set(spot.x * scaleX * facing, spot.y * scaleY);
           dot.scale.set(dotScale);
         }
-        // Photophores pulse on their own clock; an eye only answers the pod, coming up over the
-        // last few units of the approach rather than snapping on at a line.
-        lights.alpha = eyes
-          ? this.sharkEyeAlpha(shark)
-          : photophorePulseAlpha(now, shark.id);
-      }
+      };
+
+      const lights = this.sharkLights.get(sprite) ?? null;
+      place(lights, look.photophores);
+      if (lights) lights.alpha = photophorePulseAlpha(now, shark.id);
+
+      // The eye keeps its own clock: no pulse, and nothing at all until the pod is close enough
+      // to be looking at it.
+      const eyes = this.sharkEyes.get(sprite) ?? null;
+      place(eyes, look.eyes);
+      if (eyes) eyes.alpha = this.sharkEyeAlpha(shark);
 
       if (fish instanceof SharkFishSprite) {
         const tell = this.sharkAttackTell(shark);

@@ -126,42 +126,60 @@ function ruler(): { w: number; h: number } {
  */
 function paintLights(
   ctx: CanvasRenderingContext2D,
-  art: Pick<SharkArt, 'photophores' | 'photophoreColor'>,
+  art: Pick<SharkArt, 'photophores' | 'photophoreColor' | 'eyes' | 'eyeColor'>,
   box: { x: number; y: number; w: number; h: number },
   frameW: number,
   frameH: number,
 ): void {
-  const spots = art.photophores;
-  if (!spots || spots.length === 0) return;
-  const colour = `#${(art.photophoreColor ?? 0xffffff).toString(16).padStart(6, '0')}`;
   const perX = box.w / frameW;
   const perY = box.h / frameH;
+  const at = (spot: { x: number; y: number }): [number, number] => [
+    box.x + box.w / 2 + spot.x * perX,
+    box.y + box.h / 2 + spot.y * perY,
+  ];
   const core = Math.min(3.2, Math.max(1.5, perX * 1.9));
 
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  ctx.fillStyle = colour;
-  for (const spot of spots) {
-    const cx = box.x + box.w / 2 + spot.x * perX;
-    const cy = box.y + box.h / 2 + spot.y * perY;
-    for (const [radius, alpha] of [
-      [core * 4.6, 0.2],
-      [core * 2.3, 0.5],
-      [core, 1],
-    ] as const) {
-      ctx.globalAlpha = alpha;
+  const spots = art.photophores;
+  if (spots && spots.length > 0) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = `#${(art.photophoreColor ?? 0xffffff).toString(16).padStart(6, '0')}`;
+    for (const spot of spots) {
+      const [cx, cy] = at(spot);
+      for (const [radius, alpha] of [
+        [core * 4.6, 0.2],
+        [core * 2.3, 0.5],
+        [core, 1],
+      ] as const) {
+        ctx.globalAlpha = alpha;
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+
+  // Eyes are painted flat, over the top - no halo and no additive blend, because an eye is not a
+  // light the animal is making. Small, and on the head rather than the belly.
+  const eyes = art.eyes;
+  if (eyes && eyes.length > 0) {
+    ctx.save();
+    ctx.fillStyle = `#${(art.eyeColor ?? 0x4ade80).toString(16).padStart(6, '0')}`;
+    for (const spot of eyes) {
+      const [cx, cy] = at(spot);
       ctx.beginPath();
-      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.arc(cx, cy, Math.max(1.4, core * 0.72), 0, Math.PI * 2);
       ctx.fill();
     }
+    ctx.restore();
   }
-  ctx.restore();
 }
 
 function paint(
   canvas: HTMLCanvasElement,
   img: HTMLImageElement,
-  art: Pick<SharkArt, 'tint' | 'stretchX' | 'stretchY' | 'scale' | 'photophores' | 'photophoreColor'>,
+  art: Pick<SharkArt, 'tint' | 'stretchX' | 'stretchY' | 'scale' | 'photophores' | 'photophoreColor' | 'eyes' | 'eyeColor'>,
   shadow: boolean,
   largestScale: { w: number; h: number },
 ): void {
@@ -205,8 +223,8 @@ function paint(
   }
   ctx.globalCompositeOperation = 'source-over';
 
-  // Lights last, and never on a shadow: which species carries them, and where, is exactly the
-  // sort of thing an unmet card must not give away.
+  // Lights and eyes last, and never on a shadow: which species carries them, and where, is
+  // exactly the sort of thing an unmet card must not give away.
   if (!shadow) paintLights(ctx, art, { x, y, w, h }, frameW, frameH);
 }
 

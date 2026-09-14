@@ -69,7 +69,7 @@ const SPECIES: { kind: SharkKind; name: string; juvenile: string; adult: string 
     kind: 'frilled',
     name: 'Frilled Shark',
     juvenile:
-      'A long eel of a shark from the twilight water, and the darkest thing in it. It carries no lights to find it by - all you get is the green of its eye once it is already close. Slower than anything else down there, and it never stops. You are meant to outswim it, not outfight it.',
+      'A long eel of a shark from the twilight water, black as the cookiecutter and lit by two pale points set far apart - the gap between them is the only measure of its size in the dark. Close up you also catch the green of its eye, which means it has seen you. Slower than anything else down there, and it never stops.',
     adult:
       'Longer again, and it strikes. A grown frilled shark swings wide of the pod and then throws its head out along its own length - aimed once, when the strike begins, and anything lying across that line is taken.',
   },

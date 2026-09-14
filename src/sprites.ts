@@ -340,6 +340,24 @@ export function createPhotophores(spots: Photophore[], color: number): Container
 }
 
 /**
+ * A plain eye, not a lamp.
+ *
+ * Deliberately none of what createPhotophores does: no halo, no additive blend, no glow. A
+ * photophore is an organ a species lights the water with and can be read from across the arena;
+ * this is just an eye catching what little light there is, from close up. Same dot shape so the
+ * two sit consistently on the sprite, and that is the end of the resemblance.
+ */
+export function createEyes(spots: Photophore[], color: number): Container {
+  const group = new Container();
+  for (let i = 0; i < spots.length; i++) {
+    const dot = new Graphics();
+    dot.circle(0, 0, 2.2).fill({ color, alpha: 1 });
+    group.addChild(dot);
+  }
+  return group;
+}
+
+/**
  * One point down the length of an arm: where it is, and how thick it is there.
  */
 interface TentaclePoint {
