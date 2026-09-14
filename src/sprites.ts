@@ -340,16 +340,60 @@ export function createPhotophores(spots: Photophore[], color: number): Container
 }
 
 /**
- * Draws one kraken arm into an existing Graphics, from the edge to wherever it has reached.
+ * One point down the length of an arm: where it is, and how thick it is there.
+ */
+interface TentaclePoint {
+  x: number;
+  y: number;
+  w: number;
+}
+
+const TENTACLE_SEGMENTS = 22;
+/**
+ * Thick at the root, and swinging a long way at the tip.
+ *
+ * Both were about half this to begin with, which drew something closer to a ribbon than an arm:
+ * at a couple of hundred pixels long a 13px root is a band, and a 16px swing over that distance
+ * is a straight line with a kink. An arm has to be visibly heavy where it meets the dark and
+ * visibly loose at the end.
+ */
+const TENTACLE_ROOT_WIDTH = 24;
+const TENTACLE_WAVE_PX = 34;
+
+/**
+ * The shape of an arm at this instant, shared by the body and its lights.
+ *
+ * Computed once and handed to both so the two can never disagree about where the arm is - they
+ * are drawn into different layers, on opposite sides of the gloom, and nothing else ties them
+ * together.
+ */
+function tentaclePoints(lengthPx: number, dir: -1 | 1, t: number, phase: number): TentaclePoint[] {
+  const points: TentaclePoint[] = [];
+  for (let i = 0; i <= TENTACLE_SEGMENTS; i++) {
+    const along = i / TENTACLE_SEGMENTS;
+    const x = dir * lengthPx * along;
+    // The wave grows along the arm and travels outward, so the tip writhes and the root holds.
+    const y = Math.sin(t * 2.2 - along * 3.4 + phase) * TENTACLE_WAVE_PX * along * along;
+    // A gentler taper than linear, so it stays fleshy most of the way out and only draws to a
+    // point near the tip - taper too hard and the far half is a hair rather than an arm.
+    points.push({ x, y, w: TENTACLE_ROOT_WIDTH * (1 - along ** 1.9) ** 0.7 });
+  }
+  return points;
+}
+
+/**
+ * Draws the meat of one kraken arm, from the edge to wherever it has reached.
  *
  * Redrawn every frame rather than being a sprite, because the thing that makes a tentacle read as
  * a tentacle is that its length and its curl both change continuously - there is no single picture
- * of it to hold. It is built as a chain of segments whose lateral offset is a sine travelling down
- * the arm, so the curl runs outward from the root the way a real one does, and the width tapers to
- * a point at the tip.
+ * of it to hold.
+ *
+ * This half lives *under* the gloom, so at depth the arm is a shape you half-see rather than a lit
+ * object. What actually tells you where it is are its lights, drawn separately above the gloom by
+ * drawTentacleLights - the same bargain every deep-water shark down here strikes.
  *
  * @param lengthPx how far it currently reaches, in pixels
- * @param dir      -1 reaching rightward from the left edge, 1 leftward from the right
+ * @param dir      -1 reaching leftward, 1 rightward
  * @param t        seconds, for the travelling wave
  * @param phase    this arm's own wave offset, so a pair never curls in step
  * @param menace   0 while it is only telegraphing, 1 once it can take a dolphin
@@ -364,29 +408,7 @@ export function drawTentacle(
 ): void {
   g.clear();
   if (lengthPx <= 1) return;
-
-  const SEGMENTS = 22;
-  /**
-   * Thick at the root, and swinging a long way at the tip.
-   *
-   * Both were about half this to begin with, which drew something closer to a ribbon than an arm:
-   * at a couple of hundred pixels long a 13px root is a band, and a 16px swing over that distance
-   * is a straight line with a kink. An arm has to be visibly heavy where it meets the dark and
-   * visibly loose at the end.
-   */
-  const ROOT_WIDTH = 24;
-  const WAVE_PX = 34;
-
-  const points: { x: number; y: number; w: number }[] = [];
-  for (let i = 0; i <= SEGMENTS; i++) {
-    const along = i / SEGMENTS;
-    const x = dir * lengthPx * along;
-    // The wave grows along the arm and travels outward, so the tip writhes and the root holds.
-    const y = Math.sin(t * 2.2 - along * 3.4 + phase) * WAVE_PX * along * along;
-    // A gentler taper than linear, so it stays fleshy most of the way out and only draws to a
-    // point near the tip - taper too hard and the far half is a hair rather than an arm.
-    points.push({ x, y, w: ROOT_WIDTH * (1 - along ** 1.9) ** 0.7 });
-  }
+  const points = tentaclePoints(lengthPx, dir, t, phase);
 
   // One closed outline down one side of the chain and back up the other, so the taper is a shape
   // rather than a stroke that cannot change width.
@@ -394,19 +416,41 @@ export function drawTentacle(
   for (const p of points) g.lineTo(p.x, p.y - p.w);
   for (let i = points.length - 1; i >= 0; i--) g.lineTo(points[i].x, points[i].y + points[i].w);
   g.closePath();
-  // Light enough to read against dark water. This is a hazard the player is asked to dodge, and
-  // the zone it appears in runs at up to 0.62 gloom - a tentacle the colour of the background is
-  // not atmospheric, it is unfair.
-  g.fill({ color: 0x5b2f73, alpha: 0.72 + 0.28 * menace });
-  g.stroke({ width: 2, color: 0xc084fc, alpha: 0.55 + 0.45 * menace });
+  g.fill({ color: 0x4a2560, alpha: 0.82 + 0.18 * menace });
+  g.stroke({ width: 2, color: 0x7c3aed, alpha: 0.4 + 0.3 * menace });
+}
 
-  // Suckers down the underside: the detail that says tentacle rather than tail, and they fade in
-  // with the menace so a telegraphing arm is visibly not yet the dangerous thing.
-  for (let i = 2; i < SEGMENTS; i += 2) {
+/**
+ * The arm's photophores: the row of suckers along its underside, lit.
+ *
+ * Drawn into the lights layer above the gloom, so they carry through the dark the way a frilled
+ * shark's pair does. They are the whole of the arm's tell at depth, which is why they brighten
+ * with menace - a telegraphing arm glows faintly, one that can take a dolphin glows properly.
+ */
+export function drawTentacleLights(
+  g: Graphics,
+  lengthPx: number,
+  dir: -1 | 1,
+  t: number,
+  phase: number,
+  menace: number,
+): void {
+  g.clear();
+  if (lengthPx <= 1) return;
+  const points = tentaclePoints(lengthPx, dir, t, phase);
+
+  for (let i = 2; i < TENTACLE_SEGMENTS; i += 2) {
     const p = points[i];
-    g.circle(p.x, p.y + p.w * 0.35, Math.max(0.8, p.w * 0.24));
-    g.fill({ color: 0xf5d0fe, alpha: 0.45 + 0.45 * menace });
+    const r = Math.max(1.1, p.w * 0.26);
+    const cx = p.x;
+    const cy = p.y + p.w * 0.35;
+    // Halo, middle, core - the same three-layer build the sharks' photophores use, drawn
+    // additively so they read as light in water rather than as paint on it.
+    g.circle(cx, cy, r * 3.2).fill({ color: 0xd8b4fe, alpha: (0.1 + 0.12 * menace) });
+    g.circle(cx, cy, r * 1.7).fill({ color: 0xe9d5ff, alpha: (0.28 + 0.3 * menace) });
+    g.circle(cx, cy, r).fill({ color: 0xfdf4ff, alpha: (0.6 + 0.4 * menace) });
   }
+  g.blendMode = 'add';
 }
 
 export function makeRadialGradientTexture(size: number, color: string): Texture {

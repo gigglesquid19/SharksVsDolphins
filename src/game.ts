@@ -16,6 +16,7 @@ import {
   makeDolphinBodyCanvas,
   makeRadialGradientTexture,
   drawTentacle,
+  drawTentacleLights,
   makeVignetteTexture,
   photophorePulseAlpha,
   sliceSharkStrip,
@@ -149,6 +150,8 @@ const TENTACLE_WAIT_MS = 2600;
 const TENTACLE_REACH_SHARE = 0.45;
 /** How close to the arm counts as contact, in world units. */
 const TENTACLE_HIT_RADIUS = 3.2;
+/** Clearance kept from the top and bottom when an arm picks a new row to come back at. */
+const TENTACLE_EDGE_MARGIN = 8;
 /** How fast a shark leaves, and comes back, against its own speed. Faster than it hunts. */
 const KRAKEN_FLIGHT_SPEED = 2.4;
 /** How far past the edge counts as gone, in world units. */
@@ -162,10 +165,13 @@ const KRAKEN_OFFSTAGE_MARGIN = 16;
  * something far too big to ram. It never steers: the danger is entirely about where it is going.
  */
 const MEGAMOUTH_DURATION = 35;
-const MEGAMOUTH_SIZE = 2;
+/** Three times a large great white. Half again on what it was - it should be unmistakable. */
+const MEGAMOUTH_SIZE = 3;
 const MEGAMOUTH_SPEED = 0.42;
 /** Its own reach, in world units - it is enormous, and the hit box has to say so. */
-const MEGAMOUTH_HIT_RADIUS = 9;
+const MEGAMOUTH_HIT_RADIUS = 13;
+/** How far past the edge it goes before wrapping round, in world units. */
+const MEGAMOUTH_WRAP_MARGIN = 26;
 /**
  * Lights along its underside, in the strip's own frame coordinates - the same space the sharks'
  * photophores are given in. Spaced unevenly on purpose: an even row reads as something made,
@@ -532,15 +538,17 @@ export class Game {
   private jellyfish: Jellyfish[] = [];
   private jellyfishContainer!: Container;
   /**
-   * The kraken's arms, drawn above the gloom.
+   * The kraken's arms: the bodies under the gloom, their lights above it.
    *
-   * Above it deliberately: at 0.62 gloom a dark tentacle below the overlay would be a hazard the
-   * player is asked to dodge and cannot see. Reading it as lit by its own bioluminescence is both
-   * the honest fix and the one that suits the depth.
+   * Two layers rather than one. Drawing the whole arm above the overlay lit the arena up and threw
+   * away the darkness the zone is built on; drawing it all underneath left a hazard the player is
+   * asked to dodge and cannot see. Split, the arm is a shape half-glimpsed in the dark and a row
+   * of lights that carries - which is the same bargain every deep-water shark down here strikes.
    */
   private krakenContainer!: Container;
   private tentacles: Tentacle[] = [];
   private tentacleGfx = new Map<Tentacle, Graphics>();
+  private tentacleLightGfx = new Map<Tentacle, Graphics>();
   /** The megamouth, if one is crossing. Never in `sharks` - see startMegamouth. */
   private megamouth: Megamouth | null = null;
   private megamouthSprite: Container | null = null;
@@ -929,6 +937,10 @@ export class Game {
     this.gloomOverlay = new Sprite(makeVignetteTexture(512, 'rgb(1, 6, 16)'));
     this.gloomOverlay.anchor.set(0.5);
     this.gloomOverlay.visible = false;
+    // Under the gloom: the arms are meant to be lost in it, and found by their lights instead.
+    this.krakenContainer = new Container();
+    this.stage.addChild(this.krakenContainer);
+
     this.stage.addChild(this.gloomOverlay);
 
     /**
@@ -942,9 +954,6 @@ export class Game {
      * still drawn below.
      */
     this.lightsContainer = new Container();
-    this.krakenContainer = new Container();
-    this.stage.addChild(this.krakenContainer);
-
     this.stage.addChild(this.lightsContainer);
 
     this.stormOverlay = new Graphics();
@@ -3898,13 +3907,13 @@ ${cleared.name} Zone Liberated
     this.activeEvent = { type: 'megamouth', endsAt: this.gameTime + MEGAMOUTH_DURATION };
     this.clearMegamouth();
 
-    // Crosses on a shallow diagonal, entering off one side at a random height.
+    // One heading, held for the whole event: it enters off a side at a random height and simply
+    // keeps going, wrapping round rather than leaving. Something this size crossing once and
+    // vanishing read as a fly-past; circling makes it a thing that is in the water with you.
     const fromLeft = Math.random() < 0.5;
-    const x = fromLeft ? -12 : SIZE_X + 12;
+    const x = fromLeft ? -MEGAMOUTH_WRAP_MARGIN : SIZE_X + MEGAMOUTH_WRAP_MARGIN;
     const y = SIZE_Y * (0.25 + Math.random() * 0.5);
-    const dirY = (Math.random() - 0.5) * 0.5;
-    const len = Math.hypot(1, dirY) || 1;
-    this.megamouth = new Megamouth(x, y, ((fromLeft ? 1 : -1) as number) / len, dirY / len, MEGAMOUTH_SPEED);
+    this.megamouth = new Megamouth(x, y, fromLeft ? 1 : -1, 0, MEGAMOUTH_SPEED);
 
     const textureSet = this.sharkTextureSets.greatWhite;
     const container = new Container();
@@ -3923,15 +3932,14 @@ ${cleared.name} Zone Liberated
     this.megamouthLights = createPhotophores(MEGAMOUTH_PHOTOPHORES, 0x93c5fd);
     this.lightsContainer.addChild(this.megamouthLights);
 
-    this.setStatus('A megamouth is passing through');
-    this.showBanner('Megamouth!', 'storm', 2500);
+    this.setStatus('Something vast is moving through the dark');
     sfx.playMegamouth();
   }
 
   private endMegamouth(): void {
     this.clearMegamouth();
     this.activeEvent = null;
-    this.setStatus('The megamouth has passed');
+    this.setStatus('Whatever it was has moved on');
   }
 
   /** Holds its heading and crosses. Nothing it does depends on where the pod is. */
@@ -3942,6 +3950,10 @@ ${cleared.name} Zone Liberated
     m.lastY = m._y;
     m._x += m.dirX * m.speed;
     m._y = clampEntityY(m._y + m.dirY * m.speed, 6);
+    // Round it goes. The margin is wide enough that it is fully off before it reappears, so it
+    // never pops into existence halfway through its own body.
+    if (m._x > SIZE_X + MEGAMOUTH_WRAP_MARGIN) m._x = -MEGAMOUTH_WRAP_MARGIN;
+    else if (m._x < -MEGAMOUTH_WRAP_MARGIN) m._x = SIZE_X + MEGAMOUTH_WRAP_MARGIN;
 
     const scale = WORLD_SCALE;
     if (this.megamouthSprite) {
@@ -3971,17 +3983,15 @@ ${cleared.name} Zone Liberated
     }
   }
 
-  /** True once it has crossed clean out of the arena, so the event can end early. */
-  private megamouthHasLeft(): boolean {
-    const m = this.megamouth;
-    if (!m) return false;
-    return m._x < -20 || m._x > SIZE_X + 20;
-  }
-
   private clearKraken(): void {
     this.krakenContainer.removeChildren();
     for (const g of this.tentacleGfx.values()) g.destroy();
+    for (const g of this.tentacleLightGfx.values()) {
+      this.lightsContainer.removeChild(g);
+      g.destroy();
+    }
     this.tentacleGfx.clear();
+    this.tentacleLightGfx.clear();
     this.tentacles = [];
   }
 
@@ -4085,10 +4095,14 @@ ${cleared.name} Zone Liberated
       const g = new Graphics();
       this.krakenContainer.addChild(g);
       this.tentacleGfx.set(arm, g);
+      const lights = new Graphics();
+      this.lightsContainer.addChild(lights);
+      this.tentacleLightGfx.set(arm, lights);
     }
     this.sendSharksAwayFromKraken();
-    this.setStatus('Something enormous is reaching into the water - the sharks are scattering');
-    this.showBanner('Kraken!', 'storm', 2500);
+    // No banner, and nothing named. The five seconds of warning already said something was
+    // coming; what arrives is meant to be worked out from the water rather than read off a label.
+    this.setStatus('The sharks are scattering');
     sfx.playKraken();
   }
 
@@ -4132,11 +4146,19 @@ ${cleared.name} Zone Liberated
           arm.phase = 'withdrawing';
           arm.phaseEndsAt = now + TENTACLE_WITHDRAW_MS;
           break;
-        case 'withdrawing':
+        case 'withdrawing': {
           arm.reach = 0;
           arm.phase = 'waiting';
           arm.phaseEndsAt = now + TENTACLE_WAIT_MS * (0.4 + Math.random() * 0.6);
+          // A withdrawn arm comes back somewhere else. Rooted to one spot, three arms taught the
+          // player three rows to avoid and the event was solved after one cycle; moving, the
+          // question has to be asked again every time. It also picks its side afresh, so the
+          // water it threatens is never the same twice running.
+          arm.side = Math.random() < 0.5 ? -1 : 1;
+          arm.anchorY = TENTACLE_EDGE_MARGIN + Math.random() * (SIZE_Y - TENTACLE_EDGE_MARGIN * 2);
+          arm.wavePhase = Math.random() * Math.PI * 2;
           break;
+        }
       }
     }
   }
@@ -4219,15 +4241,23 @@ ${cleared.name} Zone Liberated
     const t = now / 1000;
     for (const arm of this.tentacles) {
       const g = this.tentacleGfx.get(arm);
-      if (!g) continue;
+      const lights = this.tentacleLightGfx.get(arm);
+      if (!g || !lights) continue;
       const rootX = arm.side === -1 ? 0 : SIZE_X;
-      g.position.set(rootX * scale, arm.anchorY * scale + scale / 2);
+      const px = rootX * scale;
+      const py = arm.anchorY * scale + scale / 2;
+      g.position.set(px, py);
+      lights.position.set(px, py);
       const lengthPx = arm.maxReach * arm.reach * scale;
       const menace = this.tentacleIsDangerous(arm) ? 1 : 0.25;
       // The direction alone does the mirroring: an arm rooted on the left grows into +x, one on
       // the right into -x. Flipping the Graphics as well would cancel on one side and double on
       // the other, which put every right-hand arm outside the arena.
-      drawTentacle(g, lengthPx, arm.side === -1 ? 1 : -1, t, arm.wavePhase, menace);
+      const dir = arm.side === -1 ? 1 : -1;
+      // Same length, same direction, same instant for both halves, so the lights can never end up
+      // somewhere the arm is not.
+      drawTentacle(g, lengthPx, dir, t, arm.wavePhase, menace);
+      drawTentacleLights(lights, lengthPx, dir, t, arm.wavePhase, menace);
     }
   }
 
@@ -4876,8 +4906,6 @@ ${cleared.name} Zone Liberated
       this.updateKraken(Date.now());
     } else if (this.activeEvent?.type === 'megamouth') {
       this.updateMegamouth(Date.now());
-      // It can cross clean out before its timer runs down; no reason to hold an empty event open.
-      if (this.megamouthHasLeft()) this.endMegamouth();
     }
 
     if (this.gameTime >= this.nextDolphinSpawnTime && this.dolphins.length < this.maxDolphins) {
