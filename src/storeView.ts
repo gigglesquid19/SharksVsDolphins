@@ -1,7 +1,6 @@
 import { getPearls } from './pearls';
 import {
   ECHOLOCATION_PRICE,
-  IRON_SKIN_COOLDOWN_MS,
   IRON_SKIN_PRICE,
   IRON_SKIN_UNLOCK_LEVEL,
   UPGRADES,
@@ -160,7 +159,6 @@ export function setupStore(opts: { onPearlsChange: () => void }): { open: () => 
     const stats = echolocationStats();
     const seconds = (stats.durationMs / 1000).toFixed(1).replace(/\.0$/, '');
     const skinOwned = ownsIronSkin();
-    const skinSeconds = Math.round(IRON_SKIN_COOLDOWN_MS / 1000);
 
     abilitiesEl.replaceChildren(
       abilityCard({
@@ -177,8 +175,8 @@ export function setupStore(opts: { onPearlsChange: () => void }): { open: () => 
       abilityCard({
         icon: '🛡️',
         name: 'Iron Skin',
-        desc: 'Pressure at depth leaves a hide behind it. Every so often, something that should take a dolphin simply does not.',
-        detail: skinOwned ? `Turns a hit aside every ${skinSeconds}s` : `Depthless Campaign only`,
+        desc: `Hardens you to the crush below the Bathypelagic. Without it a descent turns back at level ${IRON_SKIN_UNLOCK_LEVEL}.`,
+        detail: skinOwned ? 'The water below level 30 is open' : `Required past level ${IRON_SKIN_UNLOCK_LEVEL}`,
         owned: skinOwned,
         unlocked: ironSkinUnlocked(),
         lockedLabel: `🔒 Clear level ${IRON_SKIN_UNLOCK_LEVEL}`,

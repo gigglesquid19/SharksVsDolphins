@@ -74,7 +74,7 @@ import {
   PEARLS_FLAWLESS_CAMPAIGN_BONUS,
 } from './pearls';
 import { getDolphinName } from './profile';
-import { IRON_SKIN_COOLDOWN_MS, baseEcholocationStats, developerModeActive, echolocationStats, endlessStartBonuses, equippedSkinId, grantSkin, ownsEcholocation, ownsIronSkin, ownsSkin } from './store';
+import { IRON_SKIN_UNLOCK_LEVEL, baseEcholocationStats, developerModeActive, echolocationStats, endlessStartBonuses, equippedSkinId, grantSkin, ownsEcholocation, ownsIronSkin, ownsSkin } from './store';
 import { markCampaignCleared, markLevelCleared } from './progress';
 import { hasLevelAccess, startLevelIsRanked } from './levelAccess';
 import { skinById } from './skins';
@@ -922,9 +922,13 @@ export class Game {
   private sprintDurationBonus = 0;
   /** Levels of the Store's Responsiveness upgrade. Endless only, like every other Store line. */
   private podResponsiveness = 0;
-  /** Whether Iron Skin is being carried this run, and when the hide is worth anything again. */
+  /**
+   * Whether Iron Skin is being carried this run.
+   *
+   * It does nothing in the water. It is read once, at the moment a descent would go past
+   * IRON_SKIN_UNLOCK_LEVEL, and a run without it turns back there - see turnBackAtTheCrush.
+   */
   private ironSkin = false;
-  private ironSkinReadyAt = 0;
   // Game feel: hit-stop freezes the sim until this time; the shake jitters the Pixi stage.
   private hitStopUntil = 0;
   private shakeTime = 0;
@@ -2849,6 +2853,35 @@ ${zone.depth}`, 'levelup', duration + 1400);
     this.finishGameOver();
   }
 
+  /**
+   * The wall at level 30: the run ends here, and not as a death.
+   *
+   * A descent that reaches the floor of the Bathypelagic without Iron Skin has done everything
+   * right and simply cannot go on - the water below would crush a dolphin that has not been
+   * hardened to it. So it is banked the way a finished run is, with the depth it reached and the
+   * Pearls it earned, and the player is told what opens the way rather than being told they lost.
+   * No death is counted: nothing killed them.
+   */
+  private turnBackAtTheCrush(): void {
+    this.running = false;
+    if (this.timer) clearTimeout(this.timer);
+    this.flushLifetimeStats();
+    this.setStatus('The pressure turns you back - Iron Skin opens the water below');
+    this.showBanner('Turned Back by the Pressure', 'storm', 3600);
+    sfx.playAchievement();
+    this.onMusicStop?.();
+    this.pendingScore = {
+      board: 'endless',
+      score: {
+        levelReached: this.currentLevel,
+        timeSurvived: this.runElapsed,
+        recruited: this.totalRecruited,
+        sharksKilled: this.sharksKilled,
+      },
+    };
+    this.showRunSummary('endless');
+  }
+
   /** The end of a run once Continue is declined / unavailable / already used. */
   private finishGameOver(): void {
     if (isAndroid) {
@@ -3445,6 +3478,12 @@ ${cleared.name} Zone Liberated
     // Nothing to restart here - unlike the Campaign's overlay, this path never halted the loop,
     // which is still ticking and will carry the player east on its own.
     if (this.mode === 'endless') {
+      // Unless the water below will not have them. A descent stops at the floor of the
+      // Bathypelagic without Iron Skin, however well it was going.
+      if (this.currentLevel >= IRON_SKIN_UNLOCK_LEVEL && !this.ironSkin) {
+        this.turnBackAtTheCrush();
+        return;
+      }
       if (!cleared) this.setStatus(`Swim east to reach Level ${this.currentLevel + 1}`);
       this.awaitingNewWaters = true;
       this.newWatersPromptEl.classList.add('visible');
@@ -3722,26 +3761,6 @@ ${cleared.name} Zone Liberated
     const look = SHARK_KIND_LOOK[shark.kind];
     const frame = 64 * SHARK_BASE_SCALE * SHARK_KIND_SCALE[shark.kind] * shark.sizeMultiplier;
     return (frame * look.stretchX) / WORLD_SCALE;
-  }
-
-  /**
-   * Iron Skin: every so often, something that should take a dolphin simply does not.
-   *
-   * Asked once per hit rather than once per dolphin, so a Matriarch's two-dolphin bite is turned
-   * aside whole - the hide either holds against what hit it or it does not. Reports whether it
-   * absorbed, and starts its own recharge when it did.
-   *
-   * Deliberately silent when it is not owned or not ready, so every caller can ask without
-   * checking anything first.
-   */
-  private ironSkinAbsorbs(now: number): boolean {
-    if (!this.ironSkin || now < this.ironSkinReadyAt) return false;
-    this.ironSkinReadyAt = now + IRON_SKIN_COOLDOWN_MS;
-    this.playerHitCooldownUntil = Math.max(this.playerHitCooldownUntil, now + 1000);
-    sfx.playShieldBlock();
-    this.setStatus('Iron Skin holds!');
-    this.showBanner('Iron Skin!', 'statup', 1400);
-    return true;
   }
 
   /** Pod members a shark is allowed to take: the player and anyone recruited. */
@@ -4205,7 +4224,6 @@ ${cleared.name} Zone Liberated
       this.matriarchSpawnTime = 0;
     }
 
-    this.ironSkinReadyAt = 0;
     this.beginLevelSetPieces(config);
 
     if (this.huntingMode) this.onSchoolingChange?.(false);
@@ -5591,13 +5609,6 @@ ${cleared.name} Zone Liberated
                 victims.push(candidate);
               }
             }
-            if (victims.length > 0 && this.ironSkinAbsorbs(now)) {
-              // Turned aside. The shark still has to swallow before it can try again, so a hide
-              // that holds buys the same breathing space a lost dolphin would have.
-              shark.feedCooldownUntil = now + SHARK_FEED_COOLDOWN_MS;
-              this.revealShark(shark, now);
-              break;
-            }
             if (victims.length > 0) {
               this.playerHitCooldownUntil = now + 1000;
               shark.feedCooldownUntil = now + SHARK_FEED_COOLDOWN_MS;
@@ -5651,9 +5662,7 @@ ${cleared.name} Zone Liberated
         const victim = this.pickHazardVictim(
           (d) => now >= d.invulnerableUntil && (grabbed(d) || swept(d)),
         );
-        // Absorbed, so nothing is taken - but the frame's clock is advanced further down and
-        // must not be skipped, so this falls past the block rather than returning out of it.
-        if (victim && !this.ironSkinAbsorbs(now)) {
+        if (victim) {
           const caught = grabbed(victim) ? 'Grabbed!' : 'Swept aside!';
           this.playerHitCooldownUntil = now + 1000;
           sfx.playBite();
@@ -5691,7 +5700,6 @@ ${cleared.name} Zone Liberated
         const victim = this.pickHazardVictim((d) => jelly.distanceBetween(d) < 2.5);
         if (!victim) continue;
         if (victim.isPlayer && now < this.player.invulnerableUntil) continue;
-        if (this.ironSkinAbsorbs(now)) break;
         this.playerHitCooldownUntil = now + 1000;
         sfx.playBite();
         if (victim.isPlayer) {

@@ -30,23 +30,21 @@ export const ECHOLOCATION_ID = 'echolocation';
 export const ECHOLOCATION_PRICE = 200;
 
 /**
- * Iron Skin: the second one-off ability, and the one the deep end is for.
+ * Iron Skin: not a buff but a door.
  *
- * Locked until level 30 has been cleared - the floor of the Bathypelagic - because what it
- * answers is the pressure down there rather than anything in the first twenty levels. A dolphin
- * that has been that deep has been squeezed by water that would crush a shallow one, and comes
- * back with a hide to show for it: every so often something that should take a member of the pod
- * simply fails to.
+ * It does nothing to damage, nothing to speed and nothing to the pod. What it does is let a
+ * descent continue past level 30 - below the floor of the Bathypelagic the water would crush a
+ * dolphin that has not been hardened to it, so a run without the hide turns back there however
+ * well it is going.
  *
- * Priced above Echolocation. Echolocation is sight, which the dark levels need to be playable at
- * all; this is survival, which they do not, and a player buying it already has a build.
+ * Bought once, after level 30 has been cleared. That ordering is the whole shape of it: the
+ * depth that unlocks it is the depth it is needed beyond, so a player meets the wall, is shown
+ * what opens it, and goes and earns it.
  */
 export const IRON_SKIN_ID = 'ironSkin';
 export const IRON_SKIN_PRICE = 450;
-/** The depth that has to have been survived before it can be bought. */
+/** The depth that has to have been cleared before it can be bought - and the last one without it. */
 export const IRON_SKIN_UNLOCK_LEVEL = 30;
-/** How long the hide takes to be worth anything again after it has turned a hit aside, in ms. */
-export const IRON_SKIN_COOLDOWN_MS = 20000;
 
 export interface UpgradeDef {
   name: string;

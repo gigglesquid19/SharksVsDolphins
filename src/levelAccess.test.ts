@@ -1,13 +1,17 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { awardPearls, getPearls } from './pearls';
-import { markCampaignCleared } from './progress';
+import { markCampaignCleared, markLevelCleared } from './progress';
+import { IRON_SKIN_PRICE, IRON_SKIN_UNLOCK_LEVEL, buyIronSkin } from './store';
 import {
+  FIRST_CRUSHING_LEVEL,
   FIRST_DARK_LEVEL,
   FREE_START_LEVEL,
   MAX_START_LEVEL,
   buyLevelAccess,
   canBuyDarkDepths,
+  canDiveBelowTheCrush,
   depthNeedsEcholocation,
+  depthNeedsIronSkin,
   hasLevelAccess,
   levelAccessPrice,
   purchasedStartLevels,
@@ -23,6 +27,17 @@ beforeEach(() => {
 /** Opens the dark depths for purchase: they need Echolocation on the Store's shelf first. */
 function clearTheCampaign(): void {
   markCampaignCleared();
+}
+
+/**
+ * Opens everything: the dark depths need the campaign cleared, and the depths below the
+ * Bathypelagic need Iron Skin, which needs level 30 cleared and paying for.
+ */
+function openTheWholeOcean(): void {
+  markCampaignCleared();
+  markLevelCleared(IRON_SKIN_UNLOCK_LEVEL);
+  awardPearls(IRON_SKIN_PRICE);
+  buyIronSkin();
 }
 
 describe('pricing', () => {
@@ -84,7 +99,7 @@ describe('buying', () => {
   });
 
   it('keeps purchases sorted and unique', () => {
-    clearTheCampaign();
+    openTheWholeOcean();
     awardPearls(1_000_000);
     buyLevelAccess(31);
     buyLevelAccess(11);
@@ -225,5 +240,45 @@ describe('the testing unlock', () => {
     const before = getPearls();
     expect(buyLevelAccess(21)).toBe(false);
     expect(getPearls()).toBe(before);
+  });
+});
+
+describe('the crush below the Bathypelagic', () => {
+  it('names every depth past level 30, and none above it', () => {
+    expect(depthNeedsIronSkin(FIRST_CRUSHING_LEVEL)).toBe(true);
+    expect(depthNeedsIronSkin(FIRST_CRUSHING_LEVEL - 1)).toBe(false);
+    expect(depthNeedsIronSkin(MAX_START_LEVEL)).toBe(true);
+    expect(depthNeedsIronSkin(FIRST_DARK_LEVEL)).toBe(false);
+  });
+
+  it('will not sell one until Iron Skin is owned, however many Pearls are offered', () => {
+    clearTheCampaign();
+    awardPearls(1_000_000);
+    expect(canDiveBelowTheCrush()).toBe(false);
+    expect(buyLevelAccess(FIRST_CRUSHING_LEVEL)).toBe(false);
+    expect(hasLevelAccess(FIRST_CRUSHING_LEVEL)).toBe(false);
+  });
+
+  it('spends nothing on a refused purchase', () => {
+    clearTheCampaign();
+    awardPearls(1_000_000);
+    const before = getPearls();
+    buyLevelAccess(FIRST_CRUSHING_LEVEL);
+    expect(getPearls()).toBe(before);
+  });
+
+  it('sells one once Iron Skin is owned', () => {
+    openTheWholeOcean();
+    awardPearls(1_000_000);
+    expect(canDiveBelowTheCrush()).toBe(true);
+    expect(buyLevelAccess(FIRST_CRUSHING_LEVEL)).toBe(true);
+    expect(hasLevelAccess(FIRST_CRUSHING_LEVEL)).toBe(true);
+  });
+
+  it('leaves the depths above it alone', () => {
+    clearTheCampaign();
+    awardPearls(1_000_000);
+    // Dark, but well above the crush: Echolocation is the only thing this one ever needed.
+    expect(buyLevelAccess(FIRST_CRUSHING_LEVEL - 1)).toBe(true);
   });
 });

@@ -17,7 +17,9 @@ import {
   buyLevelAccess,
   hasLevelAccess,
   canBuyDarkDepths,
+  canDiveBelowTheCrush,
   depthNeedsEcholocation,
+  depthNeedsIronSkin,
   levelAccessPrice,
   setTestUnlockAll,
   testUnlockAllActive,
@@ -171,7 +173,7 @@ export function setupLevelSelect(opts: LevelSelectOpts): LevelSelectHandles {
         cells.push(
           `<button class="${classes.join(' ')}" data-level="${level}">
             <span class="level-cell-number">${level}</span>
-            <span class="level-cell-state">${unlocked ? (isSandboxLevel(level) ? '\u{1F9EA}' : '') : depthNeedsEcholocation(level) && !canBuyDarkDepths() ? '\u{1F30A}' : '\u{1F512}'}</span>
+            <span class="level-cell-state">${unlocked ? (isSandboxLevel(level) ? '\u{1F9EA}' : '') : depthNeedsEcholocation(level) && !canBuyDarkDepths() ? '\u{1F30A}' : depthNeedsIronSkin(level) && !canDiveBelowTheCrush() ? '\u{1F6E1}' : '\u{1F512}'}</span>
           </button>`,
         );
       }
@@ -260,11 +262,16 @@ export function setupLevelSelect(opts: LevelSelectOpts): LevelSelectHandles {
     // Shut until Echolocation is on the shelf, which is to say until the campaign is cleared.
     // Checked before affordability, because being short of Pearls is not why this one is closed.
     const needsEcho = !unlocked && depthNeedsEcholocation(level) && !canBuyDarkDepths();
+    // And below the Bathypelagic, a depth a run could not be in at all. Checked after the dark
+    // gate so a player missing both is pointed at the nearer one first.
+    const needsSkin = !unlocked && !needsEcho && depthNeedsIronSkin(level) && !canDiveBelowTheCrush();
 
     if (previewNoteEl) {
-      previewNoteEl.classList.toggle('warn', needsEcho || !ranked);
+      previewNoteEl.classList.toggle('warn', needsEcho || needsSkin || !ranked);
       previewNoteEl.textContent = needsEcho
         ? 'The water is dark from here down. Clear the campaign to unlock Echolocation in the Store, and this depth opens with it.'
+        : needsSkin
+        ? 'The water below the Bathypelagic would crush you. Clear level 30 to unlock Iron Skin in the Store, and everything under it opens.'
         : isSandboxLevel(level)
           ? 'Test water for trying new sharks out, dark as the depth really is. Echolocation is lent to you here.'
           : ranked
@@ -279,6 +286,10 @@ export function setupLevelSelect(opts: LevelSelectOpts): LevelSelectHandles {
         previewActionBtn.onclick = () => opts.onDive(level);
       } else if (needsEcho) {
         previewActionBtn.textContent = 'Echolocation needed';
+        previewActionBtn.disabled = true;
+        previewActionBtn.onclick = null;
+      } else if (needsSkin) {
+        previewActionBtn.textContent = 'Iron Skin needed';
         previewActionBtn.disabled = true;
         previewActionBtn.onclick = null;
       } else if (short > 0) {

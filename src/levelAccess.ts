@@ -1,6 +1,6 @@
 import { spendPearls } from './pearls';
 import { ENDLESS_BACKGROUND_COUNT } from './levels';
-import { ECHOLOCATION_PRICE, echolocationUnlocked } from './store';
+import { ECHOLOCATION_PRICE, IRON_SKIN_UNLOCK_LEVEL, echolocationUnlocked, ownsIronSkin } from './store';
 
 const KEY = 'svsd-depth-access';
 const TEST_UNLOCK_KEY = 'svsd-depth-test-unlock';
@@ -70,6 +70,24 @@ export function depthNeedsEcholocation(level: number): boolean {
 /** Whether the player has met that requirement yet. */
 export function canBuyDarkDepths(): boolean {
   return echolocationUnlocked();
+}
+
+/**
+ * The first depth that cannot be reached at all without Iron Skin.
+ *
+ * Unlike the dark depths, which are only gated at the point of purchase, this one is a wall in
+ * the water: a run descends into it or it does not. Buying a start here is gated for the same
+ * reason - there would be no sense in selling a depth a run cannot be in.
+ */
+export const FIRST_CRUSHING_LEVEL = IRON_SKIN_UNLOCK_LEVEL + 1;
+
+export function depthNeedsIronSkin(level: number): boolean {
+  return Math.floor(level) >= FIRST_CRUSHING_LEVEL;
+}
+
+/** Whether the player can go, or start, below the floor of the Bathypelagic. */
+export function canDiveBelowTheCrush(): boolean {
+  return ownsIronSkin();
 }
 
 function load(): number[] {
@@ -144,6 +162,9 @@ export function buyLevelAccess(level: number): boolean {
   if (hasLevelAccess(depth)) return false;
   // Shut, and not merely unaffordable, until Echolocation is on the shelf.
   if (depthNeedsEcholocation(depth) && !canBuyDarkDepths()) return false;
+  // And shut below the Bathypelagic until the hide that survives it has been bought - selling a
+  // depth a run could not be in would be selling nothing.
+  if (depthNeedsIronSkin(depth) && !canDiveBelowTheCrush()) return false;
   if (!spendPearls(levelAccessPrice(depth))) return false;
   const levels = load();
   levels.push(depth);
