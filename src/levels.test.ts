@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import type { SharkKind } from './sprites';
 import {
   DEPTH_ZONES,
   GREAT_WHITE_PAIR_FROM_LEVEL,
   LEVELS,
+  SMALL_BEFORE_LARGE_UNTIL_LEVEL,
   dealLargeSharkKinds,
+  largeKindPool,
   MAX_ENDLESS_SHARK_SPEED,
   SHARK_SPEED_CAP_LEVEL,
   getEndlessLevelConfig,
@@ -376,6 +379,104 @@ describe('dealLargeSharkKinds', () => {
         expect(dealt).toHaveLength(config.largeSharkCount);
         expect(countGreatWhites(dealt)).toBeLessThanOrEqual(1);
       }
+    }
+  });
+});
+
+describe('largeKindPool', () => {
+  const ALL = ['tiger', 'greatWhite', 'hammerhead'] as const;
+  const none = new Set<SharkKind>();
+
+  it('keeps only what the player has already met as a small shark', () => {
+    const pool = largeKindPool(ALL, 6, new Set<SharkKind>(['tiger', 'greatWhite']), none);
+    expect(pool).toEqual(['tiger', 'greatWhite']);
+  });
+
+  it('stops narrowing anything past the last gated level', () => {
+    const pool = largeKindPool(ALL, SMALL_BEFORE_LARGE_UNTIL_LEVEL + 1, none, none);
+    expect(pool).toEqual(ALL);
+  });
+
+  it('still gates on the last gated level itself', () => {
+    const pool = largeKindPool(ALL, SMALL_BEFORE_LARGE_UNTIL_LEVEL, new Set<SharkKind>(['tiger']), none);
+    expect(pool).toEqual(['tiger']);
+  });
+
+  it("falls back to this level's own smalls for a player with no history", () => {
+    // Someone who bought their way straight to a depth: the large is at least swimming alongside
+    // its own small version rather than arriving as the first of its kind they have ever seen.
+    const pool = largeKindPool(ALL, 8, none, new Set<SharkKind>(['hammerhead']));
+    expect(pool).toEqual(['hammerhead']);
+  });
+
+  it('prefers earlier levels over this one, so a species is small before it is large', () => {
+    const pool = largeKindPool(ALL, 4, new Set<SharkKind>(['tiger']), new Set<SharkKind>(['tiger', 'greatWhite']));
+    expect(pool).toEqual(['tiger']);
+  });
+
+  it('falls back to the whole pool rather than leaving a level without its large sharks', () => {
+    expect(largeKindPool(ALL, 5, none, none)).toEqual(ALL);
+  });
+});
+
+describe('a campaign played straight through', () => {
+  /**
+   * Walks levels 1-10 the way a player does, drawing each level's small sharks the way the game
+   * does and carrying what was actually met forward, then checks the rule that matters: no large
+   * shark of a species the player has not already seen a small one of.
+   */
+  const playThrough = (): { level: number; largeKinds: SharkKind[]; metBefore: SharkKind[] }[] => {
+    const met = new Set<SharkKind>();
+    const log: { level: number; largeKinds: SharkKind[]; metBefore: SharkKind[] }[] = [];
+    for (const config of LEVELS) {
+      const dealInTurn = config.dealKindsInTurn === true;
+      const smallsHere = new Set<SharkKind>();
+      for (let i = 0; i < config.normalSharkCount; i++) {
+        smallsHere.add(
+          dealInTurn
+            ? config.sharkKinds[i % config.sharkKinds.length]
+            : config.sharkKinds[Math.floor(Math.random() * config.sharkKinds.length)],
+        );
+      }
+      const pool = largeKindPool(config.sharkKinds, config.level, met, smallsHere);
+      const largeKinds = dealLargeSharkKinds(pool, config.largeSharkCount, config.level, dealInTurn);
+      log.push({ level: config.level, largeKinds, metBefore: [...met] });
+      for (const kind of smallsHere) met.add(kind);
+    }
+    return log;
+  };
+
+  it('never shows a large shark of a species not already met small, over many descents', () => {
+    for (let run = 0; run < 200; run++) {
+      for (const { level, largeKinds, metBefore } of playThrough()) {
+        if (level > SMALL_BEFORE_LARGE_UNTIL_LEVEL) continue;
+        for (const kind of largeKinds) {
+          expect(metBefore).toContain(kind);
+        }
+      }
+    }
+  });
+
+  it('keeps every level the number of large sharks it was authored with', () => {
+    for (let run = 0; run < 50; run++) {
+      const log = playThrough();
+      expect(log.map((l) => l.largeKinds.length)).toEqual(LEVELS.map((c) => c.largeSharkCount));
+    }
+  });
+
+  it('holds the great white to one a level below the pair level, all the way through', () => {
+    for (let run = 0; run < 200; run++) {
+      for (const { level, largeKinds } of playThrough()) {
+        if (level >= GREAT_WHITE_PAIR_FROM_LEVEL) continue;
+        expect(largeKinds.filter((k) => k === 'greatWhite').length).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+
+  it('makes level 4s single large a tiger, since the great white is new that level', () => {
+    for (let run = 0; run < 100; run++) {
+      const level4 = playThrough().find((l) => l.level === 4)!;
+      expect(level4.largeKinds).toEqual(['tiger']);
     }
   });
 });

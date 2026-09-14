@@ -15,6 +15,8 @@ export interface RunCheckpoint {
   totalDolphinsSaved: number;
   elapsedSeconds: number;
   seenSharkKinds: SharkKind[];
+  /** Optional: checkpoints written before small-before-large existed do not carry it. */
+  seenSmallSharkKinds?: SharkKind[];
   seenLargeSharkKinds: SharkKind[];
   seenLargeSharkVariety: boolean;
 }

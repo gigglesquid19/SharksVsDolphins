@@ -32,6 +32,7 @@ import {
   LevelConfig,
   dealLargeSharkKinds,
   getLevelBackground,
+  largeKindPool,
   getLevelConfig,
   isMesopelagicLevel,
   isSandboxLevel,
@@ -666,6 +667,14 @@ export class Game {
   private achievementsThisRun: string[] = [];
   private hintQueue: { heading: string; text: string }[] = [];
   private seenSharkKinds = new Set<SharkKind>();
+  /**
+   * Species the run has actually put in the water as small sharks, level by level.
+   *
+   * Distinct from seenSharkKinds, which is the level's *pool* and drives the intro cards: a pool
+   * can name a species that its random draw then never spawns. This is what was really there, and
+   * it is what decides whether a species is allowed to turn up large - see largeKindPool.
+   */
+  private seenSmallSharkKinds = new Set<SharkKind>();
   private seenLargeSharkKinds = new Set<SharkKind>();
   private seenLargeSharkVariety = false;
   private autoFormedForThisPod = false;
@@ -1527,6 +1536,9 @@ export class Game {
     this.syncedSharkKills = checkpoint.sharksKilled;
     this.totalDolphinsSaved = checkpoint.totalDolphinsSaved;
     this.seenSharkKinds = new Set(checkpoint.seenSharkKinds);
+    // Absent from checkpoints written before small-before-large existed; an empty set just means
+    // the first level back falls through to its own small sharks, which is the safe direction.
+    this.seenSmallSharkKinds = new Set(checkpoint.seenSmallSharkKinds ?? []);
     this.seenLargeSharkKinds = new Set(checkpoint.seenLargeSharkKinds);
     this.seenLargeSharkVariety = checkpoint.seenLargeSharkVariety;
 
@@ -1554,6 +1566,7 @@ export class Game {
       totalDolphinsSaved: this.totalDolphinsSaved,
       elapsedSeconds: this.runElapsed,
       seenSharkKinds: [...this.seenSharkKinds],
+      seenSmallSharkKinds: [...this.seenSmallSharkKinds],
       seenLargeSharkKinds: [...this.seenLargeSharkKinds],
       seenLargeSharkVariety: this.seenLargeSharkVariety,
     });
@@ -1988,6 +2001,7 @@ export class Game {
       this.sprintCooldownReduction = 0;
       this.sprintDurationBonus = 0;
       this.seenSharkKinds = new Set<SharkKind>();
+      this.seenSmallSharkKinds = new Set<SharkKind>();
       this.seenLargeSharkKinds = new Set<SharkKind>();
       this.seenLargeSharkVariety = false;
       this.retries = 0;
@@ -3868,9 +3882,13 @@ ${cleared.name} Zone Liberated
         ? config.sharkKinds[i % config.sharkKinds.length]
         : config.sharkKinds[Math.floor(Math.random() * config.sharkKinds.length)];
 
+    // What the small draw actually produced, which is not the same as what the pool allows - see
+    // seenSmallSharkKinds. Settled before the large sharks are dealt, because it gates them.
+    const smallsHere = new Set<SharkKind>();
     for (let i = 0; i < config.normalSharkCount; i++) {
       const shark = new Shark(id++);
       shark.kind = pickKind(i);
+      smallsHere.add(shark.kind);
       shark.sizeMultiplier = SHARK_KIND_LOOK[shark.kind].smallSize;
       shark.speedMultiplier = config.sharkSpeedMultiplier * SHARK_KIND_LOOK[shark.kind].speed;
       this.randomizeSharkSpawnPosition(shark);
@@ -3879,9 +3897,11 @@ ${cleared.name} Zone Liberated
       this.addSharkSprite(shark);
     }
 
-    // The large sharks are dealt as a set rather than one at a time, because the one rule they
-    // have is about the set: at most one large great white until GREAT_WHITE_PAIR_FROM_LEVEL.
-    const largeKinds = dealLargeSharkKinds(config.sharkKinds, config.largeSharkCount, config.level, dealInTurn);
+    // Two rules shape the large sharks, and both are about the set rather than the individual:
+    // nothing may arrive large that the player has not met small (largeKindPool), and at most one
+    // large great white until GREAT_WHITE_PAIR_FROM_LEVEL (dealLargeSharkKinds).
+    const largePool = largeKindPool(config.sharkKinds, config.level, this.seenSmallSharkKinds, smallsHere);
+    const largeKinds = dealLargeSharkKinds(largePool, config.largeSharkCount, config.level, dealInTurn);
     for (let i = 0; i < config.largeSharkCount; i++) {
       const shark = new Shark(id++);
       shark.kind = largeKinds[i];
@@ -3898,6 +3918,9 @@ ${cleared.name} Zone Liberated
       this.sharks.push(shark);
       this.addSharkSprite(shark);
     }
+
+    // Banked only now, so this level's own smalls could not have unlocked this level's larges.
+    for (const kind of smallsHere) this.seenSmallSharkKinds.add(kind);
 
     this.levelGloom = Math.max(0, Math.min(1, config.gloom ?? 0));
     this.maxDolphins = config.maxDolphins;

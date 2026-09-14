@@ -348,3 +348,46 @@ export function dealLargeSharkKinds(
   }
   return out;
 }
+
+/**
+ * The last level on which a large shark has to have been met as a small one first.
+ *
+ * A large shark is the same animal with a different answer: it needs a pod half again the size
+ * and a Boost dash on top, and the only way a player knows which of those two things is swimming
+ * at them is by having learned the silhouette. Meeting a species for the first time at its large
+ * size teaches the silhouette and the punishment in the same moment, which is how a level stops
+ * being difficult and starts being unfair.
+ *
+ * Past this the campaign has shown every shallow-water species in both sizes, and the boss level
+ * is allowed to field whatever it likes.
+ */
+export const SMALL_BEFORE_LARGE_UNTIL_LEVEL = 9;
+
+/**
+ * Narrows a level's pool to the kinds its large sharks are allowed to be.
+ *
+ * `metAsSmall` is what the run has already put in front of the player as a small shark on an
+ * earlier level; `smallsHere` is what this level's own small sharks turned out to be, which is
+ * settled before the large ones are dealt.
+ *
+ * Earlier levels are preferred, so in an ordinary descent a species is always a small shark
+ * before it is ever a large one - the great white arrives small on 4 and can only be large from
+ * 5, the hammerhead small on 6 and large from 7. Falling back to this level's own smalls covers
+ * the player who bought their way straight to a depth and has no history at all: the large is
+ * then at least swimming alongside its own small version rather than arriving alone.
+ *
+ * Falling back to the whole pool is the last resort, for a level whose small sharks happen to
+ * share none of its kinds - better a large shark than no large shark on a level authored for one.
+ */
+export function largeKindPool(
+  kinds: readonly SharkKind[],
+  level: number,
+  metAsSmall: ReadonlySet<SharkKind>,
+  smallsHere: ReadonlySet<SharkKind>,
+): readonly SharkKind[] {
+  if (level > SMALL_BEFORE_LARGE_UNTIL_LEVEL) return kinds;
+  const taught = kinds.filter((k) => metAsSmall.has(k));
+  if (taught.length > 0) return taught;
+  const here = kinds.filter((k) => smallsHere.has(k));
+  return here.length > 0 ? here : kinds;
+}
