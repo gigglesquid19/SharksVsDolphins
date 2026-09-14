@@ -263,6 +263,24 @@ const MEGAMOUTH_FINISHER_PEARLS = 15;
 /** Spacing between rams, so one pass through it cannot land the whole fight. */
 const MEGAMOUTH_HIT_COOLDOWN_MS = 900;
 /**
+ * How long the pod has after the megamouth sweeps one of them, rather than the one second every
+ * other hazard allows.
+ *
+ * It asks for ten dolphins to be hurt and takes them one at a time, so at a second apiece a pod
+ * of exactly ten has three seconds of margin before it drops under its own threshold - long
+ * enough to be inside it, nowhere near long enough to line a Boost up and land it. Two seconds
+ * doubles that window without making the thing safe to swim through.
+ */
+const MEGAMOUTH_SWEEP_COOLDOWN_MS = 2000;
+/**
+ * The dolphin spawn interval while the megamouth is the last thing alive.
+ *
+ * The fight needs ten dolphins and eats them, and by the time it starts every shark is dead - so
+ * the ordinary clock is refilling a pod that is being emptied twice as fast, on a level with
+ * nothing else left to do. Quicker while the fight is on, and only while it is on.
+ */
+const MEGAMOUTH_FIGHT_SPAWN_INTERVAL = 7;
+/**
  * Its speed once it turns defensive: past the pod's cruise, short of a Boost, so a dash is still
  * what catches it.
  *
@@ -5240,6 +5258,15 @@ ${cleared.name} Zone Liberated
     }
   }
 
+  /**
+   * Whether the level has come down to the megamouth and the pod: it has turned on them and has
+   * not yet been beaten. Not simply "a megamouth exists" - while it is still crossing there are
+   * sharks in the water and the level is an ordinary level.
+   */
+  private inTheMegamouthFight(): boolean {
+    return !!this.megamouth && this.megamouth.defensive && !this.megamouth.beaten;
+  }
+
   /** Whether there is still a megamouth out there that the level is waiting on. */
   private megamouthHoldsTheLevel(): boolean {
     return !!this.megamouth && !this.megamouth.beaten;
@@ -5707,8 +5734,11 @@ ${cleared.name} Zone Liberated
           (d) => now >= d.invulnerableUntil && (grabbed(d) || swept(d)),
         );
         if (victim) {
-          const caught = grabbed(victim) ? 'Grabbed!' : 'Swept aside!';
-          this.playerHitCooldownUntil = now + 1000;
+          const byArm = grabbed(victim);
+          const caught = byArm ? 'Grabbed!' : 'Swept aside!';
+          // A megamouth gives the pod longer to recover than an arm does - see the note on
+          // MEGAMOUTH_SWEEP_COOLDOWN_MS.
+          this.playerHitCooldownUntil = now + (byArm ? 1000 : MEGAMOUTH_SWEEP_COOLDOWN_MS);
           sfx.playBite();
           if (victim.isPlayer) {
             if (this.vitalityLives > 0) {
@@ -5816,7 +5846,11 @@ ${cleared.name} Zone Liberated
       const hasStray = this.dolphins.some((d) => !d.isPlayer && !d.recruited);
       if (!hasStray) {
         this.spawnRecruitableDolphin();
-        this.nextDolphinSpawnTime += this.dolphinSpawnInterval;
+        // Quicker while the megamouth fight is on, and only while it is on - see
+        // MEGAMOUTH_FIGHT_SPAWN_INTERVAL.
+        this.nextDolphinSpawnTime += this.inTheMegamouthFight()
+          ? Math.min(this.dolphinSpawnInterval, MEGAMOUTH_FIGHT_SPAWN_INTERVAL)
+          : this.dolphinSpawnInterval;
       }
     }
 
