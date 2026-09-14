@@ -352,13 +352,17 @@ const TENTACLE_SEGMENTS = 22;
 /**
  * Thick at the root, and swinging a long way at the tip.
  *
- * Both were about half this to begin with, which drew something closer to a ribbon than an arm:
- * at a couple of hundred pixels long a 13px root is a band, and a 16px swing over that distance
- * is a straight line with a kink. An arm has to be visibly heavy where it meets the dark and
- * visibly loose at the end.
+ * Both were about a third of this to begin with, which drew something closer to a ribbon than an
+ * arm: at a couple of hundred pixels long a 13px root is a band, and a 16px swing over that
+ * distance is a straight line with a kink. An arm has to be visibly heavy where it meets the dark
+ * and visibly loose at the end.
+ *
+ * The two are raised together and with the reach, so the arm keeps its proportions as it grows -
+ * a longer arm at the old thickness would go back to being a ribbon. TENTACLE_HIT_RADIUS in
+ * game.ts is part of the same set and moves with them.
  */
-const TENTACLE_ROOT_WIDTH = 24;
-const TENTACLE_WAVE_PX = 34;
+const TENTACLE_ROOT_WIDTH = 36;
+const TENTACLE_WAVE_PX = 51;
 
 /**
  * The shape of an arm at this instant, shared by the body and its lights.

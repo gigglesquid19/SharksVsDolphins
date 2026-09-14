@@ -147,9 +147,15 @@ const TENTACLE_WITHDRAW_MS = 1000;
 /** Longest wait between one arm withdrawing and reaching again, so the arena is never fully shut. */
 const TENTACLE_WAIT_MS = 2600;
 /** How far across a single arm can get, as a share of the arena's width. */
-const TENTACLE_REACH_SHARE = 0.45;
-/** How close to the arm counts as contact, in world units. */
-const TENTACLE_HIT_RADIUS = 3.2;
+const TENTACLE_REACH_SHARE = 0.675;
+/**
+ * How close to the arm counts as contact, in world units.
+ *
+ * Tied to how thick the arm is drawn: TENTACLE_ROOT_WIDTH over WORLD_SCALE is six world units at
+ * the root, and this sits just inside that. It has to move whenever the drawn thickness does, or
+ * the arm starts taking dolphins it visibly missed - or worse, missing ones it visibly hit.
+ */
+const TENTACLE_HIT_RADIUS = 4.8;
 /** Clearance kept from the top and bottom when an arm picks a new row to come back at. */
 const TENTACLE_EDGE_MARGIN = 8;
 /** How fast a shark leaves, and comes back, against its own speed. Faster than it hunts. */
@@ -167,7 +173,8 @@ const KRAKEN_OFFSTAGE_MARGIN = 16;
 const MEGAMOUTH_DURATION = 35;
 /** Three times a large great white. Half again on what it was - it should be unmistakable. */
 const MEGAMOUTH_SIZE = 3;
-const MEGAMOUTH_SPEED = 0.42;
+/** Twice what it was. At half this it crossed slowly enough to be scenery rather than a hazard. */
+const MEGAMOUTH_SPEED = 0.84;
 /** Its own reach, in world units - it is enormous, and the hit box has to say so. */
 const MEGAMOUTH_HIT_RADIUS = 13;
 /** How far past the edge it goes before wrapping round, in world units. */
