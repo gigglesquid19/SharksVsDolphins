@@ -13,6 +13,7 @@ import {
   createEyes,
   createJellyfishSprite,
   DEEP_JELLYFISH,
+  jellyfishFlashAlpha,
   SHALLOW_JELLYFISH,
   createPhotophores,
   createSharkSprite,
@@ -4810,8 +4811,9 @@ ${cleared.name} Zone Liberated
     this.lostAtSwarmStart = this.totalLost;
     this.swarmClearSince = 0;
     this.clearJellyfish();
-    // Down in the twilight the swarm is a different animal: dark red and carrying its own light.
+    // Down in the twilight the swarm is a different animal: dark red, and flashing blue.
     const look = isMesopelagicLevel(this.currentLevel) ? DEEP_JELLYFISH : SHALLOW_JELLYFISH;
+    this.swarmFlashes = look.luminous;
     for (let i = 0; i < JELLYFISH_COUNT; i++) {
       const y = 2 + Math.random() * (SIZE_Y - 4);
       const jelly = new Jellyfish(i, y);
@@ -4921,9 +4923,15 @@ ${cleared.name} Zone Liberated
 
   private drawJellyfish(): void {
     const scale = WORLD_SCALE;
+    const now = Date.now();
     for (const [jelly, sprite] of this.jellyfishSprites) {
       sprite.x = jelly._x * scale + scale / 2;
       sprite.y = jelly._y * scale + scale / 2;
+      // Only the deep swarm has an alarm to set off; the sunlit one is lit from outside and holds
+      // whatever alpha it was drawn with.
+      if (!this.swarmFlashes) continue;
+      const glow = sprite.getChildByName('glow') as Container | null;
+      if (glow) glow.alpha = jellyfishFlashAlpha(now, jelly.id);
     }
   }
 
@@ -5061,6 +5069,8 @@ ${cleared.name} Zone Liberated
 
   /** When the pod first got clear of the swarm, in seconds of play. 0 while it is still in it. */
   private swarmClearSince = 0;
+  /** Whether the swarm in the water is the deep kind, which flashes rather than glowing. */
+  private swarmFlashes = false;
 
   /** Level 5's one cry from below: when it is due, whether it has sounded, and how long it holds. */
   private deepCryAt = Infinity;

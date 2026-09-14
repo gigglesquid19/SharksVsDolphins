@@ -542,22 +542,43 @@ export const SHALLOW_JELLYFISH: JellyfishLook = {
 };
 
 /**
- * Twilight water: a near-black red body carrying a light of its own.
+ * Twilight water: a near-black red body that flashes blue.
  *
- * Dark red is what deep-sea jellyfish actually are, and for a good reason - red light does not
- * reach down there, so a red animal is a black one. That is the half of it that hides. The other
- * half is the glow, which is added to the water rather than laid over it, so the body stays a
- * dark shape and the light is the only part that carries: the same read as every other deep-water
- * species down here, where you find things by what they are lit with.
+ * Both halves are what the real animal does. Dark red is what deep-sea jellyfish are, because red
+ * light does not reach down there and a red animal is therefore a black one - that is the half
+ * that hides. The flash is the other half, and it is blue because blue is what travels through
+ * water: an Atolla sets off a train of flashes when something takes hold of it, which is no use
+ * as a warning to itself and every use as an advertisement of whatever is eating it. A burglar
+ * alarm, not a lamp.
+ *
+ * So the body never lights up. It stays a dark shape, and every couple of seconds a run of quick
+ * blue flashes goes off in it - see jellyfishFlashAlpha.
  */
 export const DEEP_JELLYFISH: JellyfishLook = {
   bell: 0x6b111b,
   rim: 0x2c0308,
   tentacle: 0x8c1c2b,
-  glow: 0xff3b4a,
-  glowAlpha: 0.5,
+  glow: 0x60d5ff,
+  glowAlpha: 0.85,
   luminous: true,
 };
+
+/**
+ * The alarm: three quick flashes, then a long dark wait, forever.
+ *
+ * Seeded off the jellyfish's own id so a swarm never flashes in unison - fifty animals on one
+ * clock reads as a light show, while fifty on their own reads as fifty animals. Dark between runs
+ * rather than dim, because the point of a flash is the contrast with what came before it.
+ */
+export function jellyfishFlashAlpha(now: number, seed: number): number {
+  const PERIOD = 2600;
+  const BURST = 200;
+  const LIT = 90;
+  const DARK = 0.05;
+  const t = (now + seed * 431) % PERIOD;
+  if (t >= BURST * 3) return DARK;
+  return t % BURST < LIT ? 1 : DARK;
+}
 
 export function createJellyfishSprite(look: JellyfishLook = SHALLOW_JELLYFISH): Container {
   const container = new Container();
@@ -579,6 +600,7 @@ export function createJellyfishSprite(look: JellyfishLook = SHALLOW_JELLYFISH): 
   container.addChild(tentacles);
 
   const glow = new Graphics();
+  glow.name = 'glow';
   glow.ellipse(0, -4, 9, 7);
   glow.fill({ color: look.glow, alpha: look.glowAlpha });
   if (look.luminous) {
@@ -587,6 +609,8 @@ export function createJellyfishSprite(look: JellyfishLook = SHALLOW_JELLYFISH): 
     glow.ellipse(0, -4, 14, 11);
     glow.fill({ color: look.glow, alpha: look.glowAlpha * 0.35 });
     glow.blendMode = 'add';
+    // Starts dark. The draw loop runs the alarm - see jellyfishFlashAlpha.
+    glow.alpha = 0;
   }
   container.addChild(glow);
 
