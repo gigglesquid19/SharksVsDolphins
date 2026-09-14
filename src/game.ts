@@ -506,8 +506,9 @@ export class Game {
   private activeEvent: { type: GameEventType; endsAt: number } | null = null;
   private nextEventCheckTime = EVENT_CHECK_INTERVAL;
   private pendingEvent: GameEventType | null = null;
-  private nextStormWarningTime = -5;
-  private stormWarningShown = false;
+  /** When the run-up warning for the next event is due, and whether it has been given. */
+  private nextEventWarningTime = -5;
+  private eventWarningShown = false;
   private jellyfish: Jellyfish[] = [];
   private jellyfishContainer!: Container;
   /**
@@ -1969,7 +1970,7 @@ export class Game {
     this.activeEvent = null;
     this.nextEventCheckTime = EVENT_CHECK_INTERVAL;
     this.pendingEvent = null;
-    this.stormWarningShown = false;
+    this.eventWarningShown = false;
     this.planNextEvent();
     this.clearJellyfish();
     // Both hold sprites of their own, so a level that ends mid-event would otherwise leave an arm
@@ -4262,8 +4263,8 @@ ${cleared.name} Zone Liberated
         ? allowed[Math.floor(Math.random() * allowed.length)]
         : null;
 
-    this.nextStormWarningTime = this.nextEventCheckTime - 5;
-    this.stormWarningShown = false;
+    this.nextEventWarningTime = this.nextEventCheckTime - 5;
+    this.eventWarningShown = false;
   }
 
   /**
@@ -4327,10 +4328,32 @@ ${cleared.name} Zone Liberated
       }
       this.nextEventCheckTime += EVENT_CHECK_INTERVAL;
       this.planNextEvent();
-    } else if (this.pendingEvent === 'storm' && this.gameTime >= this.nextStormWarningTime && !this.stormWarningShown) {
-      this.stormWarningShown = true;
-      this.setStatus('Storm approaching in 5 seconds');
+    } else if (this.pendingEvent && this.gameTime >= this.nextEventWarningTime && !this.eventWarningShown) {
+      this.eventWarningShown = true;
+      this.announcePendingEvent(this.pendingEvent);
     }
+  }
+
+  /**
+   * The five seconds of notice before an event lands.
+   *
+   * The two deep-water events share a line, and deliberately a vague one: what is coming is not
+   * named because not knowing which of the two it is - an arena closing in, or something enormous
+   * crossing it - is most of what makes the wait worth anything. A storm keeps its own wording,
+   * since it says what it is and has since long before either of these existed.
+   */
+  private announcePendingEvent(type: GameEventType): void {
+    if (type === 'storm') {
+      this.setStatus('Storm approaching in 5 seconds');
+      return;
+    }
+    if (type === 'jellyfish') {
+      this.setStatus('Something is drifting this way');
+      return;
+    }
+    this.setStatus('A strange noise came from the deep');
+    this.showBanner('A strange noise came from the deep', 'storm', 2600);
+    sfx.playDeepWarning();
   }
 
   private updateMatriarch(): void {

@@ -311,6 +311,24 @@ class SfxEngine {
   }
 
   /**
+   * The strange noise from the deep: the five seconds of notice before a kraken or a megamouth.
+   *
+   * Distant on purpose - quiet, slow, and far down the register, with nothing in it that says
+   * which of the two is coming. It is the sound of something a long way off noticing you, and it
+   * has to sit apart from every other cue in the game, all of which mean a thing is happening now
+   * rather than shortly.
+   */
+  playDeepWarning(): void {
+    const ctx = this.ensureContext();
+    const now = ctx.currentTime;
+
+    this.tone(ctx, 41, now, 2.6, { type: 'sine', gain: 0.13, glideTo: 33 });
+    this.tone(ctx, 61, now + 0.5, 2.0, { type: 'sine', gain: 0.08, glideTo: 49 });
+    // A single far-off knock a beat in, so it reads as something making a noise rather than as
+    // the water simply moving.
+    this.tone(ctx, 96, now + 1.1, 0.5, { type: 'triangle', gain: 0.06, glideTo: 72 });
+  }
+  /**
    * The kraken arriving: a long, low groan of moving water with nothing sharp in it.
    *
    * Deliberately not a sting. The hazard is slow and positional, and the sound is the cue to start
