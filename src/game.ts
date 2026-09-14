@@ -316,6 +316,13 @@ const SANDBOX_STARTING_POD = 5;
 const MATRIARCH_HITS_REQUIRED = 3;
 const MATRIARCH_HIT_COOLDOWN_MS = 900;
 const LARGE_SHARK_SIZE_MULTIPLIER = 1.8;
+/**
+ * The large tiger, which is bigger again than everything else large - it is drawn from a strip
+ * that renders at half the others' scale (SHARK_KIND_SCALE), so the number has to be larger to
+ * arrive at the same place. Up a fifth from 2.5: it is the shark that vanishes and reappears, and
+ * it should be unmistakable in the moment it is visible.
+ */
+const LARGE_TIGER_SIZE_MULTIPLIER = 3;
 // The tiger sprite draws at half the scale of the other two kinds (SHARK_KIND_SCALE), which
 // left small tigers looking undersized against them - a third bigger reads much better.
 const SMALL_TIGER_SIZE_MULTIPLIER = 1.33;
@@ -543,7 +550,7 @@ export function specialSharkArt(special: 'matriarch' | 'megamouth'): SharkArt {
 /** The art for one entry in the book: a species at a size. */
 export function sharkArt(kind: SharkKind, large: boolean): SharkArt {
   const look = SHARK_KIND_LOOK[kind];
-  const size = large ? (kind === 'tiger' ? 2.5 : LARGE_SHARK_SIZE_MULTIPLIER) : look.smallSize;
+  const size = large ? (kind === 'tiger' ? LARGE_TIGER_SIZE_MULTIPLIER : LARGE_SHARK_SIZE_MULTIPLIER) : look.smallSize;
   return {
     strip: SHARK_SPRITE_SOURCE[kind],
     tint: look.tint,
@@ -3862,7 +3869,7 @@ ${cleared.name} Zone Liberated
     if (shark.matriarch) return 10;
     const base = shark.kind === 'greatWhite' && shark.large ? 6 : 4;
     // Every shark used to bite from the same 4-unit hitbox regardless of how big it was drawn -
-    // a hammerhead renders at twice a tiger's scale, a large tiger at 2.5x - so their jaws
+    // a hammerhead renders at twice a tiger's scale, a large tiger at 3x - so their jaws
     // visibly closed over a dolphin with nothing happening. Scaled to the sprite like
     // sharkRamRadius, though more conservatively: this is the radius that hurts the player.
     const drawScale = SHARK_KIND_SCALE[shark.kind] * shark.sizeMultiplier;
@@ -3898,7 +3905,7 @@ ${cleared.name} Zone Liberated
 
   /**
    * Radius at which the pod can destroy a shark. Scaled to the drawn sprite
-   * (SHARK_KIND_SCALE x sizeMultiplier - see the draw loop), because a large tiger is 2.5x
+   * (SHARK_KIND_SCALE x sizeMultiplier - see the draw loop), because a large tiger is 3x
    * the size of a small one but used to share its 4-unit hitbox: you could sprint visibly
    * *through* one and have the ram not register. Kept separate from (and never smaller than)
    * the bite radius, so generous player hitboxes don't also make sharks more dangerous.
@@ -4050,7 +4057,7 @@ ${cleared.name} Zone Liberated
       shark.kind = largeKinds[i];
       shark.large = true;
       recordSharkEncounter(shark.kind, true);
-      shark.sizeMultiplier = shark.kind === 'tiger' ? 2.5 : LARGE_SHARK_SIZE_MULTIPLIER;
+      shark.sizeMultiplier = shark.kind === 'tiger' ? LARGE_TIGER_SIZE_MULTIPLIER : LARGE_SHARK_SIZE_MULTIPLIER;
       shark.speedMultiplier =
         config.sharkSpeedMultiplier *
         SHARK_KIND_LOOK[shark.kind].speed *

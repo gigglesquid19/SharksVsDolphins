@@ -513,7 +513,11 @@ button.school.mega-pod:hover:not(:disabled) { box-shadow: 0 6px 22px rgba(168, 8
 
 .game-banner {
   position: absolute;
-  top: 50%;
+  /* Up out of the middle, not across it. Dead centre is where the Boost tap zone is and where a
+     player's eyes are while they are deciding whether to use it, so a "Dolphin Lost" card landing
+     there covered the one part of the screen that was being looked at - and it lands at exactly
+     the moment a Boost is most wanted. High enough now to clear the tap zone entirely. */
+  top: 18%;
   left: 50%;
   transform: translate(-50%, -50%) scale(0.9);
   padding: 14px 30px;

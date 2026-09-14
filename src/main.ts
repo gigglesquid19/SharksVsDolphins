@@ -1116,7 +1116,16 @@ const inputs = {
       const touch = e.changedTouches[i];
       // A press in the middle asks for no direction, so it is free to be an ability tap - and it
       // can be one while another finger steers.
-      if (tapTouchId === null && inTapZone(touch.clientX, touch.clientY)) {
+      //
+      // The slot is handed over rather than held, which is what was eating Boosts. Steering by
+      // holding the water usually puts that finger inside the tap zone - it covers the middle
+      // three fifths of the arena - so the steering thumb claimed the tap slot on the way down
+      // and kept it for as long as it stayed on the glass. A second finger tapping the middle for
+      // Boost was then ignored outright: the slot was taken by a touch that had already
+      // disqualified itself by dragging. A candidate that has moved, or that has been held past
+      // the point where it could still be a tap, gives the slot up to a fresh press.
+      const candidateSpent = tapStartAt === 0 || tapMoved || Date.now() - tapStartAt > TAP_MAX_MS;
+      if ((tapTouchId === null || candidateSpent) && inTapZone(touch.clientX, touch.clientY)) {
         tapTouchId = touch.identifier;
         beginTap(touch.clientX, touch.clientY);
       }
