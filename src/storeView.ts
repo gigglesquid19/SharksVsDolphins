@@ -1,14 +1,20 @@
 import { getPearls } from './pearls';
 import {
   ECHOLOCATION_PRICE,
+  IRON_SKIN_COOLDOWN_MS,
+  IRON_SKIN_PRICE,
+  IRON_SKIN_UNLOCK_LEVEL,
   UPGRADES,
   UpgradeId,
   buyEcholocation,
   buySkin,
   buyUpgrade,
   canBuyUpgrade,
+  buyIronSkin,
   echolocationStats,
   echolocationUnlocked,
+  ironSkinUnlocked,
+  ownsIronSkin,
   equipSkin,
   equippedSkinId,
   nextUpgradeCost,
@@ -103,44 +109,83 @@ export function setupStore(opts: { onPearlsChange: () => void }): { open: () => 
   }
 
   /**
-   * Echolocation: locked until the campaign has been cleared, then a one-off purchase. Shown even
-   * while locked, with the reason on the button, so the campaign has something to point at.
+   * One card per ability. Both are one-off purchases behind an achievement rather than Pearls
+   * alone, and both are shown even while locked, with the reason on the button - a lock the
+   * player can read is a thing to go and do, and a card that is simply absent is nothing at all.
    */
-  function renderAbilities(): void {
+  function abilityCard(spec: {
+    icon: string;
+    name: string;
+    desc: string;
+    detail: string;
+    owned: boolean;
+    unlocked: boolean;
+    lockedLabel: string;
+    price: number;
+    buy: () => boolean;
+  }): HTMLElement {
     const balance = getPearls();
-    const owned = ownsEcholocation();
-    const unlocked = echolocationUnlocked();
-    const stats = echolocationStats();
-
     const item = document.createElement('div');
     item.className = 'store-item';
-    if (owned) item.classList.add('owned');
-    if (!unlocked) item.classList.add('locked');
+    if (spec.owned) item.classList.add('owned');
+    if (!spec.unlocked) item.classList.add('locked');
 
-    const seconds = (stats.durationMs / 1000).toFixed(1).replace(/\.0$/, '');
     item.innerHTML = `
-      <div class="store-item-icon" aria-hidden="true">🔊</div>
-      <div class="store-item-name">Echolocation</div>
-      <div class="store-item-desc">Ping the water to see cloaked tiger sharks and anything a storm is hiding.</div>
-      <div class="store-item-level">${owned ? `${seconds}s &middot; ${stats.radius} units` : 'Depthless Campaign only'}</div>`;
+      <div class="store-item-icon" aria-hidden="true">${spec.icon}</div>
+      <div class="store-item-name">${spec.name}</div>
+      <div class="store-item-desc">${spec.desc}</div>
+      <div class="store-item-level">${spec.detail}</div>`;
 
     const btn = document.createElement('button');
     btn.className = 'store-buy';
-    if (owned) {
+    if (spec.owned) {
       btn.textContent = 'Owned';
       btn.disabled = true;
-    } else if (!unlocked) {
-      btn.textContent = '🔒 Clear the campaign';
+    } else if (!spec.unlocked) {
+      btn.textContent = spec.lockedLabel;
       btn.disabled = true;
     } else {
-      btn.innerHTML = `<img class="pearl-icon" alt="" src="${pearlIconSrc()}"> ${ECHOLOCATION_PRICE}`;
-      btn.disabled = balance < ECHOLOCATION_PRICE;
+      btn.innerHTML = `<img class="pearl-icon" alt="" src="${pearlIconSrc()}"> ${spec.price}`;
+      btn.disabled = balance < spec.price;
       btn.addEventListener('click', () => {
-        if (buyEcholocation()) refresh();
+        if (spec.buy()) refresh();
       });
     }
     item.appendChild(btn);
-    abilitiesEl.replaceChildren(item);
+    return item;
+  }
+
+  function renderAbilities(): void {
+    const echoOwned = ownsEcholocation();
+    const stats = echolocationStats();
+    const seconds = (stats.durationMs / 1000).toFixed(1).replace(/\.0$/, '');
+    const skinOwned = ownsIronSkin();
+    const skinSeconds = Math.round(IRON_SKIN_COOLDOWN_MS / 1000);
+
+    abilitiesEl.replaceChildren(
+      abilityCard({
+        icon: '🔊',
+        name: 'Echolocation',
+        desc: 'Ping the water to see cloaked tiger sharks and anything a storm is hiding.',
+        detail: echoOwned ? `${seconds}s &middot; ${stats.radius} units` : 'Depthless Campaign only',
+        owned: echoOwned,
+        unlocked: echolocationUnlocked(),
+        lockedLabel: '🔒 Clear the campaign',
+        price: ECHOLOCATION_PRICE,
+        buy: buyEcholocation,
+      }),
+      abilityCard({
+        icon: '🛡️',
+        name: 'Iron Skin',
+        desc: 'Pressure at depth leaves a hide behind it. Every so often, something that should take a dolphin simply does not.',
+        detail: skinOwned ? `Turns a hit aside every ${skinSeconds}s` : `Depthless Campaign only`,
+        owned: skinOwned,
+        unlocked: ironSkinUnlocked(),
+        lockedLabel: `🔒 Clear level ${IRON_SKIN_UNLOCK_LEVEL}`,
+        price: IRON_SKIN_PRICE,
+        buy: buyIronSkin,
+      }),
+    );
   }
 
   function renderUpgrades(): void {

@@ -1,5 +1,5 @@
 import { spendPearls } from './pearls';
-import { hasClearedCampaign } from './progress';
+import { hasClearedCampaign, hasClearedLevel } from './progress';
 import { skinById } from './skins';
 
 /**
@@ -28,6 +28,25 @@ export type UpgradeId =
  */
 export const ECHOLOCATION_ID = 'echolocation';
 export const ECHOLOCATION_PRICE = 200;
+
+/**
+ * Iron Skin: the second one-off ability, and the one the deep end is for.
+ *
+ * Locked until level 30 has been cleared - the floor of the Bathypelagic - because what it
+ * answers is the pressure down there rather than anything in the first twenty levels. A dolphin
+ * that has been that deep has been squeezed by water that would crush a shallow one, and comes
+ * back with a hide to show for it: every so often something that should take a member of the pod
+ * simply fails to.
+ *
+ * Priced above Echolocation. Echolocation is sight, which the dark levels need to be playable at
+ * all; this is survival, which they do not, and a player buying it already has a build.
+ */
+export const IRON_SKIN_ID = 'ironSkin';
+export const IRON_SKIN_PRICE = 450;
+/** The depth that has to have been survived before it can be bought. */
+export const IRON_SKIN_UNLOCK_LEVEL = 30;
+/** How long the hide takes to be worth anything again after it has turned a hit aside, in ms. */
+export const IRON_SKIN_COOLDOWN_MS = 20000;
 
 export interface UpgradeDef {
   name: string;
@@ -224,6 +243,25 @@ export function buyUpgrade(id: UpgradeId): boolean {
 
 export function ownsEcholocation(): boolean {
   return load().ownedAbilities.includes(ECHOLOCATION_ID);
+}
+
+export function ownsIronSkin(): boolean {
+  return load().ownedAbilities.includes(IRON_SKIN_ID);
+}
+
+/** Iron Skin is the reward for reaching the floor of the Bathypelagic; Pearls alone are not enough. */
+export function ironSkinUnlocked(): boolean {
+  return hasClearedLevel(IRON_SKIN_UNLOCK_LEVEL);
+}
+
+/** Buys Iron Skin. Fails if level 30 is unbeaten, it is already owned, or Pearls are short. */
+export function buyIronSkin(): boolean {
+  if (!ironSkinUnlocked() || ownsIronSkin()) return false;
+  if (!spendPearls(IRON_SKIN_PRICE)) return false;
+  const state = load();
+  state.ownedAbilities.push(IRON_SKIN_ID);
+  save(state);
+  return true;
 }
 
 /** Echolocation is the reward for finishing the campaign; Pearls alone are not enough. */

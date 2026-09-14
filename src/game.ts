@@ -74,8 +74,8 @@ import {
   PEARLS_FLAWLESS_CAMPAIGN_BONUS,
 } from './pearls';
 import { getDolphinName } from './profile';
-import { baseEcholocationStats, developerModeActive, echolocationStats, endlessStartBonuses, equippedSkinId, grantSkin, ownsEcholocation, ownsSkin } from './store';
-import { markCampaignCleared } from './progress';
+import { IRON_SKIN_COOLDOWN_MS, baseEcholocationStats, developerModeActive, echolocationStats, endlessStartBonuses, equippedSkinId, grantSkin, ownsEcholocation, ownsIronSkin, ownsSkin } from './store';
+import { markCampaignCleared, markLevelCleared } from './progress';
 import { hasLevelAccess, startLevelIsRanked } from './levelAccess';
 import { skinById } from './skins';
 import { shareMilestone, SHARE_REWARD_SKIN } from './share';
@@ -922,6 +922,9 @@ export class Game {
   private sprintDurationBonus = 0;
   /** Levels of the Store's Responsiveness upgrade. Endless only, like every other Store line. */
   private podResponsiveness = 0;
+  /** Whether Iron Skin is being carried this run, and when the hide is worth anything again. */
+  private ironSkin = false;
+  private ironSkinReadyAt = 0;
   // Game feel: hit-stop freezes the sim until this time; the shake jitters the Pixi stage.
   private hitStopUntil = 0;
   private shakeTime = 0;
@@ -2190,6 +2193,7 @@ export class Game {
       this.sprintCooldownReduction = 0;
       this.sprintDurationBonus = 0;
       this.podResponsiveness = 0;
+      this.ironSkin = false;
       this.seenSharkKinds = new Set<SharkKind>();
       this.seenSmallSharkKinds = new Set<SharkKind>();
       this.seenLargeSharkKinds = new Set<SharkKind>();
@@ -2227,6 +2231,7 @@ export class Game {
         this.charismaBonusDolphins = b.charismaBonusDolphins;
         this.sprintCooldownReduction = b.sprintCooldownReduction;
         this.podResponsiveness = b.responsiveness;
+        this.ironSkin = ownsIronSkin();
         this.sprintDurationBonus = b.sprintDurationBonus;
 
         // A dark depth is dark on purpose and Echolocation is the answer to it, so two cases hand
@@ -2965,6 +2970,9 @@ ${zone.depth}`, 'levelup', duration + 1400);
     if (this.mode === 'campaign' && this.currentLevel === 5) this.tryUnlock('halfwayThere');
     if (this.wasOnLastLifeThisLevel) this.tryUnlock('comeback');
     this.flushLifetimeStats();
+    // Banked against the profile rather than the run: it is what gates Iron Skin, and a depth
+    // survived once has been survived. Endless only - the campaign's ten are a different ladder.
+    if (this.mode === 'endless') markLevelCleared(this.currentLevel);
     const pearls = pearlsForLevel(this.currentLevel, this.lostThisLevel === 0);
     this.awardRunPearls(pearls);
     // Liberating a depth zone pays a milestone bonus on top of the level's own Pearls. Banked
@@ -3716,6 +3724,26 @@ ${cleared.name} Zone Liberated
     return (frame * look.stretchX) / WORLD_SCALE;
   }
 
+  /**
+   * Iron Skin: every so often, something that should take a dolphin simply does not.
+   *
+   * Asked once per hit rather than once per dolphin, so a Matriarch's two-dolphin bite is turned
+   * aside whole - the hide either holds against what hit it or it does not. Reports whether it
+   * absorbed, and starts its own recharge when it did.
+   *
+   * Deliberately silent when it is not owned or not ready, so every caller can ask without
+   * checking anything first.
+   */
+  private ironSkinAbsorbs(now: number): boolean {
+    if (!this.ironSkin || now < this.ironSkinReadyAt) return false;
+    this.ironSkinReadyAt = now + IRON_SKIN_COOLDOWN_MS;
+    this.playerHitCooldownUntil = Math.max(this.playerHitCooldownUntil, now + 1000);
+    sfx.playShieldBlock();
+    this.setStatus('Iron Skin holds!');
+    this.showBanner('Iron Skin!', 'statup', 1400);
+    return true;
+  }
+
   /** Pod members a shark is allowed to take: the player and anyone recruited. */
   private podMembers(): Dolphin[] {
     return this.dolphins.filter((d) => d.isPlayer || d.recruited);
@@ -4177,6 +4205,7 @@ ${cleared.name} Zone Liberated
       this.matriarchSpawnTime = 0;
     }
 
+    this.ironSkinReadyAt = 0;
     this.beginLevelSetPieces(config);
 
     if (this.huntingMode) this.onSchoolingChange?.(false);
@@ -5562,6 +5591,13 @@ ${cleared.name} Zone Liberated
                 victims.push(candidate);
               }
             }
+            if (victims.length > 0 && this.ironSkinAbsorbs(now)) {
+              // Turned aside. The shark still has to swallow before it can try again, so a hide
+              // that holds buys the same breathing space a lost dolphin would have.
+              shark.feedCooldownUntil = now + SHARK_FEED_COOLDOWN_MS;
+              this.revealShark(shark, now);
+              break;
+            }
             if (victims.length > 0) {
               this.playerHitCooldownUntil = now + 1000;
               shark.feedCooldownUntil = now + SHARK_FEED_COOLDOWN_MS;
@@ -5615,7 +5651,9 @@ ${cleared.name} Zone Liberated
         const victim = this.pickHazardVictim(
           (d) => now >= d.invulnerableUntil && (grabbed(d) || swept(d)),
         );
-        if (victim) {
+        // Absorbed, so nothing is taken - but the frame's clock is advanced further down and
+        // must not be skipped, so this falls past the block rather than returning out of it.
+        if (victim && !this.ironSkinAbsorbs(now)) {
           const caught = grabbed(victim) ? 'Grabbed!' : 'Swept aside!';
           this.playerHitCooldownUntil = now + 1000;
           sfx.playBite();
@@ -5653,6 +5691,7 @@ ${cleared.name} Zone Liberated
         const victim = this.pickHazardVictim((d) => jelly.distanceBetween(d) < 2.5);
         if (!victim) continue;
         if (victim.isPlayer && now < this.player.invulnerableUntil) continue;
+        if (this.ironSkinAbsorbs(now)) break;
         this.playerHitCooldownUntil = now + 1000;
         sfx.playBite();
         if (victim.isPlayer) {

@@ -565,6 +565,20 @@ class SfxEngine {
     this.tone(ctx, 140, now + 0.01, 0.35, { type: 'sine', gain: 0.3, glideTo: 45 });
   }
 
+  /**
+   * Iron Skin turning a hit aside: a short, low, solid knock rather than a chime.
+   *
+   * Pitched under everything else that fires at the same moment - the bite it is answering plays
+   * on top of it - so the two read as one event, something striking a hide and not getting
+   * through, rather than as a reward arriving over a loss.
+   */
+  playShieldBlock(): void {
+    const ctx = this.ensureContext();
+    const now = ctx.currentTime;
+    this.tone(ctx, 150, now, 0.09, { type: 'square', gain: 0.22 });
+    this.tone(ctx, 96, now + 0.045, 0.16, { type: 'sine', gain: 0.3 });
+  }
+
   playAchievement(): void {
     const ctx = this.ensureContext();
     const now = ctx.currentTime;
