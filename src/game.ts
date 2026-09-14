@@ -92,7 +92,7 @@ function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 }
 
-const DOLPHIN_SPAWN_INTERVAL = 14;
+const DOLPHIN_SPAWN_INTERVAL = 12;
 /**
  * How long a shark has to wait after taking a dolphin before it can take another.
  *
@@ -105,8 +105,8 @@ const DOLPHIN_SPAWN_INTERVAL = 14;
  */
 const SHARK_FEED_COOLDOWN_MS = 4000;
 /**
- * What that interval becomes with developer mode on: a third off the ordinary 15, so a pod comes
- * together fast enough to actually get at the deep levels' sharks.
+ * What that interval becomes with developer mode on: a couple of seconds off the ordinary 12, so
+ * a pod comes together fast enough to actually get at the deep levels' sharks.
  *
  * A frilled shark asks for eight dolphins and a large one twelve, against a cap of fifteen, so
  * at the stock rate most of a testing run is spent waiting for a pod rather than using it. It
