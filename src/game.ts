@@ -492,6 +492,21 @@ const LOCK_RANGE = 45;
  * Deliberately shorter than the reach that follows it, so the eye is not a warning you can act on
  * from a distance - it is confirmation of what you have already swum into.
  */
+/**
+ * What one level of Responsiveness does to the pod, and the three numbers it moves.
+ *
+ * The formation is a disk of slots around the player (see moveFollowers), so drawing the radius
+ * in shrinks what the pod can brush against - the area falls with the square, which is why four
+ * percent a level reaches nearly half the footprint at six. The other two are handling: how fast
+ * the whole formation swings round as the player turns, and how hard a follower pulls toward the
+ * slot it has been given. Both were fixed at values tuned for a pod that never turned sharply.
+ */
+const POD_TIGHTEN_PER_LEVEL = 0.04;
+const POD_BASE_TURN_RATE = 0.15;
+const POD_TURN_PER_LEVEL = 0.02;
+const POD_BASE_SMOOTH = 0.22;
+const POD_SMOOTH_PER_LEVEL = 0.015;
+
 const SHARK_EYE_RANGE = 14;
 const SHARK_EYE_FADE = 6;
 
@@ -905,6 +920,8 @@ export class Game {
   private sprintCooldownReduction = 0;
   /** Extra sprint duration in ms from the Store's Boost Duration upgrade (Endless only). */
   private sprintDurationBonus = 0;
+  /** Levels of the Store's Responsiveness upgrade. Endless only, like every other Store line. */
+  private podResponsiveness = 0;
   // Game feel: hit-stop freezes the sim until this time; the shake jitters the Pixi stage.
   private hitStopUntil = 0;
   private shakeTime = 0;
@@ -2172,6 +2189,7 @@ export class Game {
       this.charismaBonusDolphins = 0;
       this.sprintCooldownReduction = 0;
       this.sprintDurationBonus = 0;
+      this.podResponsiveness = 0;
       this.seenSharkKinds = new Set<SharkKind>();
       this.seenSmallSharkKinds = new Set<SharkKind>();
       this.seenLargeSharkKinds = new Set<SharkKind>();
@@ -2208,6 +2226,7 @@ export class Game {
         this.speedBonusPct = b.speedBonusPct;
         this.charismaBonusDolphins = b.charismaBonusDolphins;
         this.sprintCooldownReduction = b.sprintCooldownReduction;
+        this.podResponsiveness = b.responsiveness;
         this.sprintDurationBonus = b.sprintDurationBonus;
 
         // A dark depth is dark on purpose and Echolocation is the answer to it, so two cases hand
@@ -2749,8 +2768,9 @@ ${zone.depth}`, 'levelup', duration + 1400);
     const desiredVY = dist > 0.001 ? (dy / dist) * wanted : 0;
 
     // Ease the actual velocity toward it rather than adopting it outright: turns arc, and a
-    // follower coasts to a halt in its slot instead of stopping dead.
-    const SMOOTH = 0.22;
+    // follower coasts to a halt in its slot instead of stopping dead. Responsiveness pulls harder
+    // on that easing, which is what makes a sharp corner read as a corner rather than an arc.
+    const SMOOTH = POD_BASE_SMOOTH + this.podResponsiveness * POD_SMOOTH_PER_LEVEL;
     dolphin.velX += (desiredVX - dolphin.velX) * SMOOTH;
     dolphin.velY += (desiredVY - dolphin.velY) * SMOOTH;
 
@@ -2786,12 +2806,14 @@ ${zone.depth}`, 'levelup', duration + 1400);
       let diff = Math.atan2(pdy, pdx) - this.podHeading;
       while (diff > Math.PI) diff -= Math.PI * 2;
       while (diff < -Math.PI) diff += Math.PI * 2;
-      this.podHeading += diff * 0.15;
+      this.podHeading += diff * (POD_BASE_TURN_RATE + this.podResponsiveness * POD_TURN_PER_LEVEL);
     }
 
     followers.forEach((dolphin, idx) => {
       const angle = idx * GOLDEN_ANGLE + this.podHeading;
-      const radius = Math.min(MAX_RADIUS, 4 + 2 * Math.sqrt(idx));
+      // Responsiveness draws the whole spiral in, so the pod occupies less water at any size.
+      const tighten = Math.max(0.5, 1 - this.podResponsiveness * POD_TIGHTEN_PER_LEVEL);
+      const radius = Math.min(MAX_RADIUS, (4 + 2 * Math.sqrt(idx)) * tighten);
       // Not rounded: quantising the slot to whole units made it hop between cells, which the
       // follower then chased - another source of the twitchy look.
       const tx = wrapX(this.player!._x + Math.cos(angle) * radius);

@@ -47,6 +47,7 @@ describe('default state', () => {
       boostDuration: 0,
       echoDuration: 0,
       echoRadius: 0,
+      responsiveness: 0,
     });
     expect(s.ownedAbilities).toEqual([]);
   });
@@ -128,12 +129,16 @@ describe('endlessStartBonuses', () => {
     buyUpgrade('boost');
     buyUpgrade('boostDuration');
     buyUpgrade('boostDuration');
+    buyUpgrade('responsiveness');
+    buyUpgrade('responsiveness');
+    buyUpgrade('responsiveness');
     expect(endlessStartBonuses()).toEqual({
       vitalityLives: 1,
       speedBonusPct: 0.1,
       charismaBonusDolphins: 0,
       sprintCooldownReduction: 750,
       sprintDurationBonus: 200,
+      responsiveness: 3,
     });
   });
 });

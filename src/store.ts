@@ -18,7 +18,8 @@ export type UpgradeId =
   | 'boost'
   | 'boostDuration'
   | 'echoDuration'
-  | 'echoRadius';
+  | 'echoRadius'
+  | 'responsiveness';
 
 /**
  * Echolocation: a one-off purchase rather than a levelled upgrade, locked until the campaign has
@@ -54,6 +55,23 @@ export const UPGRADES: Record<UpgradeId, UpgradeDef> = {
   boostDuration: { name: 'Boost Duration', desc: '+0.1s per boost', prices: [100, 200, 340, 520, 760, 1080] },
   echoDuration: { name: 'Echo Duration', desc: '+1.5s of vision', prices: [120, 220, 360, 540, 780, 1090] },
   echoRadius: { name: 'Echo Range', desc: '+6 units of vision', prices: [120, 220, 360, 540, 780, 1090] },
+  /**
+   * The only upgrade that changes the shape of the pod rather than a number on the dolphin.
+   *
+   * Every other line here makes you stronger; this one makes you smaller. A pod is a disk of
+   * dolphins around the player, and most of what kills it is that disk brushing something the
+   * player themselves would have missed - the far edge of a tentacle, the last jellyfish in a
+   * row, a shark passing wide. Drawing the formation in shrinks that disk, and turning it faster
+   * stops it swinging out through the outside of a corner while the player is already round it.
+   *
+   * Priced with the boost line rather than the echo lines: it is bought for handling, and it is
+   * felt on every level rather than only in the dark.
+   */
+  responsiveness: {
+    name: 'Responsiveness',
+    desc: 'Tighter pod, sharper turns',
+    prices: [100, 190, 330, 520, 780, 1100],
+  },
 };
 
 const DEVELOPER_MODE_KEY = 'svsd-developer-mode';
@@ -129,7 +147,16 @@ export interface StoreState {
 
 function empty(): StoreState {
   return {
-    upgrades: { vitality: 0, speed: 0, charisma: 0, boost: 0, boostDuration: 0, echoDuration: 0, echoRadius: 0 },
+    upgrades: {
+      vitality: 0,
+      speed: 0,
+      charisma: 0,
+      boost: 0,
+      boostDuration: 0,
+      echoDuration: 0,
+      echoRadius: 0,
+      responsiveness: 0,
+    },
     ownedSkins: ['classic'],
     equippedSkin: 'classic',
     ownedAbilities: [],
@@ -301,6 +328,8 @@ export function endlessStartBonuses(): {
   charismaBonusDolphins: number;
   sprintCooldownReduction: number;
   sprintDurationBonus: number;
+  /** Levels of Responsiveness, which the pod formation reads directly - see moveFollowers. */
+  responsiveness: number;
 } {
   const s = load().upgrades;
   return {
@@ -309,5 +338,6 @@ export function endlessStartBonuses(): {
     charismaBonusDolphins: s.charisma,
     sprintCooldownReduction: s.boost * 750,
     sprintDurationBonus: s.boostDuration * 100,
+    responsiveness: s.responsiveness,
   };
 }
