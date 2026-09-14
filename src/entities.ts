@@ -176,6 +176,19 @@ export class Shark {
   lockDy = 0;
 
   /**
+   * Large frilled: the direction the head was thrown, committed when the strike begins.
+   *
+   * Not the swimming heading, which is the bug this exists to fix. A frilled shark flanks - it
+   * arcs round the pod rather than driving at it - so its heading at the moment it strikes points
+   * along that arc and not at anybody. Throwing the head along it meant a strike that fired, drew
+   * and sounded correctly while landing up to a hundred and fifty degrees away from the pod, and
+   * only ever connected when the shark was already on top of a dolphin and would have bitten it
+   * anyway. Aimed once, when the strike starts, and never corrected after - the same bargain the
+   * cookiecutter's run makes.
+   */
+  reachDirX = 0;
+  reachDirY = 0;
+  /**
    * Large frilled: how far the head is thrown forward, 0 (drawn in) to 1 (a full body length out).
    *
    * Held as a fraction rather than a distance because what a body length is in world units is the
@@ -491,8 +504,8 @@ export class Tentacle {
   }
 }
 
-/** How wide a spread, in radians, the evasive heading is allowed either side of straight away. */
-export const MEGAMOUTH_EVASION_SPREAD = Math.PI / 2;
+/** How far a defensive megamouth will turn toward the pod on any one correction, in radians. */
+export const MEGAMOUTH_TURN_TOWARD = 0.5;
 
 /**
  * The megamouth: an enormous filter feeder that has no interest in the pod - until it is the
@@ -516,8 +529,10 @@ export class Megamouth {
   dirX: number;
   dirY: number;
   speed: number;
-  /** Set when it is the last thing alive: three times the speed, and no longer swimming straight. */
+  /** Set when it is the last thing alive: three times the speed, and no longer simply crossing. */
   defensive = false;
+  /** Set once it has taken the hits the level asks for. Still in the water, no longer in the way. */
+  beaten = false;
   /** Boosted rams landed on it so far, against MEGAMOUTH_HITS_REQUIRED. */
   hitsTaken = 0;
   /** Timestamp (ms) of the next heading change while defensive. */
@@ -538,27 +553,39 @@ export class Megamouth {
   }
 
   /**
-   * Turns it away from the pod, give or take.
+   * Bends its heading toward the pod, a little, when the pod is near enough to be worth turning
+   * for.
    *
-   * Straight away every time would be a creature that can be herded into a wall and held there;
-   * a pure random walk would be one that wanders back into the pod by accident and dies to a
-   * boost it never saw. A random spread either side of directly away is neither: it is always
-   * leaving, but which way it breaks is worth guessing at.
+   * It used to break onto a fresh random heading away from the pod every second or so, which read
+   * as something panicking rather than something enormous: at three times its cruising speed the
+   * direction changes came faster than the eye could join them up, and it went everywhere and
+   * nowhere. Now it holds a line and bounces off the walls like everything else in the arena, and
+   * this is the only thing that turns it - a gentle correction toward the pod, capped so it can
+   * never spin on the spot, which makes it something you can read, get out of the way of, and
+   * line a Boost up against.
    *
-   * The horizontal gap is measured the short way round the wrap, so a pod that has just come
-   * through the seam is still behind it rather than suddenly a whole arena away.
-   *
-   * `roll` is 0..1 - passed in rather than drawn here so the steering can be tested.
+   * `strength` is 0..1 - how much of the way to the pod this correction is allowed to turn. The
+   * horizontal gap is measured the short way round the wrap, so a pod just through the seam is
+   * still beside it rather than a whole arena away.
    */
-  pickEvasiveHeading(fromX: number, fromY: number, roll: number): void {
-    let dx = this._x - fromX;
+  turnToward(x: number, y: number, strength: number): void {
+    let dx = x - this._x;
     if (dx > SIZE_X / 2) dx -= SIZE_X;
     else if (dx < -SIZE_X / 2) dx += SIZE_X;
-    const dy = this._y - fromY;
-    // Directly on top of the pod there is no "away" to read, so it breaks along its own heading.
-    const away = dx === 0 && dy === 0 ? Math.atan2(this.dirY, this.dirX) : Math.atan2(dy, dx);
-    const angle = away + (roll - 0.5) * MEGAMOUTH_EVASION_SPREAD;
+    const dy = y - this._y;
+    const want = Math.atan2(dy, dx);
+    const have = Math.atan2(this.dirY, this.dirX);
+    // Shortest way round, so a correction never takes the long way to the same heading.
+    const delta = Math.atan2(Math.sin(want - have), Math.cos(want - have));
+    const turn = Math.max(-MEGAMOUTH_TURN_TOWARD, Math.min(MEGAMOUTH_TURN_TOWARD, delta * strength));
+    const angle = have + turn;
     this.dirX = Math.cos(angle);
     this.dirY = Math.sin(angle);
+  }
+
+  /** Turns it off a wall it has just run into, keeping its speed and its other axis. */
+  bounce(axis: 'x' | 'y'): void {
+    if (axis === 'x') this.dirX = -this.dirX;
+    else this.dirY = -this.dirY;
   }
 }

@@ -236,13 +236,24 @@ const MEGAMOUTH_WRAP_MARGIN = 26;
  */
 const MEGAMOUTH_POD_REQUIREMENT = 10;
 const MEGAMOUTH_HITS_REQUIRED = 3;
+/** What the optional fourth hit pays, over and above the level's own Pearls. */
+const MEGAMOUTH_FINISHER_PEARLS = 15;
 /** Spacing between rams, so one pass through it cannot land the whole fight. */
 const MEGAMOUTH_HIT_COOLDOWN_MS = 900;
 /** Its speed once it turns defensive. Past the pod's cruise, short of a Boost - so only a dash catches it. */
 const MEGAMOUTH_DEFENSIVE_SPEED_FACTOR = 3;
-/** How long it holds an evasive heading before breaking a different way, in ms. */
-const MEGAMOUTH_TURN_MIN_MS = 520;
-const MEGAMOUTH_TURN_MAX_MS = 1100;
+/**
+ * How near the pod has to be before it starts steering at them, in world units, and how hard it
+ * turns when they are right under its nose.
+ *
+ * Well under half the arena, so most of the time it is simply crossing and bouncing and you can
+ * see where it will be. Inside the range the correction scales up as the gap closes, which is
+ * what makes it read as a thing that has noticed you rather than a thing on rails.
+ */
+const MEGAMOUTH_HOMING_RANGE = 34;
+const MEGAMOUTH_HOMING_STRENGTH = 0.55;
+/** How close to the side walls it may get before turning off them, in world units. */
+const MEGAMOUTH_WALL_MARGIN = 10;
 /**
  * Lights along its underside, in the strip's own frame coordinates - the same space the sharks'
  * photophores are given in. Spaced unevenly on purpose: an even row reads as something made,
@@ -434,6 +445,16 @@ const LOCK_RANGE = 45;
  * The trigger range, the bite point and the drawn stretch all take their distance from here, so
  * what is drawn and what bites cannot come apart.
  */
+/**
+ * How close the pod has to be for an eye to catch the light, in world units, and how far outside
+ * that it begins to show.
+ *
+ * Deliberately shorter than the reach that follows it, so the eye is not a warning you can act on
+ * from a distance - it is confirmation of what you have already swum into.
+ */
+const SHARK_EYE_RANGE = 14;
+const SHARK_EYE_FADE = 6;
+
 const FRILLED_REACH_FRACTION = 0.5;
 const REACH_EXTEND_MS = 450;
 const REACH_HOLD_MS = 250;
@@ -518,8 +539,10 @@ export function sharkArt(kind: SharkKind, large: boolean): SharkArt {
     stretchX: look.stretchX,
     stretchY: look.stretchY,
     scale: SHARK_KIND_SCALE[kind] * size,
-    photophores: look.photophores,
-    photophoreColor: look.photophoreColor,
+    // Whatever lights the species carries. The frilled shark's are its eyes rather than belly
+    // photophores, and the book should show it the way the water does.
+    photophores: look.photophores ?? look.eyes,
+    photophoreColor: look.photophoreColor ?? look.eyeColor,
   };
 }
 
@@ -537,6 +560,13 @@ const SHARK_SPRITE_SOURCE: Record<SharkKind, SharkStrip> = {
  * species out of an existing sheet, which is the only way the roster grows without new artwork.
  */
 interface SharkLook {
+  /**
+   * Eyes that catch the light once the pod is inside SHARK_EYE_RANGE, in the strip's own frame
+   * coordinates. An alternative to photophores rather than an addition: lights you can see coming
+   * and a glint you cannot are opposite things to build a species around.
+   */
+  eyes?: { x: number; y: number }[];
+  eyeColor?: number;
   /** Multiplied into the artwork's colour; 0xffffff leaves it as drawn. */
   tint: number;
   /** Non-uniform scale on top of the shark's size, for reshaping a borrowed silhouette. */
@@ -573,20 +603,26 @@ const SHARK_KIND_LOOK: Record<SharkKind, SharkLook> = {
    * water to match - it is meant to be outswum, not outfought.
    */
   frilled: {
-    tint: 0xb2b9a4,
+    // As dark as the cookiecutter. It used to be a pale grey-brown, which made the one deep-water
+    // shark you could see coming; black, it has to be found the way the cookiecutter is found.
+    tint: 0x3d4352,
     stretchX: 2.05,
     stretchY: 0.56,
     animationSpeed: 0.5,
     glow: THREAT_GLOW,
     smallSize: 1.55,
     speed: 0.85,
-    // Two, well apart, so the pair reads as something long even when the body itself cannot be
-    // seen - the gap between the lights is the only measure of its size in the dark.
-    photophores: [
-      { x: -14, y: 5 },
-      { x: 10, y: 5 },
-    ],
-    photophoreColor: 0x67e8f9,
+    /**
+     * No photophores. The frilled shark's tell is its eye, and only once it is close enough for
+     * the eye to catch what little light there is.
+     *
+     * Belly lights are a warning you can read from across the arena, which is what the
+     * cookiecutter and the megamouth are for. Taking them away and giving it this instead makes
+     * it the one thing down there you find by running into it - a long black shape that is not
+     * announced until it is already near, which is the whole of what the species is for.
+     */
+    eyes: [{ x: 15, y: -4 }],
+    eyeColor: 0x4ade80,
   },
   /**
    * Cookiecutter: a tiger shrunk to a third, blacked out, and animated fast so it flicks about.
@@ -2610,8 +2646,11 @@ ${zone.depth}`, 'levelup', duration + 1400);
       container.addChild(lockTell);
     }
 
-    if (look.photophores) {
-      const lights = createPhotophores(look.photophores, look.photophoreColor ?? 0x4ade80);
+    // Belly lights or eyes - the same dots either way, lit differently. A species has one or the
+    // other; see SharkLook.eyes.
+    const lightSpots = look.photophores ?? look.eyes;
+    if (lightSpots) {
+      const lights = createPhotophores(lightSpots, look.photophoreColor ?? look.eyeColor ?? 0x4ade80);
       lights.name = 'photo';
       // Parented to the lights layer, not to the shark, so the gloom cannot cover it. It is
       // positioned from the shark each frame in drawSharks, and removed with it in removeShark.
@@ -2866,6 +2905,7 @@ ${zone.depth}`, 'levelup', duration + 1400);
     this.levelCompleted = true;
     // Clearing the level it appeared on is the only thing that spends the run's encounter. The
     // level cannot be cleared with it alive, so reaching here means it was beaten.
+    // Beating it is what spends the run's encounter; the optional finisher is extra.
     if (this.megamouthEncounterScheduled && this.megamouthAppearedThisLevel) this.megamouthDone = true;
     this.resetKillCombo();
     if (this.lostThisLevel === 0) this.tryUnlock('flawlessLevel');
@@ -3756,10 +3796,35 @@ ${cleared.name} Zone Liberated
       const range = this.sharkBodyLength(shark) * FRILLED_REACH_FRACTION;
       const inRange = this.podMembers().some((d) => this.distanceBetweenEntities(shark, d) <= range);
       if (!inRange) continue;
+      // Aimed at whoever brought it on, once, and never corrected - see Shark.reachDirX. Taking
+      // the swimming heading instead threw the head along the flanking arc, which is why the
+      // strike drew and sounded correctly while landing nowhere near the pod.
+      const target = this.podMembers().reduce((closest, d) =>
+        this.distanceBetweenEntities(shark, d) < this.distanceBetweenEntities(shark, closest) ? d : closest,
+      );
+      const aimX = directionDelta(target._x, shark._x);
+      const aimY = target._y - shark._y;
+      const aim = Math.hypot(aimX, aimY) || 1;
+      shark.reachDirX = aimX / aim;
+      shark.reachDirY = aimY / aim;
       shark.reachPhase = 'out';
       shark.reachPhaseEndTime = now + REACH_EXTEND_MS;
       sfx.playFrilledStrike();
     }
+  }
+
+  /**
+   * How brightly a shark's eye is showing: nothing beyond SHARK_EYE_RANGE, full inside the last
+   * SHARK_EYE_FADE units, and eased between. Measured to the nearest pod member rather than to
+   * the player, so an eye that has fixed on a follower is lit too.
+   */
+  private sharkEyeAlpha(shark: Shark): number {
+    const pod = this.podMembers();
+    if (pod.length === 0) return 0;
+    const near = Math.min(...pod.map((d) => this.distanceBetweenEntities(shark, d)));
+    if (near >= SHARK_EYE_RANGE) return 0;
+    if (near <= SHARK_EYE_RANGE - SHARK_EYE_FADE) return 1;
+    return (SHARK_EYE_RANGE - near) / SHARK_EYE_FADE;
   }
 
   /** Wrap-aware distance between any two things in the water. */
@@ -3774,11 +3839,28 @@ ${cleared.name} Zone Liberated
   private sharkBitePoint(shark: Shark): { _x: number; _y: number; lastX: number; lastY: number } {
     if (shark.reach <= 0) return shark;
     const out = this.sharkBodyLength(shark) * FRILLED_REACH_FRACTION * shark.reach;
+    // Along the committed strike direction, not the swimming heading.
+    const dirX = shark.reachDirX || shark.headingX;
+    const dirY = shark.reachDirY || shark.headingY;
+    // The whole of the thrown head bites, not only its tip. Testing the tip alone meant a strike
+    // aimed correctly at something closer than full extension sailed straight past it - the head
+    // was drawn lying across a dolphin while the one point that counted was five units beyond it.
+    // The nearest pod member is projected onto the reach and the jaws taken there instead.
+    let along = out;
+    const pod = this.podMembers();
+    if (pod.length > 0) {
+      const near = pod.reduce((closest, d) =>
+        this.distanceBetweenEntities(shark, d) < this.distanceBetweenEntities(shark, closest) ? d : closest,
+      );
+      const relX = directionDelta(near._x, shark._x);
+      const relY = near._y - shark._y;
+      along = Math.max(0, Math.min(out, relX * dirX + relY * dirY));
+    }
     return {
-      _x: shark._x + shark.headingX * out,
-      _y: shark._y + shark.headingY * out,
-      lastX: shark.lastX + shark.headingX * out,
-      lastY: shark.lastY + shark.headingY * out,
+      _x: shark._x + dirX * along,
+      _y: shark._y + dirY * along,
+      lastX: shark.lastX + dirX * along,
+      lastY: shark.lastY + dirY * along,
     };
   }
 
@@ -4162,8 +4244,12 @@ ${cleared.name} Zone Liberated
    *
    * While there are sharks in the water it holds its heading and crosses, wrapping round: nothing
    * it does depends on where the pod is. Once they are gone it knows it is the last thing here,
-   * and runs - three times the speed, breaking onto a new heading every second or so, always
-   * away from the pod (see Megamouth.pickEvasiveHeading).
+   * and turns on the pod: three times the speed, holding a line, bouncing off all four walls, and
+   * bending toward you whenever you are near enough to be worth turning for.
+   *
+   * Deliberately no wrap while it is defensive. A creature that leaves one side of the arena and
+   * reappears on the other cannot be cornered, and being cornered is the whole of the fight -
+   * bounded on four sides it is something a pod can work into a wall and line a Boost up against.
    */
   private updateMegamouth(now: number): void {
     const m = this.megamouth;
@@ -4171,33 +4257,56 @@ ${cleared.name} Zone Liberated
 
     if (!m.defensive && this.sharks.length === 0 && !this.levelCompleted) this.turnMegamouthDefensive();
 
-    if (m.defensive && now >= m.nextTurnAt) {
-      const target = this.player ?? { _x: m._x, _y: m._y };
-      m.pickEvasiveHeading(target._x, target._y, Math.random());
-      m.nextTurnAt = now + MEGAMOUTH_TURN_MIN_MS + Math.random() * (MEGAMOUTH_TURN_MAX_MS - MEGAMOUTH_TURN_MIN_MS);
+    // One correction a tick, toward the pod, and only while the pod is close enough to be worth
+    // turning for - far away it simply holds its line and crosses. The strength falls off with
+    // distance, so a pod on the far side barely bends it and a pod under its nose is followed.
+    if (m.defensive && this.player) {
+      const near = this.podMembers().reduce(
+        (closest, d) =>
+          this.distanceBetweenEntities(m, d) < this.distanceBetweenEntities(m, closest) ? d : closest,
+        this.player,
+      );
+      const gap = this.distanceBetweenEntities(m, near);
+      if (gap < MEGAMOUTH_HOMING_RANGE) {
+        const strength = MEGAMOUTH_HOMING_STRENGTH * (1 - gap / MEGAMOUTH_HOMING_RANGE);
+        m.turnToward(near._x, near._y, strength);
+      }
     }
 
     const speed = m.speed * (m.defensive ? MEGAMOUTH_DEFENSIVE_SPEED_FACTOR : 1);
     m.lastX = m._x;
     m.lastY = m._y;
-    m._x += m.dirX * speed;
+
     const wantY = m._y + m.dirY * speed;
     const clampedY = clampEntityY(wantY, 6);
-    // Off the top and the bottom it bounces rather than being held there. Clamping a heading
-    // that runs into the ceiling eats the vertical half of it, so a creature told to move at
-    // three times its speed spent the frame crawling along the roof at a fraction of it - and
-    // read as stuck rather than as fleeing. Reflected, the speed is the speed, and being driven
-    // into a wall costs it the line it was running rather than its pace.
+    // Off the walls it bounces rather than being held against them. Clamping a heading that runs
+    // into the ceiling eats the vertical half of it, so a creature told to move at three times its
+    // speed spent the frame crawling along the roof at a fraction of it. Reflected, the speed is
+    // the speed, and running into a wall costs it its line rather than its pace.
     if (m.defensive && clampedY !== wantY) {
-      m.dirY = -m.dirY;
+      m.bounce('y');
       m._y = clampEntityY(m._y + m.dirY * speed, 6);
     } else {
       m._y = clampedY;
     }
-    // Round it goes. The margin is wide enough that it is fully off before it reappears, so it
-    // never pops into existence halfway through its own body.
-    if (m._x > SIZE_X + MEGAMOUTH_WRAP_MARGIN) m._x = -MEGAMOUTH_WRAP_MARGIN;
-    else if (m._x < -MEGAMOUTH_WRAP_MARGIN) m._x = SIZE_X + MEGAMOUTH_WRAP_MARGIN;
+
+    if (m.defensive) {
+      // The sides are walls too now, not a seam - see the note above about cornering it.
+      const wantX = m._x + m.dirX * speed;
+      const margin = MEGAMOUTH_WALL_MARGIN;
+      if (wantX < margin || wantX > SIZE_X - margin) {
+        m.bounce('x');
+        m._x = Math.max(margin, Math.min(SIZE_X - margin, m._x + m.dirX * speed));
+      } else {
+        m._x = wantX;
+      }
+    } else {
+      m._x += m.dirX * speed;
+      // Round it goes while it is still only crossing. The margin is wide enough that it is fully
+      // off before it reappears, so it never pops into existence halfway through its own body.
+      if (m._x > SIZE_X + MEGAMOUTH_WRAP_MARGIN) m._x = -MEGAMOUTH_WRAP_MARGIN;
+      else if (m._x < -MEGAMOUTH_WRAP_MARGIN) m._x = SIZE_X + MEGAMOUTH_WRAP_MARGIN;
+    }
 
     const scale = WORLD_SCALE;
     if (this.megamouthSprite) {
@@ -4265,7 +4374,10 @@ ${cleared.name} Zone Liberated
     );
     if (!contact) return false;
 
-    const meetsPod = this.getPodSize() >= MEGAMOUTH_POD_REQUIREMENT;
+    // A beaten one asks for nothing but the dash. The pod has departed by then - clearing the
+    // level sends it home - so holding the finisher to ten dolphins would be offering something
+    // that could never be taken.
+    const meetsPod = m.beaten || this.getPodSize() >= MEGAMOUTH_POD_REQUIREMENT;
     if (!meetsPod || !this.sprinting) {
       if (this.gameTime - this.lastBoostNudgeTime > 2) {
         this.lastBoostNudgeTime = this.gameTime;
@@ -4284,14 +4396,36 @@ ${cleared.name} Zone Liberated
     this.particles.emit('hit', m._x * scale + scale / 2, m._y * scale + scale / 2, 20, { speed: 3.5, life: 0.7 });
     this.triggerBigKillFeedback('matriarch');
 
-    if (m.hitsTaken >= MEGAMOUTH_HITS_REQUIRED) {
-      this.destroyMegamouth();
+    if (m.hitsTaken > MEGAMOUTH_HITS_REQUIRED) {
+      // The finisher. Only reachable once it is already beaten, when the pod has been sent home
+      // and the level is won - so this one is landed by the player alone, for its own sake.
+      this.destroyMegamouth(true);
+      return true;
+    }
+    if (m.hitsTaken === MEGAMOUTH_HITS_REQUIRED) {
+      this.beatMegamouth();
       return true;
     }
     this.flashMegamouthHit();
     this.setStatus(`The megamouth reels! (${m.hitsTaken}/${MEGAMOUTH_HITS_REQUIRED})`);
     this.showBanner('Direct Hit!', 'storm', 900);
     return false;
+  }
+
+  /**
+   * The third hit: it stops being the thing the level is waiting on.
+   *
+   * It is not killed. The arena is won and the pod goes home, but the animal is still out there
+   * and still swimming, and a player who wants it can take one more run at it on their own - see
+   * the finisher in updateMegamouthCombat. Most will dive on, which is the point of offering it.
+   */
+  private beatMegamouth(): void {
+    const m = this.megamouth;
+    if (!m) return;
+    m.beaten = true;
+    this.flashMegamouthHit();
+    this.setStatus('It breaks off - Boost into it once more to finish it');
+    this.showBanner('It Breaks Off!', 'victory', 2200);
   }
 
   /** Flashes its sprite on a ram that didn't finish it - the same acknowledgement the Matriarch gets. */
@@ -4307,12 +4441,18 @@ ${cleared.name} Zone Liberated
   }
 
   /** The finishing blow: the lights go out first, then the body flashes and fades. */
-  private destroyMegamouth(): void {
+  private destroyMegamouth(finisher = false): void {
     const sprite = this.megamouthSprite;
     this.sharksKilled++;
     this.registerKillSound();
-    this.setStatus('The megamouth is beaten');
-    this.showBanner('Megamouth Beaten!', 'victory', 2000);
+    if (finisher) {
+      this.awardRunPearls(MEGAMOUTH_FINISHER_PEARLS);
+      this.setStatus('The megamouth is finished');
+      this.showBanner(`Megamouth Down!  +${MEGAMOUTH_FINISHER_PEARLS} Pearls`, 'victory', 2400);
+    } else {
+      this.setStatus('The megamouth is beaten');
+      this.showBanner('Megamouth Beaten!', 'victory', 2000);
+    }
     // Cleared first so nothing keeps driving it, then the sprite is animated out on its own -
     // the same send-off a large shark gets, against a container this code now owns.
     this.megamouth = null;
@@ -4785,6 +4925,11 @@ ${cleared.name} Zone Liberated
     return now < this.deepCryUntil;
   }
 
+  /** Whether there is still a megamouth out there that the level is waiting on. */
+  private megamouthHoldsTheLevel(): boolean {
+    return !!this.megamouth && !this.megamouth.beaten;
+  }
+
   /** Sounds the cry, once, when level 5 reaches DEEP_CRY_AT. */
   private updateDeepCry(): void {
     if (this.deepCryDone) return;
@@ -5143,12 +5288,11 @@ ${cleared.name} Zone Liberated
         }
       }
       this.sharks = survivingSharks;
-      this.updateMegamouthCombat();
       if (matriarchJustDefeated) {
         this.finishMatriarchWithMegaPod();
-      } else if (this.sharks.length === 0 && !this.megamouth && !this.levelCompleted) {
-        // A megamouth in the water holds the level open. It is the only thing here that is not in
-        // `sharks` and still has to be dealt with, so the clear check has to name it.
+      } else if (this.sharks.length === 0 && !this.megamouthHoldsTheLevel() && !this.levelCompleted) {
+        // A megamouth in the water holds the level open until it has taken its three. It is the
+        // only thing here that is not in `sharks` and still has to be dealt with.
         this.levelComplete();
       } else if (this.matriarch && !this.sharks.includes(this.matriarch) && !this.levelCompleted) {
         this.sharksKilled += this.sharks.length;
@@ -5341,7 +5485,12 @@ ${cleared.name} Zone Liberated
       this.updateKraken(Date.now());
     }
     // Not tied to the event window: the arrival is the event, the animal stays until it is beaten.
-    if (this.megamouth) this.updateMegamouth(Date.now());
+    // The combat runs outside Hunting Mode too - once the level is won there is no pod left to be
+    // in Hunting Mode, and the optional finisher still has to be able to land.
+    if (this.megamouth) {
+      this.updateMegamouth(Date.now());
+      if (this.activeEvent?.type !== 'jellyfish') this.updateMegamouthCombat();
+    }
 
     // Nothing swims into a kraken. The water is cleared of sharks for it, and a lone dolphin
     // wandering in to be recruited while the arms are out reads as the sea not having noticed -
@@ -5502,7 +5651,15 @@ ${cleared.name} Zone Liberated
       const scaleX = baseScale * look.stretchX;
       const scaleY = baseScale * look.stretchY;
 
-      const dx = this.player ? directionDelta(this.player._x, shark._x) : directionDelta(shark._x, shark.lastX);
+      // Mid-strike a frilled shark faces the way it threw its head, so the picture and the bite
+      // cannot point different ways - which they did while one followed the player and the other
+      // followed the swimming heading.
+      const dx =
+        shark.reach > 0 && shark.reachDirX !== 0
+          ? shark.reachDirX
+          : this.player
+            ? directionDelta(this.player._x, shark._x)
+            : directionDelta(shark._x, shark.lastX);
       const facing = Math.abs(dx) > 0.3 ? (dx > 0 ? 1 : -1) : fish.scale.x >= 0 ? 1 : -1;
 
       // A frilled shark mid-strike is drawn longer by however far its head is out, and shifted
@@ -5537,8 +5694,11 @@ ${cleared.name} Zone Liberated
         // The group is a sibling of the gloom rather than a child of the shark, so it is placed
         // at the shark's own position here instead of inheriting it.
         lights.position.set(sprite.x, sprite.y);
-        const spots = look.photophores ?? [];
-        const dotScale = Math.min(1.5, Math.max(1.1, baseScale));
+        const eyes = !look.photophores && look.eyes ? look.eyes : null;
+        const spots = look.photophores ?? look.eyes ?? [];
+        // An eye is a glint, not a lamp: half the size of a photophore, and it stays on the head
+        // rather than being read from across the arena.
+        const dotScale = Math.min(1.5, Math.max(1.1, baseScale)) * (eyes ? 0.5 : 1);
         for (let i = 0; i < lights.children.length; i++) {
           const dot = lights.children[i];
           const spot = spots[i];
@@ -5546,7 +5706,11 @@ ${cleared.name} Zone Liberated
           dot.position.set(spot.x * scaleX * facing, spot.y * scaleY);
           dot.scale.set(dotScale);
         }
-        lights.alpha = photophorePulseAlpha(now, shark.id);
+        // Photophores pulse on their own clock; an eye only answers the pod, coming up over the
+        // last few units of the approach rather than snapping on at a line.
+        lights.alpha = eyes
+          ? this.sharkEyeAlpha(shark)
+          : photophorePulseAlpha(now, shark.id);
       }
 
       if (fish instanceof SharkFishSprite) {
