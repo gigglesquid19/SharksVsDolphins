@@ -208,7 +208,6 @@ volumeSlider.addEventListener('input', () => {
   }
 });
 
-const levelSelectWrap = document.getElementById('levelSelectWrap') as HTMLSpanElement;
 const titleContinueBtn = document.getElementById('titleContinueBtn') as HTMLButtonElement;
 const savedCheckpoint = loadRunCheckpoint();
 
@@ -371,31 +370,6 @@ document.getElementById('coffeeBtn')!.addEventListener('click', (e) => {
   window.open(COFFEE_URL, '_blank', 'noopener');
 });
 
-// The "start with N dolphins" testing shortcuts only make sense on level 10 (the Matriarch
-// fight, otherwise a long grind to reach in a fresh run) - shown only while that's selected,
-// and mutually exclusive with each other (game.ts prefers the 8-dolphin one if both are checked,
-// but keeping them visually in sync avoids a misleading "both checked" state).
-const levelSelect = document.getElementById('levelSelect') as HTMLSelectElement;
-const startWithPodLabel = document.getElementById('startWithPodLabel') as HTMLLabelElement;
-const startWithPodCheckbox = document.getElementById('startWithPodCheckbox') as HTMLInputElement;
-const startWith8PodLabel = document.getElementById('startWith8PodLabel') as HTMLLabelElement;
-const startWith8PodCheckbox = document.getElementById('startWith8PodCheckbox') as HTMLInputElement;
-
-function updateStartWithPodVisibility(): void {
-  const isLevel10 = levelSelect.value === '10';
-  startWithPodLabel.classList.toggle('hidden', !isLevel10);
-  startWith8PodLabel.classList.toggle('hidden', !isLevel10);
-}
-levelSelect.addEventListener('change', updateStartWithPodVisibility);
-updateStartWithPodVisibility();
-
-startWithPodCheckbox.addEventListener('change', () => {
-  if (startWithPodCheckbox.checked) startWith8PodCheckbox.checked = false;
-});
-startWith8PodCheckbox.addEventListener('change', () => {
-  if (startWith8PodCheckbox.checked) startWithPodCheckbox.checked = false;
-});
-
 function enterAppFromTitle(): void {
   titleScreen.classList.add('hidden');
   narrativeScreen.classList.remove('hidden');
@@ -514,13 +488,11 @@ const inputs = {
     clearRunCheckpoint();
     game.setMode('campaign');
     game.showSelectedLevel();
-    levelSelectWrap.classList.remove('hidden');
     enterAppFromTitle();
   });
   document.getElementById('titleEndlessBtn')!.addEventListener('click', () => {
     game.setMode('endless');
     game.showSelectedLevel();
-    levelSelectWrap.classList.add('hidden');
     enterAppFromTitle();
   });
 
@@ -534,8 +506,7 @@ const inputs = {
       // Show that depth straight away rather than level 1 until Start is pressed.
       game.showSelectedLevel();
       depthSelect.close();
-      levelSelectWrap.classList.add('hidden');
-      enterAppFromTitle();
+        enterAppFromTitle();
     },
   });
   document.getElementById('titleDepthSelectBtn')!.addEventListener('click', () => depthSelect.open());
@@ -546,7 +517,6 @@ const inputs = {
     const checkpoint = loadRunCheckpoint();
     if (!checkpoint) return;
     game.setMode('campaign');
-    levelSelectWrap.classList.remove('hidden');
     titleScreen.classList.add('hidden');
     narrativeScreen.classList.add('hidden');
     appContent.classList.remove('hidden');
@@ -770,9 +740,9 @@ const inputs = {
   // achievements and the music controls are never urgent, so they move there for good and the bar
   // is left short enough to read at a glance.
   const PAUSE_MENU_CONTROL_IDS = ['leaderboardBtn', 'achievementsBtn', 'muteBtn', 'nextTrackBtn', 'volumeControl'];
-  // In fullscreen, only Start/Retry + Pause can stay: the level picker and the Fullscreen toggle
-  // itself join the rest in the pause panel so the bar is one row, and come back on the way out.
-  const FULLSCREEN_CONTROL_IDS = ['levelSelectWrap', 'fullscreenBtn'];
+  // In fullscreen, only Start/Retry + Pause can stay: the Fullscreen toggle itself joins the rest
+  // in the pause panel so the bar is one row, and comes back on the way out.
+  const FULLSCREEN_CONTROL_IDS = ['fullscreenBtn'];
   let relocatedControls: { el: HTMLElement; parent: HTMLElement; nextSibling: Node | null }[] = [];
 
   /** Moves the named controls into the pause panel, remembering where each came from. */

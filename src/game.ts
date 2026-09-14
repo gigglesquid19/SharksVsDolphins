@@ -907,15 +907,12 @@ export class Game {
   private pearlsNumberEl: HTMLElement | null = null;
   /** Pearls earned in the current run, shown on the run-summary card. */
   private pearlsThisRun = 0;
-  private startWithPodCheckbox: HTMLInputElement | null = null;
-  private startWith8PodCheckbox: HTMLInputElement | null = null;
   private bannerEl: HTMLDivElement;
   private bannerTimeout: ReturnType<typeof setTimeout> | null = null;
   private newWatersPromptEl: HTMLDivElement;
   private pauseOverlayEl: HTMLDivElement;
   private schoolBtnWrap: HTMLDivElement;
   private megaPodBtnWrap: HTMLDivElement | null = null;
-  private levelSelect: HTMLSelectElement | null = null;
   private leaderboardOverlayEl: HTMLDivElement | null = null;
   private leaderboardListEl: HTMLElement | null = null;
   private leaderboardHeadEl: HTMLElement | null = null;
@@ -1056,7 +1053,6 @@ export class Game {
     this.pauseOverlayEl = inputs.pauseOverlay;
     this.schoolBtnWrap = inputs.schoolBtnWrap;
     this.megaPodBtnWrap = document.getElementById('megaPodBtnWrap') as HTMLDivElement | null;
-    this.levelSelect = document.getElementById('levelSelect') as HTMLSelectElement | null;
     this.leaderboardOverlayEl = document.getElementById('leaderboardOverlay') as HTMLDivElement | null;
     this.leaderboardListEl = document.getElementById('leaderboardList') as HTMLElement | null;
     this.leaderboardHeadEl = document.getElementById('leaderboardHead') as HTMLElement | null;
@@ -1116,8 +1112,6 @@ export class Game {
     this.dolphinsSavedBadgeEl = document.getElementById('dolphinsSavedBadge');
     this.dolphinsSavedNumberEl = document.getElementById('dolphinsSavedNumber');
     this.pearlsNumberEl = document.getElementById('pearlsNumber');
-    this.startWithPodCheckbox = document.getElementById('startWithPodCheckbox') as HTMLInputElement | null;
-    this.startWith8PodCheckbox = document.getElementById('startWith8PodCheckbox') as HTMLInputElement | null;
 
     this.glowTexture = makeRadialGradientTexture(64, 'rgba(34, 211, 238, 0.45)');
   }
@@ -1243,10 +1237,10 @@ export class Game {
 
   private getSelectedLevelConfig(): LevelConfig {
     if (this.mode === 'endless') return getLevelConfig(this.depthlessStartLevel);
-    const level = parseInt(this.levelSelect?.value ?? '1', 10);
-    // Bounded to the campaign's own ten before the mode's difficulty is applied on top.
-    const campaignLevel = level >= 1 && level <= LEVELS.length ? level : 1;
-    return getLevelConfigForMode(campaignLevel, 'campaign');
+    // The campaign starts where the campaign starts. It used to read a level picker sitting in
+    // the game's own button bar, which let anyone open the game and jump straight to the
+    // Matriarch; the Depthless campaign keeps its Level Select, where a depth is bought.
+    return getLevelConfigForMode(1, 'campaign');
   }
 
   /** Sets which mode a fresh start/reset begins in. Campaign: pick a level 1-10, saves/resumes, ends at level 10. Endless: always starts at level 1, no free resume, continues past level 10 until death. */
@@ -2210,17 +2204,6 @@ export class Game {
 
     for (let i = 0; i < this.charismaBonusDolphins; i++) {
       this.spawnRecruitedDolphin(px, py);
-    }
-
-    // Testing aid: level 10 (the Matriarch fight) is otherwise a long grind to reach in a fresh
-    // run just to test it, so checkboxes on that level's Level Select entry let you jump in
-    // already at a useful pod size - 4 (the Hunting Mode threshold) or 8 (large tiger sharks'
-    // pod requirement) - instead of building up to it manually.
-    if (config.level === 10 && this.mode === 'campaign') {
-      const startingPodSize = this.startWith8PodCheckbox?.checked ? 8 : this.startWithPodCheckbox?.checked ? 4 : 0;
-      for (let i = 0; i < startingPodSize - 1; i++) {
-        this.spawnRecruitedDolphin(px, py);
-      }
     }
 
     this.currentLevel = config.level;
