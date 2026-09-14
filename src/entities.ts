@@ -133,6 +133,25 @@ export class Shark {
   stunDy = 0;
 
   /**
+   * Clearing out while the kraken is in the water, and coming back afterwards.
+   *
+   * 'gone' is the state in between: off the edge, hidden, and out of play entirely - it cannot
+   * bite, cannot be rammed, and is not drawn. The shark stays in the level's list throughout, so
+   * a level is never completed just because everything happened to be hiding.
+   */
+  krakenFlight: 'none' | 'leaving' | 'gone' | 'returning' = 'none';
+  /** Which way it ran: -1 off the left edge, 1 off the right. It comes back the same way. */
+  fleeDir: -1 | 1 = 1;
+  /** Where it was when the kraken arrived, so it can swim back to roughly its own patch. */
+  homeX = 0;
+  homeY = 0;
+
+  /** Whether this shark is out of play right now - fleeing, hidden, or on its way back. */
+  isOffStage(): boolean {
+    return this.krakenFlight !== 'none';
+  }
+
+  /**
    * Large cookiecutter: the pod member it has singled out, and where the strike has got to.
    *
    * Driven by Game.updateLockOnStrikes rather than by move(), because picking a victim needs the

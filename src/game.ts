@@ -129,6 +129,10 @@ const TENTACLE_WAIT_MS = 2600;
 const TENTACLE_REACH_SHARE = 0.45;
 /** How close to the arm counts as contact, in world units. */
 const TENTACLE_HIT_RADIUS = 3.2;
+/** How fast a shark leaves, and comes back, against its own speed. Faster than it hunts. */
+const KRAKEN_FLIGHT_SPEED = 2.4;
+/** How far past the edge counts as gone, in world units. */
+const KRAKEN_OFFSTAGE_MARGIN = 16;
 
 /**
  * The megamouth: a filter feeder that crosses the arena and ignores everyone in it.
@@ -3559,6 +3563,9 @@ ${cleared.name} Zone Liberated
    */
   private sharkContactsPod(shark: Shark): boolean {
     if (!this.player) return false;
+    // A shark that has cleared out for the kraken is not in the water as far as anything else is
+    // concerned - it can neither bite nor be rammed until it has swum back.
+    if (shark.isOffStage()) return false;
     const radius = this.sharkHitRadius(shark);
     const jaws = this.sharkBitePoint(shark);
     return this.dolphins.some((d) => (d.isPlayer || d.recruited) && sweptDistance(jaws, d) < radius);
@@ -3953,6 +3960,89 @@ ${cleared.name} Zone Liberated
     this.tentacles = [];
   }
 
+  /**
+   * Sends every shark off the nearest side when the kraken arrives.
+   *
+   * It is the obvious thing for them to do and it solves a real problem: an arm closing a lane and
+   * a shark hunting you down it are two hazards asking for the same square of water, and together
+   * they read as noise rather than as either one. With the water cleared, the kraken is the whole
+   * event - which is what something that size should be.
+   *
+   * They stay in `sharks` the entire time. Emptying the list would complete the level the moment
+   * the event started, which is a considerably worse bug than any of this is worth.
+   */
+  private sendSharksAwayFromKraken(): void {
+    for (const shark of this.sharks) {
+      if (shark.krakenFlight !== 'none') continue;
+      shark.homeX = shark._x;
+      shark.homeY = shark._y;
+      shark.fleeDir = shark._x < SIZE_X / 2 ? -1 : 1;
+      shark.krakenFlight = 'leaving';
+      // A shark part-way through a special stops doing it; it has somewhere else to be.
+      shark.charging = false;
+      shark.ambushing = false;
+      shark.stalking = false;
+      shark.lockPhase = 'none';
+      shark.lockTarget = null;
+      shark.reach = 0;
+      shark.reachPhase = 'none';
+    }
+  }
+
+  /** Calls them back once the arms are gone. */
+  private callSharksBackAfterKraken(): void {
+    for (const shark of this.sharks) {
+      if (shark.krakenFlight === 'none') continue;
+      shark.krakenFlight = 'returning';
+      const sprite = this.sharkSprites.get(shark);
+      if (sprite) sprite.visible = true;
+    }
+  }
+
+  /**
+   * Moves the sharks that are leaving or coming back, in place of their ordinary hunting.
+   *
+   * Returns true if this shark was handled here, so the caller knows to skip its normal move.
+   */
+  private updateKrakenFlight(shark: Shark, sharkSpeed: number): boolean {
+    if (shark.krakenFlight === 'none') return false;
+    const step = sharkSpeed * shark.speedMultiplier * KRAKEN_FLIGHT_SPEED;
+    const sprite = this.sharkSprites.get(shark);
+
+    if (shark.krakenFlight === 'leaving') {
+      shark._x += shark.fleeDir * step;
+      shark.headingX = shark.fleeDir;
+      shark.headingY = 0;
+      const past = shark.fleeDir === -1 ? shark._x < -KRAKEN_OFFSTAGE_MARGIN : shark._x > SIZE_X + KRAKEN_OFFSTAGE_MARGIN;
+      if (past) {
+        shark.krakenFlight = 'gone';
+        if (sprite) sprite.visible = false;
+      }
+      return true;
+    }
+
+    if (shark.krakenFlight === 'gone') {
+      if (sprite) sprite.visible = false;
+      return true;
+    }
+
+    // Returning: swim back in toward where it was, and rejoin the level once it is home.
+    const dx = shark.homeX - shark._x;
+    const dy = shark.homeY - shark._y;
+    const dist = Math.hypot(dx, dy);
+    if (dist < step || dist === 0) {
+      shark._x = shark.homeX;
+      shark._y = shark.homeY;
+      shark.krakenFlight = 'none';
+      return true;
+    }
+    shark._x += (dx / dist) * step;
+    shark._y = clampEntityY(shark._y + (dy / dist) * step, 4);
+    shark.headingX = dx / dist;
+    shark.headingY = dy / dist;
+    return true;
+  }
+
   private startKraken(): void {
     this.activeEvent = { type: 'kraken', endsAt: this.gameTime + KRAKEN_DURATION };
     this.clearKraken();
@@ -3971,15 +4061,17 @@ ${cleared.name} Zone Liberated
       this.krakenContainer.addChild(g);
       this.tentacleGfx.set(arm, g);
     }
-    this.setStatus('Something enormous is reaching into the water');
+    this.sendSharksAwayFromKraken();
+    this.setStatus('Something enormous is reaching into the water - the sharks are scattering');
     this.showBanner('Kraken!', 'storm', 2500);
     sfx.playKraken();
   }
 
   private endKraken(): void {
     this.clearKraken();
+    this.callSharksBackAfterKraken();
     this.activeEvent = null;
-    this.setStatus('The arms withdraw');
+    this.setStatus('The arms withdraw - the sharks are coming back');
   }
 
   /**
@@ -4408,6 +4500,8 @@ ${cleared.name} Zone Liberated
         this.updateFrilledReach(now);
       }
       for (const shark of this.sharks) {
+        // Leaving, gone or coming back: the kraken owns the water, so nothing else steers.
+        if (this.updateKrakenFlight(shark, sharkSpeed)) continue;
         // A shark mid-run is not steering any more; it is going where it aimed.
         if (shark.lockPhase === 'zoom') {
           this.moveLockedShark(shark, sharkSpeed);
@@ -4478,7 +4572,8 @@ ${cleared.name} Zone Liberated
         // whole tick counts, not just where everyone ended up on it - a boosting pod covers
         // several units per tick and used to sail straight through a shark without connecting.
         const ramRadius = this.sharkRamRadius(shark);
-        const hitsAnyDolphin = this.dolphins.some((d) => sweptDistance(shark, d) < ramRadius);
+        const hitsAnyDolphin =
+          !shark.isOffStage() && this.dolphins.some((d) => sweptDistance(shark, d) < ramRadius);
 
         // In Campaign mode the Matriarch can only be hurt while the Mega Pod is active, and only
         // by sprinting into her - each ram flashes her and counts toward MATRIARCH_HITS_REQUIRED,
@@ -4974,8 +5069,12 @@ ${cleared.name} Zone Liberated
       // light that survived it would leave nothing for cloaking to do.
       const lightsSeen = !!lights && this.levelGloom > 0 && !shark.cloaked;
 
-      sprite.visible = bodySeen;
-      if (lights) lights.visible = lightsSeen || bodySeen;
+      // A shark that has swum off for the kraken is drawn while it leaves and while it comes
+      // back - watching them scatter is most of the point - but not while it is parked off the
+      // edge, and its lights go with it rather than hanging in the water where it was.
+      const offStage = shark.krakenFlight === 'gone';
+      sprite.visible = bodySeen && !offStage;
+      if (lights) lights.visible = (lightsSeen || bodySeen) && !offStage;
       fish.visible = bodySeen;
       glow.visible = bodySeen;
       if (reqText) reqText.visible = bodySeen;

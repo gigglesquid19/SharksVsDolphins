@@ -499,3 +499,23 @@ describe('Tentacle.tipX', () => {
     expect(arm.tipX()).toBeCloseTo(REACH / 2, 6);
   });
 });
+
+describe('Shark kraken flight', () => {
+  it('is in play until it is sent away', () => {
+    const s = testShark(40, 40);
+    expect(s.isOffStage()).toBe(false);
+    expect(s.krakenFlight).toBe('none');
+  });
+
+  it('counts as out of play at every stage of the trip', () => {
+    // Everything that asks "is this shark in the water" - biting, ramming, drawing - goes through
+    // isOffStage, so it has to be true for the whole round trip and not merely while it is parked.
+    const s = testShark(40, 40);
+    for (const stage of ['leaving', 'gone', 'returning'] as const) {
+      s.krakenFlight = stage;
+      expect(s.isOffStage()).toBe(true);
+    }
+    s.krakenFlight = 'none';
+    expect(s.isOffStage()).toBe(false);
+  });
+});
