@@ -27,6 +27,8 @@ import {
   VIGNETTE_CLEAR_FRACTION,
 } from './sprites';
 import { sfx } from './sfx';
+import { recordEncounter, recordSharkEncounter } from './sharkopedia';
+import { HUNTING_MODE_POD_SIZE, podRequirement } from './sharks';
 import {
   LEVELS,
   LevelConfig,
@@ -289,7 +291,6 @@ const GLOOM_ECHO_MARGIN = 1.08;
 const ECHO_LENT_FROM_LEVEL = 11;
 /** The pod a sandbox hands you, enough to ram anything currently benched there. */
 const SANDBOX_STARTING_POD = 5;
-const HUNTING_MODE_POD_SIZE = 4;
 const MATRIARCH_HITS_REQUIRED = 3;
 const MATRIARCH_HIT_COOLDOWN_MS = 900;
 const LARGE_SHARK_SIZE_MULTIPLIER = 1.8;
@@ -302,7 +303,6 @@ const SMALL_TIGER_SIZE_MULTIPLIER = 1.33;
 const CLOAK_DURATION_MS = 20000;
 const CLOAK_COOLDOWN_MS = 20000;
 // Up to and including this level, a large great white needs 10 pod members rather than 12.
-const GREAT_WHITE_EASED_UNTIL_LEVEL = 5;
 // Breathing room at the start of a level, counted from the first tick that actually runs.
 const LEVEL_START_INVULNERABILITY_MS = 5000;
 // While that safety window runs the sharks fade back, so a swarm arriving on top of the pod
@@ -455,7 +455,57 @@ const GREAT_WHITE_LARGE_SPEED_BONUS = 1.25;
 const MESO_LARGE_SPEED_FACTOR = 0.84;
 
 /** Which loaded strip a kind is animated from. Three sheets, five species. */
-const SHARK_SPRITE_SOURCE: Record<SharkKind, 'greatWhite' | 'hammerhead' | 'tiger'> = {
+export type SharkStrip = 'greatWhite' | 'hammerhead' | 'tiger';
+
+/**
+ * Everything the Sharkopedia needs to draw a shark the way the water draws it.
+ *
+ * Exported from here rather than restated in the view, because the look tables live here and a
+ * second copy of them would be wrong the first time a tint is tuned. The view has no Pixi of its
+ * own - it paints frame zero of the same strip onto a canvas - so it needs the numbers rather
+ * than the sprite.
+ */
+export interface SharkArt {
+  strip: SharkStrip;
+  /** Multiply tint, as the sprite uses it. */
+  tint: number;
+  /** Width and height against the strip's own frame, before scale. */
+  stretchX: number;
+  stretchY: number;
+  /** How big this one is drawn against a small tiger, which is the roster's smallest. */
+  scale: number;
+}
+
+/**
+ * The art for the two that are not simply a species at a size.
+ *
+ * Both are built from the great white's strip in the water and both are built from it here, with
+ * the same numbers: the Matriarch at twice a large one, the megamouth at three times and blacked
+ * out to the near-black it swims as. Neither is pure black - a flat 0x000000 kills the strip's
+ * shading and leaves a hole rather than an animal.
+ */
+export function specialSharkArt(special: 'matriarch' | 'megamouth'): SharkArt {
+  const base = sharkArt('greatWhite', true);
+  if (special === 'matriarch') {
+    return { ...base, scale: SHARK_KIND_SCALE.greatWhite * LARGE_SHARK_SIZE_MULTIPLIER * 2 };
+  }
+  return { ...base, tint: 0x14161f, scale: SHARK_KIND_SCALE.greatWhite * MEGAMOUTH_SIZE };
+}
+
+/** The art for one entry in the book: a species at a size. */
+export function sharkArt(kind: SharkKind, large: boolean): SharkArt {
+  const look = SHARK_KIND_LOOK[kind];
+  const size = large ? (kind === 'tiger' ? 2.5 : LARGE_SHARK_SIZE_MULTIPLIER) : look.smallSize;
+  return {
+    strip: SHARK_SPRITE_SOURCE[kind],
+    tint: look.tint,
+    stretchX: look.stretchX,
+    stretchY: look.stretchY,
+    scale: SHARK_KIND_SCALE[kind] * size,
+  };
+}
+
+const SHARK_SPRITE_SOURCE: Record<SharkKind, SharkStrip> = {
   greatWhite: 'greatWhite',
   hammerhead: 'hammerhead',
   tiger: 'tiger',
@@ -3816,33 +3866,9 @@ ${cleared.name} Zone Liberated
     return SHARK_FADE_WHILE_SAFE + (1 - SHARK_FADE_WHILE_SAFE) * t;
   }
 
+  /** Thin wrapper over the shared rule, which the Sharkopedia prints from - see sharks.ts. */
   private sharkPodRequirement(kind: SharkKind, large: boolean): number {
-    if (large) {
-      if (kind === 'tiger') return 8;
-      // Levels 4 and 5 cap the pod at 12 (see levels.ts) and are the first to field a large
-      // great white, so the standing requirement of 12 meant a flawless run - every dolphin you
-      // had ever recruited still alive - just to make one killable. Early levels ask for 10.
-      if (kind === 'greatWhite') {
-        return this.currentLevel <= GREAT_WHITE_EASED_UNTIL_LEVEL ? 10 : 12;
-      }
-      if (kind === 'hammerhead') return 10;
-      // Both kept above their small forms below, so size never makes one cheaper to ram.
-      if (kind === 'frilled') return 12;
-      if (kind === 'cookiecutter') return 8;
-    } else {
-      if (kind === 'tiger') return 4;
-      if (kind === 'greatWhite') return 5;
-      if (kind === 'hammerhead') return 4;
-      // The two deep-water species cost far more pod than their size suggests, which is the
-      // point of them: a frilled shark at 8 is not something a working pod rams on the way past,
-      // it is a pod's worth of work on a level that caps at 15 - but it leaves room to still be
-      // running one down while the rest of the water is happening, which asking for ten did not.
-      // The cookiecutter at 5 is past the 4 that merely opens Hunting Mode, so arriving in
-      // Hunting Mode is no longer the same as being able to clear one out of the way.
-      if (kind === 'frilled') return 8;
-      if (kind === 'cookiecutter') return 5;
-    }
-    return HUNTING_MODE_POD_SIZE;
+    return podRequirement(kind, large, this.currentLevel);
   }
 
   /**
@@ -3911,6 +3937,7 @@ ${cleared.name} Zone Liberated
       const shark = new Shark(id++);
       shark.kind = pickKind(i);
       smallsHere.add(shark.kind);
+      recordSharkEncounter(shark.kind, false);
       shark.sizeMultiplier = SHARK_KIND_LOOK[shark.kind].smallSize;
       shark.speedMultiplier = config.sharkSpeedMultiplier * SHARK_KIND_LOOK[shark.kind].speed;
       this.randomizeSharkSpawnPosition(shark);
@@ -3928,6 +3955,7 @@ ${cleared.name} Zone Liberated
       const shark = new Shark(id++);
       shark.kind = largeKinds[i];
       shark.large = true;
+      recordSharkEncounter(shark.kind, true);
       shark.sizeMultiplier = shark.kind === 'tiger' ? 2.5 : LARGE_SHARK_SIZE_MULTIPLIER;
       shark.speedMultiplier =
         config.sharkSpeedMultiplier *
@@ -3992,6 +4020,7 @@ ${cleared.name} Zone Liberated
     this.matriarch = shark;
     this.sharks.push(shark);
     this.addSharkSprite(shark);
+    recordEncounter('matriarch');
     this.setStatus('Matriarch has arrived!');
     this.showBanner('Matriarch!', 'storm', 2500);
   }
@@ -4091,6 +4120,7 @@ ${cleared.name} Zone Liberated
     this.lightsContainer.addChild(this.megamouthLights);
 
     this.megamouthAppearedThisLevel = true;
+    recordEncounter('megamouth');
     this.setStatus('Something vast is moving through the dark');
     sfx.playMegamouth();
   }

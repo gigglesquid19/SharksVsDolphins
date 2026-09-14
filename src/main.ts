@@ -1,4 +1,5 @@
 import './style.css';
+import { setupSharkopedia } from './sharkopediaView';
 import { Game } from './game';
 import { sfx } from './sfx';
 import { clearRunCheckpoint, loadRunCheckpoint } from './runState';
@@ -538,6 +539,8 @@ const inputs = {
     },
   });
   document.getElementById('titleDepthSelectBtn')!.addEventListener('click', () => depthSelect.open());
+  const sharkopedia = setupSharkopedia();
+  document.getElementById('titleSharkopediaBtn')!.addEventListener('click', () => sharkopedia.open());
   titleContinueBtn.addEventListener('click', () => {
     // Re-read: a checkpoint may have been written this session (e.g. after an Android Game Over).
     const checkpoint = loadRunCheckpoint();

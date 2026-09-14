@@ -2208,3 +2208,102 @@ button.mega-shrimp.green {
   color: var(--muted);
   font-weight: 600;
 }
+
+/* ---- Sharkopedia ---------------------------------------------------------
+   Built on the About screen's panel so it inherits the overlay, the scroll and
+   the Back button, and adds only the grid of cards. */
+.pedia-panel {
+  max-width: 720px;
+}
+.pedia-progress {
+  margin: 0 0 14px;
+  text-align: center;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  color: #7dd3fc;
+}
+.pedia-grid {
+  display: grid;
+  /* Two up wherever there is room, one up on a phone. */
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.pedia-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 12px 10px;
+  border: 1px solid rgba(125, 211, 252, 0.25);
+  border-radius: 12px;
+  background: rgba(8, 22, 40, 0.72);
+  text-align: center;
+}
+.pedia-card.unknown {
+  border-style: dashed;
+  border-color: rgba(148, 163, 184, 0.28);
+  background: rgba(8, 16, 28, 0.6);
+}
+/* A pool of lit water behind the animal. The two deep-water species are painted nearly black -
+   that is the whole point of them down there - and on a near-black card they were a smudge you
+   had to hunt for. Against a lifted centre they read as themselves. */
+.pedia-art {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 110px;
+  margin-bottom: 8px;
+  border-radius: 10px;
+  background: radial-gradient(ellipse at center, rgba(70, 132, 190, 0.34), rgba(10, 26, 46, 0) 72%);
+}
+.pedia-card.unknown .pedia-art {
+  /* The shadow is a shape, not a picture: blurred back so it reads as something seen through
+     water rather than as a sprite someone forgot to colour in. */
+  filter: blur(1.5px);
+  opacity: 0.75;
+}
+.pedia-name {
+  margin: 0;
+  font-size: 1rem;
+  color: #e2e8f0;
+}
+.pedia-card.unknown .pedia-name {
+  color: #64748b;
+  letter-spacing: 0.18em;
+}
+.pedia-stage {
+  margin: 2px 0 8px;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #38bdf8;
+}
+.pedia-card.unknown .pedia-stage {
+  color: #475569;
+}
+.pedia-desc {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: #cbd5f5;
+}
+.pedia-card.unknown .pedia-desc {
+  color: #64748b;
+  font-style: italic;
+}
+.pedia-pod {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  margin: 10px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid rgba(125, 211, 252, 0.16);
+  font-size: 0.78rem;
+  color: #94a3b8;
+}
+.pedia-pod span:last-child {
+  color: #facc15;
+  font-weight: 600;
+}
