@@ -105,6 +105,8 @@ const EVENT_CHECK_INTERVAL = 60;
 const EVENT_CHANCE = 0.1;
 const EVENT_DURATION = 30;
 const JELLYFISH_SWARM_DURATION = 45;
+/** The deepest level a jellyfish swarm can appear at - see Game.jellyfishAllowed. */
+const JELLYFISH_MAX_LEVEL = 19;
 const JELLYFISH_COUNT = 50;
 const STORM_VISIBILITY_RADIUS = 18;
 /**
@@ -3818,35 +3820,52 @@ ${cleared.name} Zone Liberated
     this.activeEvent = null;
   }
 
+  /**
+   * Picks what the next event will be, if anything.
+   *
+   * The two events are allowed at different depths rather than by one shared rule, because they
+   * are doing different jobs. Whichever are allowed here share the roll evenly; if neither is,
+   * the depth simply has no weather.
+   */
   private planNextEvent(): void {
+    const allowed: GameEventType[] = [];
+    if (this.stormsAllowed()) allowed.push('storm');
+    if (this.jellyfishAllowed()) allowed.push('jellyfish');
+
     const roll = Math.random();
-    if (this.levelHasWeather() && roll < EVENT_CHANCE * 2) {
-      if (this.currentLevel <= 5) {
-        this.pendingEvent = Math.random() < 0.5 ? 'storm' : 'jellyfish';
-      } else {
-        this.pendingEvent = 'storm';
-      }
-    } else {
-      this.pendingEvent = null;
-    }
+    this.pendingEvent =
+      allowed.length > 0 && roll < EVENT_CHANCE * 2
+        ? allowed[Math.floor(Math.random() * allowed.length)]
+        : null;
+
     this.nextStormWarningTime = this.nextEventCheckTime - 5;
     this.stormWarningShown = false;
   }
 
   /**
-   * Whether this depth gets weather at all.
+   * Storms: everywhere except the Mesopelagic.
    *
-   * The Mesopelagic does not. A storm is a visibility mechanic - it cuts sight to
-   * STORM_VISIBILITY_RADIUS - and the zone already runs its own darkness, climbing from 0.35 to
-   * 0.62, with the photophores and Echolocation built around reading it. Laying a storm over that
-   * changes almost nothing except to take the tool the zone hands you and make it briefly useless,
-   * and a thunderstorm a thousand metres down was never a thing anyone was going to believe.
-   *
-   * Jellyfish are already absent from here: planNextEvent only rolls them at level 5 or shallower,
-   * so from level 6 down every event was a storm. Turning storms off leaves the zone with none.
+   * A storm is a visibility mechanic - it cuts sight to STORM_VISIBILITY_RADIUS - and that zone
+   * already runs its own darkness, climbing from 0.35 to 0.62, with the photophores and
+   * Echolocation built around reading it. Laying a storm over that changes almost nothing except
+   * to take the tool the zone hands you and briefly make it useless, and a thunderstorm a
+   * thousand metres down was never a thing anyone was going to believe.
    */
-  private levelHasWeather(): boolean {
+  private stormsAllowed(): boolean {
     return !isMesopelagicLevel(this.currentLevel);
+  }
+
+  /**
+   * Jellyfish: level 19 and shallower, which is nearly everywhere a player will spend time.
+   *
+   * They used to stop after level 5, so from level 6 down every event was a storm. A swarm is a
+   * hazard to swim around rather than a fog to see through, which is the one kind of weather that
+   * still means something in dark water - so it is the event the Mesopelagic keeps while storms
+   * are off there. It stops at 19 rather than 20 so the zone's Matriarch is fought in clear
+   * water: one boss and a swarm at once is two things asking for the same attention.
+   */
+  private jellyfishAllowed(): boolean {
+    return this.currentLevel <= JELLYFISH_MAX_LEVEL;
   }
 
   private updateEvents(): void {

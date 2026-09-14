@@ -280,9 +280,10 @@ describe('the authored Mesopelagic, levels 11-20', () => {
     }
   });
 
-  it('is the stretch that game.ts turns weather off over', () => {
-    // Game.levelHasWeather keys off exactly this, so the two have to agree on where the zone is:
-    // a storm is a visibility mechanic and the zone already runs its own darkness.
+  it('is the stretch that game.ts turns storms off over', () => {
+    // Game.stormsAllowed keys off exactly this, so the two have to agree on where the zone is:
+    // a storm is a visibility mechanic and the zone already runs its own darkness. Jellyfish are
+    // gated separately, by level, and do reach into this zone.
     for (let level = 11; level <= 20; level++) expect(isMesopelagicLevel(level)).toBe(true);
     expect(isMesopelagicLevel(10)).toBe(false);
     expect(isMesopelagicLevel(21)).toBe(false);
