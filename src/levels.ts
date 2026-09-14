@@ -37,16 +37,16 @@ const TIGER_GREAT_WHITE: SharkKind[] = ['tiger', 'greatWhite'];
 const ALL_KINDS: SharkKind[] = ['tiger', 'greatWhite', 'hammerhead'];
 
 export const LEVELS: LevelConfig[] = [
-  { level: 1, sharkKinds: TIGER, normalSharkCount: 4, largeSharkCount: 0, maxDolphins: 8, sharkSpeedMultiplier: 1.0 },
-  { level: 2, sharkKinds: TIGER, normalSharkCount: 5, largeSharkCount: 0, maxDolphins: 8, sharkSpeedMultiplier: 1.03 },
-  { level: 3, sharkKinds: TIGER, normalSharkCount: 5, largeSharkCount: 1, maxDolphins: 10, sharkSpeedMultiplier: 1.06 },
-  { level: 4, sharkKinds: TIGER_GREAT_WHITE, normalSharkCount: 6, largeSharkCount: 1, maxDolphins: 12, sharkSpeedMultiplier: 1.09 },
-  { level: 5, sharkKinds: TIGER_GREAT_WHITE, normalSharkCount: 6, largeSharkCount: 2, maxDolphins: 12, sharkSpeedMultiplier: 1.12 },
-  { level: 6, sharkKinds: ALL_KINDS, normalSharkCount: 7, largeSharkCount: 2, maxDolphins: 12, sharkSpeedMultiplier: 1.15 },
-  { level: 7, sharkKinds: ALL_KINDS, normalSharkCount: 7, largeSharkCount: 3, maxDolphins: 12, sharkSpeedMultiplier: 1.18 },
-  { level: 8, sharkKinds: ALL_KINDS, normalSharkCount: 8, largeSharkCount: 3, maxDolphins: 13, sharkSpeedMultiplier: 1.21 },
-  { level: 9, sharkKinds: ALL_KINDS, normalSharkCount: 8, largeSharkCount: 4, maxDolphins: 14, sharkSpeedMultiplier: 1.24 },
-  { level: 10, sharkKinds: ALL_KINDS, normalSharkCount: 9, largeSharkCount: 4, maxDolphins: 15, sharkSpeedMultiplier: 1.27, matriarch: true }
+  { level: 1, sharkKinds: TIGER, normalSharkCount: 3, largeSharkCount: 0, maxDolphins: 8, sharkSpeedMultiplier: 1.0 },
+  { level: 2, sharkKinds: TIGER, normalSharkCount: 4, largeSharkCount: 0, maxDolphins: 8, sharkSpeedMultiplier: 1.03 },
+  { level: 3, sharkKinds: TIGER, normalSharkCount: 4, largeSharkCount: 1, maxDolphins: 10, sharkSpeedMultiplier: 1.06 },
+  { level: 4, sharkKinds: TIGER_GREAT_WHITE, normalSharkCount: 5, largeSharkCount: 1, maxDolphins: 12, sharkSpeedMultiplier: 1.09 },
+  { level: 5, sharkKinds: TIGER_GREAT_WHITE, normalSharkCount: 5, largeSharkCount: 2, maxDolphins: 12, sharkSpeedMultiplier: 1.12 },
+  { level: 6, sharkKinds: ALL_KINDS, normalSharkCount: 6, largeSharkCount: 2, maxDolphins: 12, sharkSpeedMultiplier: 1.15 },
+  { level: 7, sharkKinds: ALL_KINDS, normalSharkCount: 6, largeSharkCount: 3, maxDolphins: 12, sharkSpeedMultiplier: 1.18 },
+  { level: 8, sharkKinds: ALL_KINDS, normalSharkCount: 7, largeSharkCount: 3, maxDolphins: 13, sharkSpeedMultiplier: 1.21 },
+  { level: 9, sharkKinds: ALL_KINDS, normalSharkCount: 7, largeSharkCount: 4, maxDolphins: 14, sharkSpeedMultiplier: 1.24 },
+  { level: 10, sharkKinds: ALL_KINDS, normalSharkCount: 8, largeSharkCount: 4, maxDolphins: 15, sharkSpeedMultiplier: 1.27, matriarch: true }
 ];
 
 /**
@@ -183,7 +183,7 @@ const SHARK_SPEED_PER_LEVEL =
 export const SANDBOX_LEVELS: Record<number, Partial<LevelConfig>> = {
   // The same water level 11 opens with, so the deep events can be watched against a shark mix
   // that is already understood rather than against a new one at the same time.
-  21: { sharkKinds: ['cookiecutter', 'frilled'], normalSharkCount: 4, largeSharkCount: 0, matriarch: false, gloom: 0.8, dealKindsInTurn: true },
+  21: { sharkKinds: ['cookiecutter', 'frilled'], normalSharkCount: 3, largeSharkCount: 0, matriarch: false, gloom: 0.8, dealKindsInTurn: true },
   31: { sharkKinds: [], normalSharkCount: 0, largeSharkCount: 0, matriarch: false, gloom: 0.9, dealKindsInTurn: true },
 };
 
@@ -193,7 +193,7 @@ export const SANDBOX_LEVELS: Record<number, Partial<LevelConfig>> = {
  * Past the campaign every level was the same three shallow-water species in slowly growing
  * numbers, so the two deep-water sharks existed only on a test bench and the zone that should
  * have introduced them never did. These ten run the curve levels 1-10 run - the same counts
- * (4,5,5,6,6,7,7,8,8,9 small against 0,0,1,1,2,2,3,3,4,4 large), a new species folded in twice
+ * (3,4,4,5,5,6,6,7,7,8 small against 0,0,1,1,2,2,3,3,4,4 large), a new species folded in twice
  * along the way, and a Matriarch at the end - but starting from the frilled shark and the
  * cookiecutter rather than from tigers.
  *
@@ -238,16 +238,16 @@ const mesoGloom = (level: number): number =>
 const MESO_POD_LIMIT = 15;
 
 export const MESOPELAGIC_LEVELS: Record<number, Partial<LevelConfig>> = {
-  11: { sharkKinds: MESO_CC_FRILLED, normalSharkCount: 4, largeSharkCount: 0, dealKindsInTurn: true },
-  12: { sharkKinds: MESO_CC_FRILLED, normalSharkCount: 5, largeSharkCount: 0, dealKindsInTurn: true },
-  13: { sharkKinds: MESO_CC_FRILLED, normalSharkCount: 5, largeSharkCount: 1, dealKindsInTurn: true },
-  14: { sharkKinds: MESO_CC_FRILLED, normalSharkCount: 6, largeSharkCount: 1, dealKindsInTurn: true },
-  15: { sharkKinds: MESO_CC_FRILLED, normalSharkCount: 6, largeSharkCount: 2, dealKindsInTurn: true },
-  16: { sharkKinds: MESO_PLUS_HAMMER, normalSharkCount: 7, largeSharkCount: 2 },
-  17: { sharkKinds: MESO_PLUS_HAMMER, normalSharkCount: 7, largeSharkCount: 3 },
-  18: { sharkKinds: MESO_PLUS_HAMMER, normalSharkCount: 8, largeSharkCount: 3 },
-  19: { sharkKinds: MESO_ALL, normalSharkCount: 8, largeSharkCount: 4 },
-  20: { sharkKinds: MESO_ALL, normalSharkCount: 9, largeSharkCount: 4 },
+  11: { sharkKinds: MESO_CC_FRILLED, normalSharkCount: 3, largeSharkCount: 0, dealKindsInTurn: true },
+  12: { sharkKinds: MESO_CC_FRILLED, normalSharkCount: 4, largeSharkCount: 0, dealKindsInTurn: true },
+  13: { sharkKinds: MESO_CC_FRILLED, normalSharkCount: 4, largeSharkCount: 1, dealKindsInTurn: true },
+  14: { sharkKinds: MESO_CC_FRILLED, normalSharkCount: 5, largeSharkCount: 1, dealKindsInTurn: true },
+  15: { sharkKinds: MESO_CC_FRILLED, normalSharkCount: 5, largeSharkCount: 2, dealKindsInTurn: true },
+  16: { sharkKinds: MESO_PLUS_HAMMER, normalSharkCount: 6, largeSharkCount: 2 },
+  17: { sharkKinds: MESO_PLUS_HAMMER, normalSharkCount: 6, largeSharkCount: 3 },
+  18: { sharkKinds: MESO_PLUS_HAMMER, normalSharkCount: 7, largeSharkCount: 3 },
+  19: { sharkKinds: MESO_ALL, normalSharkCount: 7, largeSharkCount: 4 },
+  20: { sharkKinds: MESO_ALL, normalSharkCount: 8, largeSharkCount: 4 },
 };
 
 /** Whether this depth is one of the ten authored Mesopelagic levels. */
@@ -265,7 +265,7 @@ export function getEndlessLevelConfig(level: number): LevelConfig {
   const base: LevelConfig = {
     level,
     sharkKinds: ALL_KINDS,
-    normalSharkCount: Math.min(9 + Math.ceil(over / 3), 16),
+    normalSharkCount: Math.min(8 + Math.ceil(over / 3), 15),
     largeSharkCount: Math.min(4 + Math.ceil(over / 3), 10),
     maxDolphins: Math.min(15 + Math.floor(over / 4), 20),
     sharkSpeedMultiplier: Math.min(

@@ -73,7 +73,7 @@ describe('getEndlessLevelConfig', () => {
 
   it('caps shark counts and pod size so late levels stay playable', () => {
     const config = getEndlessLevelConfig(200);
-    expect(config.normalSharkCount).toBeLessThanOrEqual(16);
+    expect(config.normalSharkCount).toBeLessThanOrEqual(15);
     expect(config.largeSharkCount).toBeLessThanOrEqual(10);
     expect(config.maxDolphins).toBeLessThanOrEqual(20);
   });
