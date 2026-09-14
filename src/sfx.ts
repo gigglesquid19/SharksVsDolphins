@@ -33,6 +33,14 @@ const MATRIARCH_HIT_SAMPLE = 'matriarch-hit.mp3';
 /** Stings for the two moments a run changes state. Both are phrases, not impacts. */
 const LEVEL_COMPLETE_SAMPLE = 'level-complete.mp3';
 const GAME_OVER_SAMPLE = 'game-over.mp3';
+/**
+ * The two Mesopelagic events arriving. Recordings rather than oscillators because both are meant
+ * to sound like a creature rather than a signal, and that is the line synthesis never quite gets
+ * across - the synthesised versions are kept underneath as the fallback for the first play of a
+ * session, before the file has finished downloading.
+ */
+const KRAKEN_SAMPLE = 'kraken.mp3';
+const MEGAMOUTH_SAMPLE = 'megamouth.mp3';
 
 class SfxEngine {
   private ctx: AudioContext | null = null;
@@ -68,6 +76,8 @@ class SfxEngine {
     this.preloadSample(MATRIARCH_HIT_SAMPLE);
     this.preloadSample(LEVEL_COMPLETE_SAMPLE);
     this.preloadSample(GAME_OVER_SAMPLE);
+    this.preloadSample(KRAKEN_SAMPLE);
+    this.preloadSample(MEGAMOUTH_SAMPLE);
   }
 
   /** Fetches and decodes a sample once, caching the result. Safe to call repeatedly. */
@@ -335,6 +345,8 @@ class SfxEngine {
    * choosing a lane rather than to flinch - a sharp attack would ask for the wrong reaction.
    */
   playKraken(): void {
+    if (this.playSample(KRAKEN_SAMPLE, 0.85)) return;
+
     const ctx = this.ensureContext();
     const now = ctx.currentTime;
 
@@ -350,6 +362,8 @@ class SfxEngine {
    * enormous and going somewhere, and the sound should read as something surfacing into view.
    */
   playMegamouth(): void {
+    if (this.playSample(MEGAMOUTH_SAMPLE, 0.85)) return;
+
     const ctx = this.ensureContext();
     const now = ctx.currentTime;
 

@@ -43,10 +43,10 @@ Every sound is procedurally synthesized at runtime with the Web Audio API
 
 #### Recorded effects — Pixabay
 
-Three sounds are recordings rather than synthesis, all from **Pixabay** under the
-**Pixabay Content License**: free for commercial use, no attribution required,
-but not to be redistributed as standalone downloads. Source files in
-`audio/Sfx/`; the served copies are in `public/sfx/`.
+Eight sounds are recordings rather than synthesis. The three identified below are
+from **Pixabay** under the **Pixabay Content License**: free for commercial use,
+no attribution required, but not to be redistributed as standalone downloads.
+Source files in `audio/Sfx/`; the served copies are in `public/sfx/`.
 
 | In game | Source filename | Pixabay uploader | Pixabay sound ID |
 |---|---|---|---|
@@ -56,8 +56,10 @@ but not to be redistributed as standalone downloads. Source files in
 | `matriarch-hit.mp3` | `MatriarchHit3.mp3` | **unconfirmed** | **unconfirmed** |
 | `level-complete.mp3` | `LevelComplete.mp3` | **unconfirmed** | **unconfirmed** |
 | `game-over.mp3` | `GameOver.mp3` | **unconfirmed** | **unconfirmed** |
+| `kraken.mp3` | `Kraken.mp3` | **unconfirmed** | **unconfirmed** |
+| `megamouth.mp3` | `MegamouthShark.mp3` | **unconfirmed** | **unconfirmed** |
 
-> The last three were supplied already renamed, so their original uploaders and
+> The last five were supplied already renamed, so their original uploaders and
 > sound IDs are not recoverable from the filenames. Confirm their sources before
 > any store release: anything not covered by Pixabay's licence (or another
 > permitting commercial use) has to be replaced. The first three were identified
@@ -98,7 +100,20 @@ the background music to 30% for their duration (`onMusicDuck` in `src/main.ts`).
 Nothing stops the level music at a game over, and a five-second phrase over a
 running loop just sounds muddy.
 
-All six have synthesized fallbacks in `src/sfx.ts` covering the first play of a
+`kraken.mp3` (6.5s, 203KB) plays when the kraken's arms reach into the
+Mesopelagic, and `megamouth.mp3` (3.7s, 116KB) when a megamouth begins its
+crossing. Both also play five seconds earlier as the "strange noise from the
+deep" warning is a separate synthesized cue, so these two mark the arrival
+itself.
+
+Unlike the six above, both are served exactly as supplied: stereo, untrimmed and
+at their original bitrate, which is why they are several times the size of
+everything else here. That costs nothing at install - `mp3` is excluded from the
+precache and cached on first play instead (`vite.config.ts`) - but they are the
+obvious candidates if the served audio ever needs to come down: downmixing to
+mono at 96kbps, as the others are, would take roughly three quarters off each.
+
+All eight have synthesized fallbacks in `src/sfx.ts` covering the first play of a
 session, before the files have finished loading.
 
 
