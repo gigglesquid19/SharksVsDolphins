@@ -105,6 +105,12 @@ function escapeHtml(s: string): string {
 
 const DOLPHIN_SPAWN_INTERVAL = 12;
 /**
+ * Level 19 gets dolphins slightly faster than the ordinary rate - not the full halving level 10
+ * gets for its boss fight, just enough to rebuild a pod a little quicker while playtesting found
+ * it a rough spot to get stuck on.
+ */
+const LEVEL_19_DOLPHIN_SPAWN_FACTOR = 0.75;
+/**
  * How long a shark has to wait after taking a dolphin before it can take another.
  *
  * There is a one-second floor on the pod as a whole - no hazard can strip it faster than that -
@@ -246,6 +252,14 @@ const MEGAMOUTH_SIZE = 3;
 const MEGAMOUTH_SPEED = 0.84;
 /** Its own reach, in world units - it is enormous, and the hit box has to say so. */
 const MEGAMOUTH_HIT_RADIUS = 13;
+/**
+ * The same reach while other sharks are still in the water. While it is just crossing rather
+ * than fighting, its line is one more thing to dodge on top of whatever else is hunting the pod
+ * at the same time - a slightly tighter box gives a little more room in what is otherwise the
+ * most crowded moment the encounter has. Once it is the only thing left, the ordinary radius
+ * applies again.
+ */
+const MEGAMOUTH_HIT_RADIUS_WITH_SHARKS = 11;
 /** How far past the edge it goes before wrapping round, in world units. */
 const MEGAMOUTH_WRAP_MARGIN = 26;
 /**
@@ -881,6 +895,14 @@ export class Game {
   /** Whether this level is the one carrying the encounter, and whether it has arrived yet. */
   private megamouthEncounterScheduled = false;
   private megamouthAppearedThisLevel = false;
+  /**
+   * The level it last actually appeared on, or null. A level can end before it has had a
+   * chance to spawn (see megamouthEncounterDue), which defers the same encounter forward rather
+   * than spending it - so this is a second, independent guard against the level right after an
+   * appearance rolling it right back in, whatever the reason megamouthDone did not already
+   * cover it.
+   */
+  private megamouthLastAppearedLevel: number | null = null;
   private krakenContainer!: Container;
   private tentacles: Tentacle[] = [];
   private tentacleGfx = new Map<Tentacle, Graphics>();
@@ -2297,6 +2319,7 @@ export class Game {
         MEGAMOUTH_ENCOUNTER_FIRST_LEVEL +
         Math.floor(Math.random() * (MEGAMOUTH_ENCOUNTER_LAST_LEVEL - MEGAMOUTH_ENCOUNTER_FIRST_LEVEL + 1));
       this.megamouthDone = false;
+      this.megamouthLastAppearedLevel = null;
       this.totalRecruited = 0;
       this.totalLost = 0;
       this.sharksKilled = 0;
@@ -4331,7 +4354,9 @@ ${cleared.name} Zone Liberated
       ? DEV_DOLPHIN_SPAWN_INTERVAL
       : config.level === 10
         ? DOLPHIN_SPAWN_INTERVAL / 2
-        : DOLPHIN_SPAWN_INTERVAL;
+        : config.level === 19
+          ? DOLPHIN_SPAWN_INTERVAL * LEVEL_19_DOLPHIN_SPAWN_FACTOR
+          : DOLPHIN_SPAWN_INTERVAL;
 
     this.matriarch = null;
     this.matriarchWarningShown = false;
@@ -4476,6 +4501,7 @@ ${cleared.name} Zone Liberated
     this.lightsContainer.addChild(this.megamouthLights);
 
     this.megamouthAppearedThisLevel = true;
+    this.megamouthLastAppearedLevel = this.currentLevel;
     recordEncounter('megamouth');
     this.setStatus('Something vast is moving through the dark');
     sfx.playMegamouth();
@@ -5259,9 +5285,13 @@ ${cleared.name} Zone Liberated
    * before forty-five seconds are up, and a player who bought their way to a depth past the roll
    * should not have the encounter silently skipped. So it lands on the first level of the zone
    * at or after the roll, and only a fought-and-won encounter spends it.
+   *
+   * The level right after one it actually appeared on is refused outright, on top of that: a
+   * player who has just fought one does not want to walk straight into a second.
    */
   private megamouthEncounterDue(level: number): boolean {
     if (this.megamouthDone || this.megamouthRunLevel === null) return false;
+    if (this.megamouthLastAppearedLevel !== null && level === this.megamouthLastAppearedLevel + 1) return false;
     if (isSandboxLevel(level) || !isMesopelagicLevel(level)) return false;
     if (getLevelConfig(level).matriarch) return false;
     return level >= this.megamouthRunLevel;
@@ -5809,8 +5839,9 @@ ${cleared.name} Zone Liberated
     if (this.player && (krakenOut || (this.megamouth && !this.megamouth.beaten))) {
       const grabbed = (d: Dolphin): boolean => krakenOut && this.tentacles.some((arm) => this.tentacleHits(arm, d));
       // A beaten one takes nobody. It is bleeding out on the floor, not crossing the arena.
+      const megamouthReach = this.sharks.length > 0 ? MEGAMOUTH_HIT_RADIUS_WITH_SHARKS : MEGAMOUTH_HIT_RADIUS;
       const swept = (d: Dolphin): boolean =>
-        !!this.megamouth && !this.megamouth.beaten && this.megamouth.distanceBetween(d) < MEGAMOUTH_HIT_RADIUS;
+        !!this.megamouth && !this.megamouth.beaten && this.megamouth.distanceBetween(d) < megamouthReach;
       const now = Date.now();
       if (now >= this.playerHitCooldownUntil && now >= this.ghostUntil) {
         const victim = this.pickHazardVictim(
