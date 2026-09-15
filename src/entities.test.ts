@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { SIZE_X, SIZE_Y } from './constants';
 import { Megamouth, MEGAMOUTH_TURN_TOWARD, Tentacle, Dolphin, Jellyfish, Shark } from './entities';
 
@@ -331,6 +331,46 @@ describe('Shark.move frilled flank', () => {
     const p = playerAt(50, 50);
     const s = testShark(50, 46, { kind: 'frilled' });
     for (let i = 0; i < 30; i++) s.move(1, p, [s], true, NOW);
+    expect(s.distanceBetween(p)).toBeLessThan(4);
+  });
+});
+
+describe('Shark.move small frilled: a lurker rather than a hunter', () => {
+  // A small frilled is meant to mostly hold its patrol and only commit once the pod is
+  // genuinely close - unlike every other juvenile, which drifts toward the player even while
+  // "searching" (see SEARCH_DRIFT). Without suppressing that drift for this one kind, it read
+  // as always pursuing regardless of the tighter hunt radius, since the drift alone was enough
+  // to converge on the player from most of the level.
+  it('pursues once the pod is within its shortened hunt radius', () => {
+    const p = playerAt(50, 50);
+    const s = testShark(50, 60, { kind: 'frilled' }); // 10 units away, inside FRILLED_SMALL_HUNT_RADIUS
+    s.move(1, p, [s], false, NOW);
+    // Heading snaps toward the player on the very first tick, the same as any other pursuit.
+    expect(s.headingY).toBeLessThan(-0.5);
+  });
+
+  it('does not drift toward the pod from outside that radius, unlike a same-sized tiger', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    try {
+      const p = playerAt(50, 90);
+      const frilled = testShark(50, 50, { kind: 'frilled' }); // 40 units away
+      const tiger = testShark(50, 50, { kind: 'tiger' });
+      frilled.move(1, p, [frilled], false, NOW);
+      tiger.move(1, p, [tiger], false, NOW);
+      // Both roll the same wander angle under frozen randomness. Only the tiger's heading bends
+      // toward the player (positive Y, since the player is below it); the frilled shark's stays
+      // exactly the raw wander direction.
+      expect(frilled.headingY).toBeCloseTo(0, 4);
+      expect(tiger.headingY).toBeGreaterThan(0.5);
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
+  it('still finds the player if its patrol happens to wander close enough', () => {
+    const p = playerAt(50, 50);
+    const s = testShark(50, 60, { kind: 'frilled' });
+    for (let i = 0; i < 30; i++) s.move(1, p, [s], false, NOW);
     expect(s.distanceBetween(p)).toBeLessThan(4);
   });
 });

@@ -778,12 +778,12 @@ const SHARK_INTRO_INFO: Partial<Record<SharkKind, { name: string; description: s
   frilled: {
     name: 'Frilled Shark',
     description:
-      'A long eel of a shark from the twilight water. It is slower than anything else down here, it comes round at you from the side rather than straight on, and it never stops. Seven dolphins would see one off; you are meant to outswim it, not outfight it.',
+      'A long eel of a shark from the twilight water, slower than anything else down here. It mostly holds a slow patrol and only comes for you once your pod strays close, then comes round at you from the side rather than straight on. Seven dolphins would see one off; you are meant to outswim it, not outfight it.',
   },
   cookiecutter: {
     name: 'Cookiecutter Shark',
     description:
-      'Small, black and quick, lit only by the green glow of its own belly. One is barely a threat, but it takes five dolphins to see off, and they do not travel alone.',
+      'Small, black and quick, lit only by the green glow of its own belly. One is barely a threat, but it takes four dolphins to see off, and they do not travel alone.',
   },
 };
 

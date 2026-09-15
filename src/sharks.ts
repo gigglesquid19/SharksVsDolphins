@@ -31,16 +31,15 @@ export function podRequirement(kind: SharkKind, large: boolean, level: number): 
     if (kind === 'tiger') return 4;
     if (kind === 'greatWhite') return 5;
     if (kind === 'hammerhead') return 4;
-    // The two deep-water species cost far more pod than their size suggests, which is the point
-    // of them: a frilled shark is not something a working pod rams on the way past, it is a pod's
-    // worth of work on a level that caps at 15 - but it leaves room to still be running one down
-    // while the rest of the water is happening, which asking for ten did not. Seven rather than
-    // eight, since a pod that has taken any losses at all spends most of a level under eight and
-    // the species then reads as unkillable rather than expensive. The cookiecutter at 5 is past
-    // the 4 that merely opens Hunting Mode, so arriving in Hunting Mode is no longer the same as
-    // being able to clear one out of the way.
+    // The frilled shark costs far more pod than its size suggests, which is the point of it: it
+    // is not something a working pod rams on the way past, it is a pod's worth of work on a
+    // level that caps at 15 - but it leaves room to still be running one down while the rest of
+    // the water is happening, which asking for ten did not. Seven rather than eight, since a pod
+    // that has taken any losses at all spends most of a level under eight and the species then
+    // reads as unkillable rather than expensive. The cookiecutter sits right at the 4 that opens
+    // Hunting Mode, so a pod that can hunt at all can already clear one out of the way.
     if (kind === 'frilled') return 7;
-    if (kind === 'cookiecutter') return 5;
+    if (kind === 'cookiecutter') return 4;
   }
   return HUNTING_MODE_POD_SIZE;
 }

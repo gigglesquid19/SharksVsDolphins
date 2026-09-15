@@ -15,6 +15,13 @@ const AMBUSH_RANGE = 25;
 // pod up sooner; beyond this it loses track and drops into the idle search cruise.
 const HUNT_RADIUS = 25;
 const LARGE_HUNT_RADIUS = 40;
+// A small frilled shark is a lurker rather than a hunter: it mostly holds its slow patrol and
+// only commits once the pod strays genuinely close, rather than converging on the player from
+// most of the level the way every other juvenile does at HUNT_RADIUS. Chosen to line up with
+// the range at which its green eye becomes visible to the player (SHARK_EYE_RANGE in game.ts),
+// so the two read as one cue: seeing the eye means it has seen you. A large frilled keeps the
+// ordinary LARGE_HUNT_RADIUS - it is committing to a strike by then, not idly patrolling.
+const FRILLED_SMALL_HUNT_RADIUS = 14;
 const AMBUSH_MIN_DIST = 2;
 const AMBUSH_SPEED = 3;
 // Idle "searching" cruise: how far the wander angle can drift per tick (radians), how quickly
@@ -251,7 +258,11 @@ export class Shark {
     hidden = false,
   ): void {
     if (!player) return;
-    const huntRadius = this.large ? LARGE_HUNT_RADIUS : HUNT_RADIUS;
+    const huntRadius = this.large
+      ? LARGE_HUNT_RADIUS
+      : this.kind === 'frilled'
+        ? FRILLED_SMALL_HUNT_RADIUS
+        : HUNT_RADIUS;
     const distToPlayer = this.distanceBetween(player);
     const margin = Math.ceil((24 * this.sizeMultiplier) / WORLD_SCALE);
     const keepX = this.kind === 'tiger' || this.matriarch ? clampX : wrapX;
@@ -411,10 +422,17 @@ export class Shark {
       // like an animal casting about, rather than turning into a second, slower pursuit.
       // Nothing to converge on while the pod is ghosted, so the shark genuinely casts about
       // instead of quietly homing in on a player it is not supposed to be able to find.
+      //
+      // A small frilled shark is the one exception to all of that: it is a lurker rather than a
+      // hunter, and is meant to actually patrol rather than quietly homing in on the player from
+      // outside FRILLED_SMALL_HUNT_RADIUS the way every other juvenile does here. Without this it
+      // read as "always pursuing" regardless of the hunt radius above, since the drift alone was
+      // enough to converge on the player from most of the level.
+      const lurking = this.kind === 'frilled' && !this.large;
       const toPlayerX = directionDelta(player._x, this._x);
       const toPlayerY = player._y - this._y;
       const toPlayerLen = Math.hypot(toPlayerX, toPlayerY);
-      if (!hidden && toPlayerLen > 0) {
+      if (!hidden && !lurking && toPlayerLen > 0) {
         desX += (toPlayerX / toPlayerLen) * SEARCH_DRIFT;
         desY += (toPlayerY / toPlayerLen) * SEARCH_DRIFT;
       }

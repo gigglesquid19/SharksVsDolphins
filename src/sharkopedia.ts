@@ -69,7 +69,7 @@ const SPECIES: { kind: SharkKind; name: string; juvenile: string; adult: string 
     kind: 'frilled',
     name: 'Frilled Shark',
     juvenile:
-      'A long eel of a shark from the twilight water, black as the cookiecutter and lit by two pale points set far apart - the gap between them is the only measure of its size in the dark. Close up you also catch the green of its eye, which means it has seen you. Slower than anything else down there, and it never stops.',
+      'A long eel of a shark from the twilight water, black as the cookiecutter and lit by two pale points set far apart - the gap between them is the only measure of its size in the dark. Slower than anything else down there, and it mostly holds a slow patrol - it only comes for you once your pod strays close, and close up you also catch the green of its eye, which means it has seen you.',
     adult:
       'Longer again, and it strikes. A grown frilled shark swings wide of the pod and then throws its head out along its own length - aimed once, when the strike begins, and anything lying across that line is taken.',
   },
@@ -77,7 +77,7 @@ const SPECIES: { kind: SharkKind; name: string; juvenile: string; adult: string 
     kind: 'cookiecutter',
     name: 'Cookiecutter Shark',
     juvenile:
-      'Small, black and quick, lit only by the green glow of its own belly. One is barely a threat, but it takes five dolphins to see off, and they never travel alone.',
+      'Small, black and quick, lit only by the green glow of its own belly. One is barely a threat, but it takes four dolphins to see off, and they never travel alone.',
     adult:
       'It picks a single dolphin out of your pod and commits to one run at it. The warning is the whole of the counterplay - the run is aimed once, when the warning ends, and never corrected, so moving the pod off that line is a dodge rather than a delay.',
   },
