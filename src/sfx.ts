@@ -385,6 +385,20 @@ class SfxEngine {
     this.tone(ctx, 140, now, 0.3, { type: 'sine', gain: 0.16, glideTo: 70 });
   }
 
+  /**
+   * A large frilled shark has picked a target and is holding, coiled, before it strikes: one
+   * slow, unhurried rise rather than a beep. Deliberately unlike the cookiecutter's climbing
+   * double-beep (playLockOnWarning) - a different creature, and the player should be able to
+   * tell the two apart with their eyes shut.
+   */
+  playFrilledWarning(): void {
+    const ctx = this.ensureContext();
+    const now = ctx.currentTime;
+
+    this.tone(ctx, 95, now, 0.65, { type: 'sine', gain: 0.16, glideTo: 250 });
+    this.tone(ctx, 60, now, 0.7, { type: 'sine', gain: 0.12, glideTo: 100 });
+  }
+
   /** The frilled shark throwing its head out: a low sweep opening rather than a snap. */
   playFrilledStrike(): void {
     const ctx = this.ensureContext();

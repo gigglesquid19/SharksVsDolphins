@@ -203,7 +203,7 @@ export class Shark {
    * loop stretches the sprite by it and the bite check reaches along it.
    */
   reach = 0;
-  reachPhase: 'none' | 'out' | 'hold' | 'back' = 'none';
+  reachPhase: 'none' | 'warning' | 'out' | 'hold' | 'back' = 'none';
   reachPhaseEndTime = 0;
   reachCooldownEnd = 0;
 

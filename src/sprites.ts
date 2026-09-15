@@ -338,21 +338,44 @@ export function photophoreFlashAlpha(now: number, seed: number): number {
   return t < PHOTOPHORE_FLASH_PERIOD_MS * 0.55 ? PHOTOPHORE_ALPHA_PEAK : PHOTOPHORE_ALPHA_REST * 0.5;
 }
 
+/**
+ * Draws one light's three rings - halo, middle, hard core - in the given color, onto whatever is
+ * already there. Shared by createPhotophores (first draw) and setPhotophoreColor (a repaint), so
+ * the two can never draw a light differently by accident.
+ */
+function paintPhotophoreDot(dot: Graphics, color: number): void {
+  // Bigger than a light this bright needs to be, because at distance it is competing with a
+  // whole screen: a 2px point is lost among the drifting motes, while a soft disc this size
+  // reads as a light source from across the arena. The halo does most of that work - the core
+  // only has to keep it from looking like a smudge.
+  dot.circle(0, 0, 12).fill({ color, alpha: 0.2 });
+  dot.circle(0, 0, 6).fill({ color, alpha: 0.5 });
+  dot.circle(0, 0, 2.6).fill({ color, alpha: 1 });
+}
+
 export function createPhotophores(spots: Photophore[], color: number): Container {
   const group = new Container();
   for (let i = 0; i < spots.length; i++) {
     const dot = new Graphics();
-    // Bigger than a light this bright needs to be, because at distance it is competing with a
-    // whole screen: a 2px point is lost among the drifting motes, while a soft disc this size
-    // reads as a light source from across the arena. The halo does most of that work - the core
-    // only has to keep it from looking like a smudge.
-    dot.circle(0, 0, 12).fill({ color, alpha: 0.2 });
-    dot.circle(0, 0, 6).fill({ color, alpha: 0.5 });
-    dot.circle(0, 0, 2.6).fill({ color, alpha: 1 });
+    paintPhotophoreDot(dot, color);
     dot.blendMode = 'add';
     group.addChild(dot);
   }
   return group;
+}
+
+/**
+ * Repaints every light in a photophore group to a new color - a cookiecutter's belly light
+ * turning red for its lock-on warning, in particular (see updateLockOnStrikes). Geometry, size
+ * and blend mode are untouched; only the fill changes, so the light does not so much as flicker
+ * on the frame it turns.
+ */
+export function setPhotophoreColor(group: Container, color: number): void {
+  for (const child of group.children) {
+    const dot = child as Graphics;
+    dot.clear();
+    paintPhotophoreDot(dot, color);
+  }
 }
 
 /**

@@ -24,6 +24,7 @@ import {
   makeVignetteTexture,
   photophoreFlashAlpha,
   photophorePulseAlpha,
+  setPhotophoreColor,
   sliceSharkStrip,
   SharkFishSprite,
   Photophore,
@@ -475,11 +476,13 @@ const SHARK_KIND_SCALE: Record<SharkKind, number> = {
  * is the whole of the counterplay - the run is aimed once, when the warning ends, and never
  * corrected, so moving the pod off that line is a dodge rather than a postponement.
  *
- * Forty-five seconds between runs, not the thirty it started at. One arriving every half minute
- * meant the warning was always either on screen or about to be, and something that constant is
- * read as the weather rather than as a threat - the gap is what makes the banner mean anything.
+ * Thirty-two seconds between runs. It started at thirty, was pulled out to forty-five because a
+ * run every half minute made the warning read as the weather rather than as a threat, and has
+ * come back down from there - playtesting through the teen levels wanted the pressure more
+ * often than forty-five seconds gave it, and thirty-two still leaves a real gap rather than
+ * landing back on the exact figure that read as constant.
  */
-const LOCK_INTERVAL_MS = 45000;
+const LOCK_INTERVAL_MS = 32000;
 /**
  * How long a level gets before the first one. Without it the cooldown starts at zero and the
  * strike lands on the opening tick, so a level could open with a dolphin already being run down
@@ -488,6 +491,8 @@ const LOCK_INTERVAL_MS = 45000;
 const LOCK_FIRST_DELAY_MS = 8000;
 /** How long the player has between the banner and the run being aimed. */
 const LOCK_WARNING_MS = 1500;
+/** What a large cookiecutter's own belly light turns for the run's warning - the same red as the closing ring. */
+const LOCK_WARNING_PHOTOPHORE_COLOR = 0xf87171;
 const LOCK_ZOOM_MS = 900;
 /** Against the shark's own speed. A cookiecutter is quick; locked on it is the quickest thing down there. */
 const LOCK_ZOOM_SPEED = 4.5;
@@ -551,24 +556,43 @@ const SHARK_EYE_RANGE = 14;
 const SHARK_EYE_FADE = 6;
 
 const FRILLED_REACH_FRACTION = 0.5;
+/**
+ * How long the shark holds still, aimed and committed, before the head actually goes out.
+ *
+ * The strike itself used to be the only tell - the 450ms of the head extending - which is not
+ * much warning for something that also carries a hard-to-read approach. This runs first, aim
+ * already taken and shown on the water (see the strikeTell ring in drawSharks), so a dolphin
+ * that reacts to the warning rather than to the strike still has a real head start.
+ */
+const REACH_WARNING_MS = 700;
 const REACH_EXTEND_MS = 450;
 const REACH_HOLD_MS = 250;
 const REACH_RETRACT_MS = 350;
 /**
  * How long the head takes to recharge between strikes.
  *
- * Long, at 20 seconds. On a three-second recharge the strike came round roughly every four, which
- * turned the reach into the shark's ordinary way of moving rather than a thing it did - and left
- * no window in which a dolphin could safely be inside the range the body cannot reach. A spent
- * strike now buys real time on the wrong side of it, which is what makes getting close to a
- * frilled shark a decision rather than a mistake.
+ * Started at three seconds, which turned the reach into the shark's ordinary way of moving
+ * rather than a thing it did and left no window in which a dolphin could safely be inside the
+ * range the body cannot reach - twenty seconds fixed that, but playtesting through the teen
+ * levels found a large frilled with the run of a whole cooldown to itself reads as passive.
+ * Thirteen keeps a real recovery (with the new warning phase, a strike-to-strike cycle is still
+ * over fourteen seconds end to end) while asking more of staying near one.
  */
-const REACH_COOLDOWN_MS = 20000;
+const REACH_COOLDOWN_MS = 13000;
 
 const HAMMERHEAD_SPEED_BONUS = 1.15;
 const GREAT_WHITE_LARGE_SPEED_BONUS = 1.25;
-/** What a large great white or hammerhead keeps of its speed in the dark - see mesopelagicLargeSpeedFactor. */
-const MESO_LARGE_SPEED_FACTOR = 0.84;
+/** What a large great white keeps of its speed in the dark - see mesopelagicLargeSpeedFactor. */
+const MESO_GREAT_WHITE_SPEED_FACTOR = 0.84;
+/**
+ * What a large hammerhead keeps of its speed in the dark - see mesopelagicLargeSpeedFactor.
+ *
+ * A further step down from the great white's 0.84, rather than sharing it: playtesting through
+ * the Mesopelagic found the hammerhead's flanking swing round the side, on top of arriving out
+ * of nothing the way both of them do at this gloom, left less room to react than the great
+ * white's straight approach does at the same speed.
+ */
+const MESO_HAMMERHEAD_SPEED_FACTOR = 0.78;
 
 /** Which loaded strip a kind is animated from. Three sheets, five species. */
 export type SharkStrip = 'greatWhite' | 'hammerhead' | 'tiger';
@@ -2766,11 +2790,14 @@ ${zone.depth}`, 'levelup', duration + 1400);
       container.addChild(this.createFallbackSharkFish());
     }
 
-    if (shark.kind === 'cookiecutter') {
-      const lockTell = new Graphics();
-      lockTell.name = 'lockTell';
-      lockTell.visible = false;
-      container.addChild(lockTell);
+    // The closing ring that reads a warning from the water rather than only from the banner -
+    // shared between the cookiecutter's lock-on and the frilled's reach, the two large sharks
+    // that commit to a strike at a fixed target rather than simply biting on contact.
+    if (shark.kind === 'cookiecutter' || shark.kind === 'frilled') {
+      const strikeTell = new Graphics();
+      strikeTell.name = 'strikeTell';
+      strikeTell.visible = false;
+      container.addChild(strikeTell);
     }
 
     if (look.eyes) {
@@ -3951,7 +3978,8 @@ ${cleared.name} Zone Liberated
   /**
    * The large frilled shark's head extension.
    *
-   * Fires when a pod member comes inside range: the head goes out over REACH_EXTEND_MS, holds,
+   * Fires when a pod member comes inside range: the shark holds for REACH_WARNING_MS, aim
+   * already taken and shown on the water, then the head goes out over REACH_EXTEND_MS, holds,
    * and comes back, and then the shark is spent for REACH_COOLDOWN_MS. Nothing about the body
    * moves - the reach is all in the strike, which is what lets something this slow still be
    * dangerous to a dolphin that has outswum it, and the recharge is what lets that dolphin get
@@ -3960,6 +3988,14 @@ ${cleared.name} Zone Liberated
   private updateFrilledReach(now: number): void {
     for (const shark of this.sharks) {
       if (shark.kind !== 'frilled' || !shark.large) continue;
+
+      if (shark.reachPhase === 'warning') {
+        if (now < shark.reachPhaseEndTime) continue;
+        shark.reachPhase = 'out';
+        shark.reachPhaseEndTime = now + REACH_EXTEND_MS;
+        sfx.playFrilledStrike();
+        continue;
+      }
 
       if (shark.reachPhase === 'out') {
         const left = shark.reachPhaseEndTime - now;
@@ -4005,9 +4041,11 @@ ${cleared.name} Zone Liberated
       const aim = Math.hypot(aimX, aimY) || 1;
       shark.reachDirX = aimX / aim;
       shark.reachDirY = aimY / aim;
-      shark.reachPhase = 'out';
-      shark.reachPhaseEndTime = now + REACH_EXTEND_MS;
-      sfx.playFrilledStrike();
+      shark.reachPhase = 'warning';
+      shark.reachPhaseEndTime = now + REACH_WARNING_MS;
+      sfx.playFrilledWarning();
+      this.showBanner(target.isPlayer ? 'Frilled shark striking at you!' : 'Frilled shark striking!', 'storm', REACH_WARNING_MS);
+      this.setStatus('A frilled shark is winding up to strike');
     }
   }
 
@@ -4175,16 +4213,19 @@ ${cleared.name} Zone Liberated
    * The species that belong down there carry photophores, so however dark it gets you can track
    * one by its lights. A great white or a hammerhead carries none, which is the whole of the
    * problem: at 0.62 gloom they arrive out of nothing, and at their size they arrive fast. Taking
-   * a sixth off gives back the half-second it takes to read what has just appeared and turn the
-   * pod, without making either of them slow - a large great white still runs ahead of everything
-   * else in the water.
+   * a sixth off the great white gives back the half-second it takes to read what has just
+   * appeared and turn the pod, without making it slow - it still runs ahead of everything else
+   * in the water. The hammerhead is cut further still, to MESO_HAMMERHEAD_SPEED_FACTOR - see
+   * there for why the two no longer share a number.
    *
    * Only the large ones, and only in this zone. A small hammerhead is not what anyone loses a pod
    * to, and the shallows are lit well enough that seeing one coming was never the issue.
    */
   private mesopelagicLargeSpeedFactor(kind: SharkKind, level: number): number {
     if (!isMesopelagicLevel(level)) return 1;
-    return kind === 'greatWhite' || kind === 'hammerhead' ? MESO_LARGE_SPEED_FACTOR : 1;
+    if (kind === 'greatWhite') return MESO_GREAT_WHITE_SPEED_FACTOR;
+    if (kind === 'hammerhead') return MESO_HAMMERHEAD_SPEED_FACTOR;
+    return 1;
   }
 
   private randomizeSharkSpawnPosition(shark: Shark): void {
@@ -6047,17 +6088,21 @@ ${cleared.name} Zone Liberated
       const grownPx = (stretched - scaleX) * 64 * facing;
       fish.x = grownPx / 2;
 
-      const lockTell = sprite.getChildByName('lockTell') as Graphics | null;
-      if (lockTell) {
+      const strikeTell = sprite.getChildByName('strikeTell') as Graphics | null;
+      if (strikeTell) {
         // A ring that closes as the warning runs out, so the moment it commits is readable from
-        // the water rather than only from the banner.
-        lockTell.clear();
-        const warning = shark.lockPhase === 'warning';
-        lockTell.visible = warning;
-        if (warning) {
-          const left = Math.max(0, Math.min(1, (shark.lockPhaseEndTime - now) / LOCK_WARNING_MS));
+        // the water rather than only from the banner. Cookiecutter and frilled run their own
+        // warnings on different clocks, so each reads its own phase and end time.
+        strikeTell.clear();
+        const lockWarning = shark.kind === 'cookiecutter' && shark.lockPhase === 'warning';
+        const reachWarning = shark.kind === 'frilled' && shark.reachPhase === 'warning';
+        strikeTell.visible = lockWarning || reachWarning;
+        if (lockWarning || reachWarning) {
+          const totalMs = lockWarning ? LOCK_WARNING_MS : REACH_WARNING_MS;
+          const endTime = lockWarning ? shark.lockPhaseEndTime : shark.reachPhaseEndTime;
+          const left = Math.max(0, Math.min(1, (endTime - now) / totalMs));
           const radius = 10 + 26 * left;
-          lockTell.circle(0, 0, radius).stroke({ width: 2, color: 0xf87171, alpha: 0.35 + 0.5 * (1 - left) });
+          strikeTell.circle(0, 0, radius).stroke({ width: 2, color: 0xf87171, alpha: 0.35 + 0.5 * (1 - left) });
         }
       }
 
@@ -6088,6 +6133,15 @@ ${cleared.name} Zone Liberated
       // An adult blinks; a juvenile breathes. See photophoreFlashAlpha.
       if (lights) {
         lights.alpha = shark.large ? photophoreFlashAlpha(now, shark.id) : photophorePulseAlpha(now, shark.id);
+      }
+      // A large cookiecutter's own belly light turns red for the run's warning - the ring
+      // already tells the story, but the light is the one thing about this shark the player has
+      // been tracking since before it was close enough to be anything else, so the tell belongs
+      // on it too. Repainted every frame rather than only on the transition: simpler than
+      // tracking a last-known color, and one light redrawing red is not a meaningful cost.
+      if (lights && shark.kind === 'cookiecutter' && shark.large) {
+        const lockWarning = shark.lockPhase === 'warning';
+        setPhotophoreColor(lights, lockWarning ? LOCK_WARNING_PHOTOPHORE_COLOR : (look.photophoreColor ?? 0x4ade80));
       }
 
       // The eye keeps its own clock: no pulse, and nothing at all until the pod is close enough
