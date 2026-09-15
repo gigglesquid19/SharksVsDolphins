@@ -105,11 +105,13 @@ function escapeHtml(s: string): string {
 
 const DOLPHIN_SPAWN_INTERVAL = 12;
 /**
- * Level 19 gets dolphins slightly faster than the ordinary rate - not the full halving level 10
- * gets for its boss fight, just enough to rebuild a pod a little quicker while playtesting found
- * it a rough spot to get stuck on.
+ * 18, 19 and 20 all field the same 3 large sharks now (see MESOPELAGIC_LEVELS), so they share
+ * one flat spawn rate rather than singling one out - not the full halving level 10 gets for its
+ * boss fight, just enough to rebuild a pod quicker across the stretch playtesting found rough.
  */
-const LEVEL_19_DOLPHIN_SPAWN_FACTOR = 0.75;
+const MESO_FAST_SPAWN_FIRST_LEVEL = 18;
+const MESO_FAST_SPAWN_LAST_LEVEL = 20;
+const MESO_FAST_SPAWN_INTERVAL = 8;
 /**
  * How long a shark has to wait after taking a dolphin before it can take another.
  *
@@ -4379,8 +4381,8 @@ ${cleared.name} Zone Liberated
       ? DEV_DOLPHIN_SPAWN_INTERVAL
       : config.level === 10
         ? DOLPHIN_SPAWN_INTERVAL / 2
-        : config.level === 19
-          ? DOLPHIN_SPAWN_INTERVAL * LEVEL_19_DOLPHIN_SPAWN_FACTOR
+        : config.level >= MESO_FAST_SPAWN_FIRST_LEVEL && config.level <= MESO_FAST_SPAWN_LAST_LEVEL
+          ? MESO_FAST_SPAWN_INTERVAL
           : DOLPHIN_SPAWN_INTERVAL;
 
     this.matriarch = null;
