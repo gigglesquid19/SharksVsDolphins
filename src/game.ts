@@ -375,6 +375,16 @@ const GLOOM_ECHO_MARGIN = 1.08;
  * Mesopelagic, which is where the water starts being dark.
  */
 const ECHO_LENT_FROM_LEVEL = 11;
+/**
+ * Levels 18-20 double whatever Echolocation the player has, bought or lent - the last stretch
+ * of the Mesopelagic fields the great white and hammerhead, neither of which carries a
+ * photophore (see mesopelagicLargeSpeedFactor and the gloom note on MESOPELAGIC_LEVELS), and a
+ * ping is the one tool that can still find them. Cooldown is untouched - only what a ping
+ * covers and how long it lasts.
+ */
+const ECHO_BOOST_FIRST_LEVEL = 18;
+const ECHO_BOOST_LAST_LEVEL = 20;
+const ECHO_BOOST_FACTOR = 2;
 /** The pod a sandbox hands you, enough to ram anything currently benched there. */
 const SANDBOX_STARTING_POD = 5;
 const MATRIARCH_HITS_REQUIRED = 3;
@@ -1689,6 +1699,21 @@ export class Game {
     return Date.now() < this.echoEndTime;
   }
 
+  /** Whether the current level doubles Echolocation - see ECHO_BOOST_FIRST_LEVEL. */
+  private echoBoosted(): boolean {
+    return this.currentLevel >= ECHO_BOOST_FIRST_LEVEL && this.currentLevel <= ECHO_BOOST_LAST_LEVEL;
+  }
+
+  /** What a ping actually reaches right now: the owned/lent radius, doubled on 18-20. */
+  private currentEchoRadius(): number {
+    return this.echoRadius * (this.echoBoosted() ? ECHO_BOOST_FACTOR : 1);
+  }
+
+  /** What a ping actually lasts right now: the owned/lent duration, doubled on 18-20. */
+  private currentEchoDurationMs(): number {
+    return this.echoDurationMs * (this.echoBoosted() ? ECHO_BOOST_FACTOR : 1);
+  }
+
   /** Whether the player has Echolocation available in this run at all (bought, and in Endless). */
   hasEcholocation(): boolean {
     return this.echoAvailable;
@@ -1698,7 +1723,7 @@ export class Game {
   getEchoCooldownFraction(): number {
     const now = Date.now();
     if (!this.echoAvailable || now >= this.echoCooldownEnd) return 1;
-    const total = this.echoDurationMs + this.echoCooldownMs;
+    const total = this.currentEchoDurationMs() + this.echoCooldownMs;
     const startedAt = this.echoCooldownEnd - total;
     return Math.max(0, Math.min(1, (now - startedAt) / total));
   }
@@ -1709,7 +1734,7 @@ export class Game {
     if (!this.echoAvailable || !this.running || this.paused) return false;
     if (now < this.echoCooldownEnd) return false;
     this.echoStartedAt = now;
-    this.echoEndTime = now + this.echoDurationMs;
+    this.echoEndTime = now + this.currentEchoDurationMs();
     this.echoCooldownEnd = this.echoEndTime + this.echoCooldownMs;
     sfx.playEcho();
     this.setStatus('Echolocation!');
@@ -1722,7 +1747,7 @@ export class Game {
    */
   private sharkRevealedByEcho(shark: Shark): boolean {
     if (!this.player || !this.isEcholocating()) return false;
-    return shark.distanceBetween(this.player) <= this.echoRadius;
+    return shark.distanceBetween(this.player) <= this.currentEchoRadius();
   }
 
   /** How far the pod can see unaided at this depth. The whole screen, in water with no gloom. */
@@ -2568,7 +2593,7 @@ ${zone.depth}`, 'levelup', duration + 1400);
     const elapsed = now - this.echoStartedAt;
     const cx = this.player._x * scale + scale / 2;
     const cy = this.player._y * scale + scale / 2;
-    const full = this.echoRadius * scale;
+    const full = this.currentEchoRadius() * scale;
 
     // The held boundary, so the reach is always legible.
     this.echoRing.circle(cx, cy, full).stroke({ width: 1.5, color: 0x67e8f9, alpha: 0.22 });
@@ -6278,7 +6303,7 @@ ${cleared.name} Zone Liberated
       this.gloomOverlay.visible = false;
       return;
     }
-    const lit = this.isEcholocating() ? this.echoRadius * GLOOM_ECHO_MARGIN : this.gloomSightRadius();
+    const lit = this.isEcholocating() ? this.currentEchoRadius() * GLOOM_ECHO_MARGIN : this.gloomSightRadius();
     // Sized from the clear middle of the texture outwards, which leaves the solid part far larger
     // than the canvas however close to an edge the pod swims.
     const span = (2 * lit * scale) / VIGNETTE_CLEAR_FRACTION;
