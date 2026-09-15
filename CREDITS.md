@@ -11,23 +11,40 @@ Audio
 
 ### Music — Pixabay
 
-All six background tracks were downloaded from **Pixabay** and are used under
+All background tracks were downloaded from **Pixabay** and are used under
 the **Pixabay Content License** (https://pixabay.com/service/license-summary/):
 free for commercial use, **no attribution required**; the audio files may not be
 redistributed as standalone downloads, resold, or used to imply endorsement.
 
-Source files live in `audio/Ambient/` and `audio/Boss/` (the project's
-convention for original assets); the served copies are in `public/music/`.
-Titles below are taken from the download filenames.
+Source files live in `audio/Menus/`, `audio/Ambient/` and `audio/Boss/` (the
+project's convention for original assets, copied into place by
+`tools/copy_music.py`); the served copies are in `public/music/`. Titles below
+are taken from the download filenames. The menu track and zone 1's first
+ambient track are the same file, played in two places - see `MENU_TRACK` in
+`src/music.ts`.
+
+Ambient tracks are grouped by depth zone (`AMBIENT_ZONES` in `src/music.ts`),
+one for one with `DEPTH_ZONES` in `src/levels.ts`. Only the first three zones
+have their own music so far; a level past the Bathypelagic plays zone 3's
+tracks until the Abyssopelagic and the Hadal get their own.
 
 | In game | Title (from filename) | Pixabay uploader | Pixabay track ID |
 |---|---|---|---|
-| `ambient-1.mp3` | Ocean Waves Chill | alex-morgan | 537452 |
-| `ambient-2.mp3` | The Ocean | nojisuma | 122252 |
-| `ambient-3.mp3` | Fantasy Worlds – Enchanted Garden | vadim_makes_sound | 570007 |
-| `boss-1.mp3` | Dark Fight Music (Boss) | montogoronto | 142794 |
-| `boss-2.mp3` | Fast Battle – Intense 8-Bit Chiptune | nickpanek | 378777 |
-| `boss-3.mp3` | Multi-Boss – Fast-Paced 8-Bit Chiptune | nickpanek | 358679 |
+| `menu.mp3` | Ocean Waves Chill | alex-morgan | 537452 |
+| `ambient/zone1/ocean-waves-chill.mp3` | Ocean Waves Chill | alex-morgan | 537452 |
+| `ambient/zone1/ocean-joy.mp3` | Ocean Joy | andriicomposer | 380628 |
+| `ambient/zone1/wonders-of-the-ocean.mp3` | Wonders of the Ocean | dupilupiworld | 295598 |
+| `ambient/zone1/enchanted-garden.mp3` | Fantasy Worlds – Enchanted Garden | vadim_makes_sound | 570007 |
+| `ambient/zone2/at-the-bottom-of-the-sea.mp3` | At the Bottom of the Sea (Where the Sun Never Reaches) | nojisuma | 112916 |
+| `ambient/zone2/the-ocean.mp3` | The Ocean | nojisuma | 122252 |
+| `ambient/zone2/coral-labyrinth.mp3` | Whispers for Winners – Coral Labyrinth | stylomanas | 366755 |
+| `ambient/zone3/emotional.mp3` | Emotional | goldensoundlabs | 160374 |
+| `ambient/zone3/epic-adventure.mp3` | An Epic Adventure | leo_music_production | 464049 |
+| `ambient/zone3/sea-of-ghosts.mp3` | Sea of Ghosts | turning_pages | 579004 |
+| `boss/mad-world.mp3` | Mad World | lemonmusicstudio | 365968 |
+| `boss/dark-fight.mp3` | Dark Fight Music (Boss) | montogoronto | 142794 |
+| `boss/fast-battle.mp3` | Fast Battle – Intense 8-Bit Chiptune | nickpanek | 378777 |
+| `boss/multi-boss.mp3` | Multi-Boss – Fast-Paced 8-Bit Chiptune | nickpanek | 358679 |
 
 To re-locate a track's Pixabay page, search its ID on pixabay.com.
 

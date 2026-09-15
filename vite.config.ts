@@ -40,11 +40,16 @@ export default defineConfig({
         globIgnores: ['**/levels/endless/*.webp'],
         runtimeCaching: [
           {
+            // Every same-origin mp3 matches this, music and the eight recorded sound effects
+            // alike - there is no separate route for src/sfx.ts's samples. 32 comfortably holds
+            // the current 15 music tracks (menu, 3 ambient zones, boss) plus the 8 sfx with room
+            // to grow: two more ambient zones at roughly the size of the others already fit
+            // under it without pushing anything else out.
             urlPattern: /\.(?:mp3|ogg)$/,
             handler: 'CacheFirst',
             options: {
               cacheName: 'svsd-audio',
-              expiration: { maxEntries: 6 },
+              expiration: { maxEntries: 32 },
             },
           },
           {

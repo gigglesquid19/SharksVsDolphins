@@ -64,7 +64,7 @@ import {
 } from './scoring';
 import { RunCheckpoint, clearRunCheckpoint, saveRunCheckpoint } from './runState';
 import { hasSeenHint, markHintSeen, HintId } from './tutorialHints';
-import { AMBIENT_TRACKS, BOSS_TRACKS, pickRandomTrack } from './music';
+import { ambientTracksForLevel, BOSS_TRACKS, MENU_TRACK, pickRandomTrack } from './music';
 import { ACHIEVEMENTS, AchievementId, getUnlockedMap, unlock } from './achievements';
 import { bumpLifetime, recordPlayDay } from './lifetimeStats';
 import {
@@ -2429,7 +2429,11 @@ export class Game {
     this.draw();
     if (!silent) this.checkForNewSharks(config);
     this.announceLevel();
-    this.applyLevelMusic();
+    // The idle preview behind the title and menu screens plays the menu theme rather than
+    // whatever level it happens to be showing - it is not being played yet, so its music
+    // should not sound like it is. A real start (silent = false) picks the level's own music.
+    if (silent) this.applyMenuMusic();
+    else this.applyLevelMusic();
     this.updateDolphinsSavedBadge();
     this.updatePearlsBadge();
     return true;
@@ -2494,8 +2498,9 @@ ${zone.depth}`, 'levelup', duration + 1400);
   /**
    * Picks the background music track for the level just entered (a no-op on a same-level retry,
    * since currentLevel won't have changed). A boss level gets a fresh random boss track; the level
-   * right after a boss level (or level 1 of a fresh run) gets a fresh random ambient track; any other
-   * level leaves whatever's already playing alone, so the ambient track loops across a whole block.
+   * right after a boss level (or level 1 of a fresh run) gets a fresh random ambient track, drawn
+   * from that level's own depth zone (see ambientTracksForLevel); any other level leaves whatever's
+   * already playing alone, so the ambient track loops across a whole block.
    */
   private applyLevelMusic(): void {
     if (this.currentLevel === this.lastMusicLevel) return;
@@ -2509,8 +2514,17 @@ ${zone.depth}`, 'levelup', duration + 1400);
 
     const previousWasBoss = this.currentLevel > 1 && getLevelConfig(this.currentLevel - 1).matriarch;
     if (this.currentLevel === 1 || previousWasBoss) {
-      this.onMusicTrackChange?.(pickRandomTrack(AMBIENT_TRACKS));
+      this.onMusicTrackChange?.(pickRandomTrack(ambientTracksForLevel(this.currentLevel)));
     }
+  }
+
+  /**
+   * The title/menu theme, for the idle preview behind the title and menu screens - see the
+   * `silent` branch in initModel. `lastMusicLevel` is left at the 0 initModel already reset it
+   * to, so the next real applyLevelMusic() call (silent = false) is never skipped as a no-op.
+   */
+  private applyMenuMusic(): void {
+    this.onMusicTrackChange?.(MENU_TRACK);
   }
 
   /**
