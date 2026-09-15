@@ -24,6 +24,23 @@ const LARGE_HUNT_RADIUS = 40;
 const FRILLED_SMALL_HUNT_RADIUS = 14;
 const AMBUSH_MIN_DIST = 2;
 const AMBUSH_SPEED = 3;
+/**
+ * How far a shark starts steering clear of the megamouth's bulk, and how hard, tapering to
+ * nothing at the edge of the radius - see move(). It is enormous and, while it is still just
+ * crossing rather than fighting, holds a straight line no matter what else is in the water;
+ * without this the other sharks steered as if it were not there and swam straight through it.
+ *
+ * Both numbers are large because the push competes with an un-normalised pursuit vector (the
+ * raw distance to the player, added into desX/desY before steer() ever sees it) that can easily
+ * run 20-40 units - a small, "reasonable-looking" push was completely lost against it and had
+ * no measurable effect at all. The radius also has to give a shark real lead time to turn away:
+ * steer() caps how far a heading can swing in one tick, hardest of all on the idle wander cruise
+ * (WANDER_STEER), so an avoidance that only starts at the megamouth's own hit radius is already
+ * too late for anything not already pointed away from it. Tuned against MEGAMOUTH_HIT_RADIUS (13
+ * in game.ts) so a shark given any reasonable lead distance clears the body with room to spare.
+ */
+const MEGAMOUTH_AVOID_RADIUS = 36;
+const MEGAMOUTH_AVOID_PUSH = 140;
 // Idle "searching" cruise: how far the wander angle can drift per tick (radians), how quickly
 // the shark turns onto it, and its cruise speed as a fraction of the pursuit speed.
 const WANDER_TURN = 0.5;
@@ -248,6 +265,9 @@ export class Shark {
    * @param hidden The pod has eaten a Ghost Shrimp: the shark cannot sense the player at all, so
    *   it neither hunts nor drifts toward them. Specials already in flight still finish, because a
    *   lunge that stops dead in the water looks like a bug rather than a trick.
+   * @param megamouth While it is out there and not yet beaten, every shark steers clear of its
+   *   body - see MEGAMOUTH_AVOID_RADIUS. Not while beaten: by the time it is, it is defensive and
+   *   the only thing left alive anyway, so there is nothing left to steer around it.
    */
   move(
     speed: number,
@@ -256,8 +276,21 @@ export class Shark {
     unlimitedRange = false,
     now: number = Date.now(),
     hidden = false,
+    megamouth: Megamouth | null = null,
   ): void {
     if (!player) return;
+    let megaAvoidX = 0;
+    let megaAvoidY = 0;
+    if (megamouth && !megamouth.beaten) {
+      const mdx = directionDelta(this._x, megamouth._x);
+      const mdy = this._y - megamouth._y;
+      const md = Math.hypot(mdx, mdy);
+      if (md > 0 && md < MEGAMOUTH_AVOID_RADIUS) {
+        const push = MEGAMOUTH_AVOID_PUSH * (1 - md / MEGAMOUTH_AVOID_RADIUS);
+        megaAvoidX = (mdx / md) * push;
+        megaAvoidY = (mdy / md) * push;
+      }
+    }
     const huntRadius = this.large
       ? LARGE_HUNT_RADIUS
       : this.kind === 'frilled'
@@ -393,6 +426,8 @@ export class Shark {
       }
       desX += sepDx * 3;
       desY += sepDy * 3;
+      desX += megaAvoidX;
+      desY += megaAvoidY;
 
       this.steer(desX, desY, flanking ? 0.28 : 0.18);
       // 0.95, not the original 0.7: that figure was tuned against the old 8-direction movement,
@@ -445,6 +480,8 @@ export class Shark {
       const floor = SIZE_Y - 1 - margin;
       if (this._y < margin + edge) desY += (EDGE_PUSH * (margin + edge - this._y)) / edge;
       else if (this._y > floor - edge) desY -= (EDGE_PUSH * (this._y - (floor - edge))) / edge;
+      desX += megaAvoidX;
+      desY += megaAvoidY;
 
       this.steer(desX, desY, WANDER_STEER);
       // Cruising, not hunting: noticeably slower than the 0.95 pursuit speed, so a shark that

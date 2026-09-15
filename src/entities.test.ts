@@ -387,6 +387,54 @@ describe('Shark.move never retreats from the pod', () => {
   });
 });
 
+describe('Shark.move steers clear of the megamouth', () => {
+  // The megamouth is enormous and, while it is still just crossing rather than fighting, holds
+  // a straight line no matter what else is in the water - without this a shark's ordinary
+  // pursuit or wander desire drowned out a small avoidance push completely (an un-normalised
+  // pursuit vector routinely runs 20-40 units) and it swam straight through the body.
+  it('curves around it while pursuing, and still closes most of the gap once clear', () => {
+    const p = playerAt(60, 90);
+    const s = testShark(50, 50, { kind: 'tiger' });
+    const m = new Megamouth(50, 70, 0, 1, 1); // sitting on the direct line to the player
+    const startDist = s.distanceBetween(p);
+    let minDist = Infinity;
+    for (let i = 0; i < 200; i++) {
+      s.move(1, p, [s], true, NOW, false, m);
+      minDist = Math.min(minDist, s.distanceBetween(m));
+    }
+    expect(minDist).toBeGreaterThan(18); // clear of MEGAMOUTH_HIT_RADIUS (13 in game.ts), with room
+    // The detour is temporary, not a permanent block: most of the original gap is closed again.
+    expect(s.distanceBetween(p)).toBeLessThan(startDist * 0.3);
+  });
+
+  it('gives a wandering shark, with reasonable lead distance, room to swing wide of it too', () => {
+    const p = playerAt(0, 0); // far off and out of hunt range - this shark is only wandering
+    const s = testShark(50, 40, { kind: 'tiger', headingX: 0, headingY: 1, wanderAngle: Math.PI / 2 });
+    const m = new Megamouth(50, 70, 0, 1, 1);
+    let minDist = Infinity;
+    for (let i = 0; i < 250; i++) {
+      s.move(1, p, [s], false, NOW, false, m);
+      minDist = Math.min(minDist, s.distanceBetween(m));
+    }
+    expect(minDist).toBeGreaterThan(18);
+  });
+
+  it('does nothing once it has been beaten - by then nothing is left to steer around it for', () => {
+    const p = playerAt(50, 90);
+    const s = testShark(50, 50, { kind: 'tiger' });
+    const m = new Megamouth(50, 70, 0, 1, 1);
+    m.beaten = true;
+    // With no avoidance active, a straight-line pursuit passes directly through where it sits -
+    // tracked as a minimum during the run, since by the end the shark has swum on past it.
+    let minDist = Infinity;
+    for (let i = 0; i < 40; i++) {
+      s.move(1, p, [s], true, NOW, false, m);
+      minDist = Math.min(minDist, s.distanceBetween(m));
+    }
+    expect(minDist).toBeLessThan(3);
+  });
+});
+
 describe('Shark.move search drift', () => {
   // Beyond the hunt radius a shark is searching rather than chasing, but it should still be
   // working its way toward the pod - sharks milling at random read as ignoring the player,

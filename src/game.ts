@@ -5575,7 +5575,7 @@ ${cleared.name} Zone Liberated
           continue;
         }
         const unlimitedRange = allSharksLarge || shark.kind === 'greatWhite' || shark.kind === 'hammerhead';
-        shark.move(sharkSpeed, this.player, this.sharks, unlimitedRange, now, ghosted);
+        shark.move(sharkSpeed, this.player, this.sharks, unlimitedRange, now, ghosted, this.megamouth);
       }
     }
 
