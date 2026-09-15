@@ -282,18 +282,12 @@ describe('the authored Mesopelagic, levels 11-20', () => {
     expect(getLevelConfig(16).dealKindsInTurn).toBeUndefined();
   });
 
-  it('darkens steadily from level 10s daylight through level 18, then steps back for 19 and 20', () => {
+  it('darkens steadily from level 10s daylight to the zone floor', () => {
     const gloom = zone().map((c) => c.gloom ?? 0);
     expect(getLevelConfig(10).gloom ?? 0).toBe(0);
     expect(gloom[0]).toBeCloseTo(0.35, 5);
-    // 19 and 20 (indices 8 and 9) deliberately break the climb: the great white and hammerhead
-    // that join the zone from 16 carry no photophores at all, so the climbing default was making
-    // them harder to see rather than harder to track - see the note on MESO_GLOOM_AT_11.
-    for (let i = 1; i < 8; i++) expect(gloom[i]).toBeGreaterThan(gloom[i - 1]);
-    expect(gloom[7]).toBeCloseTo(0.56, 5); // level 18, the last level still on the climb
-    expect(gloom[8]).toBeLessThan(gloom[7]); // level 19 steps back down
-    expect(gloom[9]).toBeGreaterThan(gloom[8]); // level 20 climbs a little from 19, but nowhere near 18
-    expect(gloom[9]).toBeLessThan(gloom[7]);
+    expect(gloom[9]).toBeCloseTo(0.62, 5);
+    for (let i = 1; i < gloom.length; i++) expect(gloom[i]).toBeGreaterThan(gloom[i - 1]);
     expect(gloom.every((g) => g > 0 && g < 1)).toBe(true);
   });
 

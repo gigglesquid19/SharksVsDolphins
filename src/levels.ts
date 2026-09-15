@@ -233,11 +233,6 @@ const MESO_ALL: SharkKind[] = ['cookiecutter', 'frilled', 'hammerhead', 'greatWh
  * Gloom climbs 0.35 -> 0.62 across the zone, a step of 0.03 a level. Level 10 ends in daylight,
  * so opening at the 0.62 the bench used to sit at was a wall; eased in, the water closes over the
  * descent, and the photophores go from a curiosity to the only way to track what is hunting you.
- *
- * That is true for the two deep-water species, but not for the great white or the hammerhead
- * that join them from level 16 - both carry no photophores at all, so this climb was making
- * them harder to see rather than harder to track. 19 and 20 name their own gloom rather than
- * taking this default - see MESOPELAGIC_LEVELS.
  */
 const MESO_GLOOM_AT_11 = 0.35;
 const MESO_GLOOM_PER_LEVEL = 0.03;
@@ -256,21 +251,13 @@ export const MESOPELAGIC_LEVELS: Record<number, Partial<LevelConfig>> = {
   16: { sharkKinds: MESO_PLUS_HAMMER, normalSharkCount: 6, largeSharkCount: 2 },
   17: { sharkKinds: MESO_PLUS_HAMMER, normalSharkCount: 6, largeSharkCount: 2 },
   18: { sharkKinds: MESO_PLUS_HAMMER, normalSharkCount: 7, largeSharkCount: 3 },
-  // The great white and hammerhead carry no photophores at all down here, unlike the deep-water
-  // species either of them shares the water with, and from 16 the draw is random rather than
-  // dealt - so a level could hand either of them out two or three at once with no tell before
-  // they hit. Rather than giving the two shallow-water species a light they should not have,
-  // gloom on these last two levels steps back down instead - not all the way to the zone's own
-  // opening (11's 0.35), which would erase the descent, but enough that a shark's outline and
-  // roughly where it is moving read before it is already on the pod. The climbing default would
-  // have put 19 at 0.59.
-  19: { sharkKinds: MESO_ALL, normalSharkCount: 7, largeSharkCount: 3, gloom: 0.42 },
+  19: { sharkKinds: MESO_ALL, normalSharkCount: 7, largeSharkCount: 3 },
   // One fewer large than the endless curve would otherwise give the zone's boss level (4, the
   // same as level 10's) - playtesting found the four-large version too easy to lose a pod to
-  // blind, for the same reason 19's gloom steps back: no photophore tell, and a random draw that
-  // can double or triple up a species with nothing warning the player first. The climbing
-  // default would have put 20 at 0.62.
-  20: { sharkKinds: MESO_ALL, normalSharkCount: 8, largeSharkCount: 3, gloom: 0.45 },
+  // blind, since the great white and hammerhead among them carry no photophores at all down
+  // here and the draw is random rather than dealt, so a level could hand out two or three of
+  // either with no tell before they hit.
+  20: { sharkKinds: MESO_ALL, normalSharkCount: 8, largeSharkCount: 3 },
 };
 
 /** Whether this depth is one of the ten authored Mesopelagic levels. */
@@ -302,10 +289,7 @@ export function getEndlessLevelConfig(level: number): LevelConfig {
   if (isMesopelagicLevel(level)) {
     // matriarch and sharkSpeedMultiplier are left to the endless curve: level 20 is every tenth
     // level, so it gets its boss from the same rule that gives 30 and 40 theirs.
-    //
-    // gloom is placed ahead of the per-level entry, not after it, so a level can opt out of the
-    // climbing default by naming its own - see 19 and 20 below.
-    return { ...base, gloom: mesoGloom(depth), ...MESOPELAGIC_LEVELS[depth], maxDolphins: MESO_POD_LIMIT };
+    return { ...base, ...MESOPELAGIC_LEVELS[depth], maxDolphins: MESO_POD_LIMIT, gloom: mesoGloom(depth) };
   }
   return base;
 }

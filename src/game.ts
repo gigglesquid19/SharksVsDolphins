@@ -4274,7 +4274,7 @@ ${cleared.name} Zone Liberated
    *
    * The species that belong down there carry photophores, so however dark it gets you can track
    * one by its lights. A great white or a hammerhead carries none, which is the whole of the
-   * problem: at this zone's gloom they arrive out of nothing, and at their size they arrive fast. Taking
+   * problem: at 0.62 gloom they arrive out of nothing, and at their size they arrive fast. Taking
    * a sixth off the great white gives back the half-second it takes to read what has just
    * appeared and turn the pod, without making it slow - it still runs ahead of everything else
    * in the water. The hammerhead is cut further still, to MESO_HAMMERHEAD_SPEED_FACTOR - see
