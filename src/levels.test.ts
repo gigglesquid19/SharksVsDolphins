@@ -227,9 +227,14 @@ describe('the authored Mesopelagic, levels 11-20', () => {
     expect(isMesopelagicLevel(21)).toBe(false);
   });
 
-  it('runs the same shark curve levels 1-10 run', () => {
+  it('runs the same shark curve levels 1-10 run, except one fewer large on the boss level', () => {
     expect(zone().map((c) => c.normalSharkCount)).toEqual(LEVELS.map((c) => c.normalSharkCount));
-    expect(zone().map((c) => c.largeSharkCount)).toEqual(LEVELS.map((c) => c.largeSharkCount));
+    const levelLargeCounts = LEVELS.map((c) => c.largeSharkCount);
+    // Levels 11-19 mirror 1-9 exactly; level 20 deliberately breaks from level 10's 4, down to
+    // 3 - a level whose great white and hammerhead carry no photophore tell at all, dealt at
+    // random rather than in turn, was too easy to lose a pod to blind at the full count.
+    expect(zone().slice(0, 9).map((c) => c.largeSharkCount)).toEqual(levelLargeCounts.slice(0, 9));
+    expect(zone()[9].largeSharkCount).toBe(levelLargeCounts[9] - 1);
   });
 
   it('opens on the two deep-water species alone, and deals them in turn', () => {

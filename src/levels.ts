@@ -192,10 +192,11 @@ export const SANDBOX_LEVELS: Record<number, Partial<LevelConfig>> = {
  *
  * Past the campaign every level was the same three shallow-water species in slowly growing
  * numbers, so the two deep-water sharks existed only on a test bench and the zone that should
- * have introduced them never did. These ten run the curve levels 1-10 run - the same counts
- * (3,4,4,5,5,6,6,7,7,8 small against 0,0,1,1,1,2,2,3,3,4 large), a new species folded in twice
- * along the way, and a Matriarch at the end - but starting from the frilled shark and the
- * cookiecutter rather than from tigers.
+ * have introduced them never did. These ten mostly run the curve levels 1-10 run - the same
+ * counts (3,4,4,5,5,6,6,7,7,8 small), a new species folded in twice along the way, and a
+ * Matriarch at the end - but starting from the frilled shark and the cookiecutter rather than
+ * from tigers. Large sharks depart the mirror at the very end: 0,0,1,1,1,2,2,3,3 and then 3
+ * again rather than 4 on the boss level - see the note on level 20 below.
  *
  * 11-15 are those two alone, dealt in turn so both are always in the water: a random draw over a
  * two-deep pool can hand you four of one kind, which is no way to introduce either. From 16 the
@@ -251,7 +252,12 @@ export const MESOPELAGIC_LEVELS: Record<number, Partial<LevelConfig>> = {
   17: { sharkKinds: MESO_PLUS_HAMMER, normalSharkCount: 6, largeSharkCount: 2 },
   18: { sharkKinds: MESO_PLUS_HAMMER, normalSharkCount: 7, largeSharkCount: 3 },
   19: { sharkKinds: MESO_ALL, normalSharkCount: 7, largeSharkCount: 3 },
-  20: { sharkKinds: MESO_ALL, normalSharkCount: 8, largeSharkCount: 4 },
+  // One fewer large than the endless curve would otherwise give the zone's boss level (4, the
+  // same as level 10's) - playtesting found the four-large version too easy to lose a pod to
+  // blind, since the great white and hammerhead among them carry no photophores at all down
+  // here and the draw is random rather than dealt, so a level could hand out two or three of
+  // either with no tell before they hit.
+  20: { sharkKinds: MESO_ALL, normalSharkCount: 8, largeSharkCount: 3 },
 };
 
 /** Whether this depth is one of the ten authored Mesopelagic levels. */
