@@ -1006,9 +1006,8 @@ button.mega-shrimp.green {
 /* --stage-top is the height of the controls row, measured in main.ts. HUD overlays anchor
    below it so they sit over the water instead of covering the Start/Pause buttons - the
    badge used to render on top of Start, hiding it completely at some window widths. */
-.level-badge {
+.level-badge, .pod-badge {
   position: absolute;
-  top: calc(var(--stage-top, 0px) + 10px);
   right: 10px;
   z-index: 20;
   display: flex;
@@ -1022,8 +1021,14 @@ button.mega-shrimp.green {
   pointer-events: none;
   backdrop-filter: blur(3px);
 }
+.level-badge { top: calc(var(--stage-top, 0px) + 10px); }
+/* Stacked directly under the level badge rather than beside it - the level only changes between
+   dives, but the pod is exactly what fluctuates shot to shot, so it earns the spot right under
+   the number the player already glances at. */
+.pod-badge { top: calc(var(--stage-top, 0px) + 58px); }
 /* Sized to the dolphin counter across from it: the pair read as one HUD rather than as a big
-   badge and a small one, and the level is reference, not something watched shot to shot. */
+   badge and a small one, and the level is reference, not something watched shot to shot. Shared
+   by the pod badge underneath it for the same reason. */
 .level-badge-label {
   font-size: 0.85rem;
   font-weight: 700;
@@ -1035,6 +1040,14 @@ button.mega-shrimp.green {
   font-weight: 800;
   color: #22d3ee;
   text-shadow: 0 0 10px rgba(34, 211, 238, 0.6);
+}
+/* Green rather than the level's cyan, so the two numbers never get misread for each other at a
+   glance. */
+.pod-badge #podBadgeNumber {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #4ade80;
+  text-shadow: 0 0 10px rgba(74, 222, 128, 0.6);
 }
 
 .dolphins-saved-badge {

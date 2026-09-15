@@ -1009,6 +1009,7 @@ export class Game {
   private sharkGuideList: HTMLElement;
   private lastLifeHeart: HTMLElement | null = null;
   private levelBadgeNumberEl: HTMLElement | null = null;
+  private podBadgeNumberEl: HTMLElement | null = null;
   private dolphinsSavedBadgeEl: HTMLElement | null = null;
   private dolphinsSavedNumberEl: HTMLElement | null = null;
   private pearlsNumberEl: HTMLElement | null = null;
@@ -1218,6 +1219,7 @@ export class Game {
     this.onConsumableChange = inputs.onConsumableChange;
     this.lastLifeHeart = document.getElementById('lastLifeHeart');
     this.levelBadgeNumberEl = document.getElementById('levelBadgeNumber');
+    this.podBadgeNumberEl = document.getElementById('podBadgeNumber');
     this.dolphinsSavedBadgeEl = document.getElementById('dolphinsSavedBadge');
     this.dolphinsSavedNumberEl = document.getElementById('dolphinsSavedNumber');
     this.pearlsNumberEl = document.getElementById('pearlsNumber');
@@ -2420,6 +2422,7 @@ export class Game {
 
   private announceLevel(duration = 2200): void {
     this.updateLevelBadge();
+    this.updatePodBadge();
 
     // Depthless only: the first level of a depth zone announces the zone instead of the number,
     // which the HUD badge is already showing anyway. The campaign is one zone from end to end,
@@ -2436,6 +2439,13 @@ ${zone.depth}`, 'levelup', duration + 1400);
 
   private updateLevelBadge(): void {
     if (this.levelBadgeNumberEl) this.levelBadgeNumberEl.textContent = String(this.currentLevel);
+  }
+
+  /** Unlike the level badge, this one is read every tick - the pod is exactly what changes
+   * shot to shot, and is what tells the player how close they are to Hunting Mode or to the
+   * next shark's ram threshold. */
+  private updatePodBadge(): void {
+    if (this.podBadgeNumberEl) this.podBadgeNumberEl.textContent = String(this.getPodSize());
   }
 
   /** Shown only in Campaign mode, where Dolphins Saved is actually tracked (see saveDolphinsAndDepart). */
@@ -5530,6 +5540,8 @@ ${cleared.name} Zone Liberated
     }
 
     const scale = WORLD_SCALE;
+
+    this.updatePodBadge();
 
     const canSchool = this.getPodSize() >= HUNTING_MODE_POD_SIZE;
 
