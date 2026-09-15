@@ -22,30 +22,43 @@ SHORT_SIDE = 900
 QUALITY = 82
 LAST_LEVEL = 50
 # Folders whose numbers are the level numbers. Anything else under Images/Levels (spares,
-# rejects, the Redo pile) is ignored.
+# rejects, the Redo pile) is ignored. Must match DEPTH_ZONES in src/levels.ts - this list had
+# drifted from the real folder names (it named zones 3 and 4 "Abyssopelagic"/"Mythopelagic",
+# which don't exist on disk; the actual folders are "Bathypelagic" and "Abyssopelagic"), so
+# levels 21-40 silently fell back to their nearest neighbour's art.
 ZONES = [
     "1. Eutrophic",
     "2. Mesopelagic",
-    "3. Abyssopelagic",
-    "4. Mythopelagic",
+    "3. Bathypelagic",
+    "4. Abyssopelagic",
     "5. Hadal",
 ]
 
 
 def find_sources() -> dict[int, str]:
-    """Maps level number -> source file, from the numbered zone folders."""
+    """Maps level number -> source file, from the numbered zone folders.
+
+    A stem is either a bare level number ("11.png") or a level number with a ".1" suffix
+    ("3.1.png") - the second form wins only when the bare form is absent, so a folder can hold
+    both an in-use image and a spare/revision without the spare silently overwriting it.
+    """
     found: dict[int, str] = {}
+    fallback: dict[int, str] = {}
     for zone in ZONES:
         zone_dir = os.path.join(SRC_ROOT, zone)
         if not os.path.isdir(zone_dir):
             continue
-        for name in os.listdir(zone_dir):
+        for name in sorted(os.listdir(zone_dir)):
             stem, ext = os.path.splitext(name)
             if ext.lower() not in (".png", ".jpg", ".jpeg", ".webp"):
                 continue
-            if not stem.isdigit():
-                continue
-            found[int(stem)] = os.path.join(zone_dir, name)
+            path = os.path.join(zone_dir, name)
+            if stem.isdigit():
+                found[int(stem)] = path
+            elif stem.endswith(".1") and stem[:-2].isdigit():
+                fallback[int(stem[:-2])] = path
+    for level, path in fallback.items():
+        found.setdefault(level, path)
     return found
 
 
