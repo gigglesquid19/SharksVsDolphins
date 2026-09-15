@@ -5566,6 +5566,22 @@ ${cleared.name} Zone Liberated
       this.showBanner('Pod Formed!', 'victory', 1500);
     }
 
+    // First time the pod is actually strong enough to hurt a large shark, say so before the
+    // player has to work it out by bouncing off one. The Matriarch is excluded - she needs the
+    // Mega Pod rather than an ordinary Boost, and has her own dedicated fight.
+    if (this.huntingMode) {
+      const readyTarget = this.sharks.find(
+        (s) => s.large && !s.matriarch && !s.isOffStage() && this.getPodSize() >= this.sharkPodRequirement(s.kind, s.large)
+      );
+      if (readyTarget) {
+        this.queueTutorialHint(
+          'largeShark',
+          'Big Shark!',
+          'Your pod is big enough to take this one down. Ram it while Boosting - a plain hit does nothing, you need to be Boosting at the moment you hit it.'
+        );
+      }
+    }
+
     if (this.activeEvent?.type !== 'jellyfish' && this.huntingMode) {
       const survivingSharks: Shark[] = [];
       let matriarchJustDefeated = false;

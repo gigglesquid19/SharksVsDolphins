@@ -1778,6 +1778,10 @@ button.mega-shrimp.green {
   text-transform: uppercase;
   white-space: nowrap;
 }
+.new-waters-prompt .sublabel {
+  font-size: 0.62rem;
+  opacity: 0.85;
+}
 
 @keyframes newWatersPulse {
   0%, 100% { transform: translateY(-50%) translateX(0); }

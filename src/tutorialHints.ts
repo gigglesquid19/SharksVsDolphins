@@ -1,6 +1,6 @@
 const SEEN_KEY = 'svsd-tutorial-hints-seen';
 
-export type HintId = 'formPod' | 'huntingMode' | 'megaShrimp';
+export type HintId = 'formPod' | 'huntingMode' | 'megaShrimp' | 'largeShark';
 
 function loadSeen(): Set<HintId> {
   try {
