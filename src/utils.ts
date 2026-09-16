@@ -98,3 +98,18 @@ export function bindSecretTaps(el: HTMLElement, handler: () => void): void {
   el.style.cursor = 'default';
   el.addEventListener('pointerdown', handler);
 }
+
+/**
+ * How to draw a sprite so it faces the way it is travelling, for artwork drawn facing +x.
+ *
+ * `dir` is the horizontal scale sign: -1 mirrors the sprite for anything heading left. `rotation`
+ * then aims it. The mirrored case is the subtle one - Pixi scales before it rotates, so after the
+ * flip the nose points along -x and the angle that aims it at (tx, ty) is atan2(-ty, -tx), the
+ * *opposite* heading. Measuring against a half-mirrored axis instead - atan2(ty, -tx) - flips the
+ * horizontal component and leaves the vertical one, which draws anything moving up-and-left as
+ * though it were moving down-and-left.
+ */
+export function spriteFacing(tx: number, ty: number): { dir: 1 | -1; rotation: number } {
+  const dir: 1 | -1 = tx >= 0 ? 1 : -1;
+  return { dir, rotation: dir === 1 ? Math.atan2(ty, tx) : Math.atan2(-ty, -tx) };
+}

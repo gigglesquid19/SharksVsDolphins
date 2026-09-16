@@ -54,7 +54,7 @@ import {
   zoneNumber,
 } from './levels';
 import { CANVAS_H, CANVAS_W, SIZE_X, SIZE_Y, WORLD_SCALE } from './constants';
-import { clampEntityY, directionDelta, sweptDistance, wrapX } from './utils';
+import { clampEntityY, directionDelta, spriteFacing, sweptDistance, wrapX } from './utils';
 import { Dolphin, Shark, Jellyfish, Megamouth, Tentacle } from './entities';
 import type { ConsumableId, Inventory } from './inventory';
 import { getInventory, magicShrimpHeld, useConsumable } from './inventory';
@@ -430,6 +430,25 @@ const SHARK_EXODUS_MARGIN = 18;
  * that the two ribbons touch on the way up and read as one mass rather than two.
  */
 const SHARK_EXODUS_LANE_WIDTH = 9;
+
+/**
+ * The exodus is meant to read as happening at a distance rather than alongside the player, so it
+ * is drawn a quarter smaller than the same sharks would be in a level and pulled toward black.
+ * Darkening rather than fading: these are solid bodies seen through a lot of water, not ghosts,
+ * and dropping the alpha instead would show the cliff through them.
+ */
+const SHARK_EXODUS_SCALE = 0.75;
+/** How far the exodus tint is pulled toward black. 0 leaves it alone, 1 is black. */
+const SHARK_EXODUS_DARKEN = 0.35;
+
+/** A tint with every channel pulled toward black by `amount`. */
+function darkenTint(tint: number, amount: number): number {
+  const k = 1 - amount;
+  const r = Math.round(((tint >> 16) & 0xff) * k);
+  const g = Math.round(((tint >> 8) & 0xff) * k);
+  const b = Math.round((tint & 0xff) * k);
+  return (r << 16) | (g << 8) | b;
+}
 
 /**
  * The Campaign's opening beat, on 0a: a tiger pack crosses in front of Echo while she holds still
@@ -4092,12 +4111,13 @@ ${cleared.name} Zone Liberated
       console.warn('Exodus shark sprite failed:', err);
       return;
     }
-    (fish as Sprite).tint = look.tint;
+    (fish as Sprite).tint = darkenTint(look.tint, SHARK_EXODUS_DARKEN);
     container.addChild(fish);
 
     const lane = Math.random() < 0.5 ? 0 : 1;
     const acc = EXODUS_LANE_LENGTHS[lane];
-    const base = SHARK_BASE_SCALE * SHARK_KIND_SCALE[kind] * sizeMultiplier;
+    const base =
+      SHARK_BASE_SCALE * SHARK_KIND_SCALE[kind] * sizeMultiplier * SHARK_EXODUS_SCALE;
 
     this.procession.push({
       sprite: container,
@@ -4146,12 +4166,9 @@ ${cleared.name} Zone Liberated
       p.sprite.y = y * scale + scale / 2;
 
       const fish = p.sprite.children[0] as Container;
-      // The strip is drawn facing right, so a shark heading left is mirrored and its angle has to
-      // be measured against the mirrored axis or it would point back down the lane it came up.
-      const dir = at.tx >= 0 ? 1 : -1;
-      fish.scale.set(p.scaleX * dir, p.scaleY);
-      fish.rotation =
-        Math.atan2(at.ty, at.tx * dir) + Math.sin(t * p.wobbleRate + p.wobblePhase) * 0.05;
+      const facing = spriteFacing(at.tx, at.ty);
+      fish.scale.set(p.scaleX * facing.dir, p.scaleY);
+      fish.rotation = facing.rotation + Math.sin(t * p.wobbleRate + p.wobblePhase) * 0.05;
 
       survivors.push(p);
     }

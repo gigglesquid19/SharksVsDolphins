@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SIZE_X, SIZE_Y } from './constants';
-import { clampEntityY, clampX, directionDelta, sweptDistance, wrapX } from './utils';
+import { clampEntityY, clampX, directionDelta, spriteFacing, sweptDistance, wrapX } from './utils';
 
 describe('wrapX', () => {
   it('leaves in-bounds values unchanged', () => {
@@ -97,5 +97,46 @@ describe('sweptDistance', () => {
     const a = at(44, 50, 56, 51);
     const b = at(50, 47, 50, 55);
     expect(sweptDistance(a, b)).toBeCloseTo(sweptDistance(b, a));
+  });
+});
+
+describe('spriteFacing', () => {
+  /** Where a sprite drawn facing +x actually ends up pointing, once mirrored and rotated. */
+  function aimedAt(tx: number, ty: number): { x: number; y: number } {
+    const { dir, rotation } = spriteFacing(tx, ty);
+    // Pixi scales before it rotates: the nose starts at (dir, 0) and is then turned by rotation.
+    const cos = Math.cos(rotation);
+    const sin = Math.sin(rotation);
+    return { x: dir * cos, y: dir * sin };
+  }
+
+  const directions: [string, number, number][] = [
+    ['east', 1, 0],
+    ['west', -1, 0],
+    ['north', 0, -1],
+    ['south', 0, 1],
+    ['north-east', 0.6, -0.8],
+    ['north-west', -0.6, -0.8],
+    ['south-east', 0.6, 0.8],
+    ['south-west', -0.6, 0.8],
+  ];
+
+  it.each(directions)('points a sprite %s when it travels that way', (_name, tx, ty) => {
+    const aim = aimedAt(tx, ty);
+    expect(aim.x).toBeCloseTo(tx, 6);
+    expect(aim.y).toBeCloseTo(ty, 6);
+  });
+
+  it('mirrors only what is heading left', () => {
+    expect(spriteFacing(1, -1).dir).toBe(1);
+    expect(spriteFacing(0, -1).dir).toBe(1);
+    expect(spriteFacing(-1, -1).dir).toBe(-1);
+  });
+
+  it('does not invert the climb when mirrored', () => {
+    // The regression this exists for: a shark on the exodus's left lane, climbing up and to the
+    // left, was drawn heading down and to the left instead.
+    expect(aimedAt(-0.7, -0.7).y).toBeLessThan(0);
+    expect(aimedAt(-0.7, 0.7).y).toBeGreaterThan(0);
   });
 });
