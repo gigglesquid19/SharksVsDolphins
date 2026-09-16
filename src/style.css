@@ -97,8 +97,10 @@ h1 {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 20px;
-  padding: 24px;
+  /* Tight, because the stack has to hold the heading, the blurb, the pearls, seven buttons and a
+     build stamp inside a 667px phone without the ends being clipped - there is no scroll here. */
+  gap: 12px;
+  padding: 20px;
   text-align: center;
   background:
     linear-gradient(180deg, rgba(2, 6, 23, 0.55), rgba(2, 6, 23, 0.85)),
@@ -275,11 +277,64 @@ h1 {
   line-height: 1.5;
 }
 
-.title-mode-choices {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  justify-content: center;
+/*
+ * The menu is one column of equal-width buttons.
+ *
+ * Every button used to be a direct child of .title-screen and so sized itself to its own label -
+ * Store came out at 84px against Sharkopedia's 137, and the two mode buttons at 206 and 246 - which
+ * read as an accident rather than a layout. A fixed column width makes the stack deliberate and
+ * gives the labels a consistent tap target.
+ */
+.title-mode-choices,
+.title-secondary-choices {
+  display: grid;
+  width: min(100%, 300px);
+  gap: 10px;
+}
+.title-mode-choices { gap: 12px; }
+.title-mode-choices button,
+.title-secondary-choices button { width: 100%; }
+
+/* The two tiers are told apart by weight rather than by colour alone: the modes are the loud
+   orange, the rest is quiet glass that recedes until it is wanted. */
+.title-secondary-choices button.secondary {
+  padding: 11px 18px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+.title-secondary-choices button.secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+/* A campaign in progress is the one secondary worth looking at, so it reads as a live thread
+   rather than as another menu entry. */
+.title-secondary-choices #titleContinueBtn {
+  background: rgba(56, 189, 248, 0.16);
+  border-color: rgba(56, 189, 248, 0.45);
+  color: #e0f2fe;
+}
+.title-secondary-choices #titleContinueBtn:hover:not(:disabled) {
+  background: rgba(56, 189, 248, 0.26);
+  border-color: rgba(56, 189, 248, 0.65);
+}
+
+/*
+ * The mode buttons do not pulse on the menu. In play, .school.ready is a prompt that something is
+ * available *now*; on a title screen nothing is waiting, and two large buttons throbbing against
+ * each other compete for the eye and settle nothing. They carry their weight through size and colour
+ * instead. The class stays for the in-game uses, which still pulse.
+ */
+.title-mode-choices button.school.ready {
+  animation: none;
+  font-size: 1.1rem;
+  padding: 14px 24px;
+  box-shadow: 0 6px 20px rgba(249, 115, 22, 0.35);
+}
+.title-mode-choices button.school.ready:hover:not(:disabled) {
+  box-shadow: 0 10px 28px rgba(249, 115, 22, 0.5);
 }
 .title-mode-sub {
   display: block;
@@ -2220,7 +2275,9 @@ button.mega-shrimp.green {
      play area had to be scrolled to be seen whole. Both are reference rather than gameplay: the
      summary under the arena still says what the game is, and tutorialHints.ts teaches the
      controls in play, where they are needed. Desktop keeps them; it has the room. */
-  h1 { display: none; }
+  /* Scoped to the arena's own heading. Unscoped, this also hid .title-heading, so the game's
+     name was invisible on the title screen on every phone - which is the one place it belongs. */
+  .app-content h1 { display: none; }
   #hintPanel { display: none; }
 
   /* Two up in the shop, always. The tiles ask for at least 150px each, which with the gap wants
