@@ -6,7 +6,11 @@ import {
   LEVELS,
   CAMPAIGN_LARGE_SHARK_COUNTS,
   SMALL_BEFORE_LARGE_UNTIL_LEVEL,
+  OPENING_STORY_LEVEL,
+  STORY_INTERSTITIALS,
   dealLargeSharkKinds,
+  getStoryInterstitialBackground,
+  storyInterstitialAfter,
   getLevelConfigForMode,
   largeKindPool,
   MAX_ENDLESS_SHARK_SPEED,
@@ -111,6 +115,110 @@ describe('getLevelBackground', () => {
 
   it('defaults to the campaign set when no mode is given', () => {
     expect(getLevelBackground(11)).toBe('/levels/1.webp');
+  });
+});
+
+describe('story interstitials', () => {
+  const endlessScreens = STORY_INTERSTITIALS.filter((s) => s.mode === 'endless');
+
+  it('sits after the levels the art was drawn for', () => {
+    expect(endlessScreens.map((s) => s.afterLevel)).toEqual([10, 17, 29, 30, 34, 39]);
+  });
+
+  it('names each screen after the level it follows', () => {
+    for (const s of STORY_INTERSTITIALS) expect(s.id).toBe(`${s.afterLevel}a`);
+  });
+
+  it('finds the screen that follows a level, and nothing anywhere else', () => {
+    expect(storyInterstitialAfter(10, 'endless')?.id).toBe('10a');
+    expect(storyInterstitialAfter(39, 'endless')?.id).toBe('39a');
+    expect(storyInterstitialAfter(9, 'endless')).toBeNull();
+    expect(storyInterstitialAfter(11, 'endless')).toBeNull();
+    expect(storyInterstitialAfter(40, 'endless')).toBeNull();
+  });
+
+  it('keeps each mode to its own story screens', () => {
+    // The two modes share the level-10 art but not the screen: the Campaign's ends its run and
+    // the Depthless one is swum through, so a lookup must never cross modes.
+    expect(storyInterstitialAfter(OPENING_STORY_LEVEL, 'campaign')?.id).toBe('0a');
+    expect(storyInterstitialAfter(OPENING_STORY_LEVEL, 'endless')).toBeNull();
+    expect(storyInterstitialAfter(10, 'campaign')?.endsRun).toBe(true);
+    expect(storyInterstitialAfter(10, 'endless')?.endsRun).toBeUndefined();
+    expect(storyInterstitialAfter(17, 'campaign')).toBeNull();
+  });
+
+  it('ends the Campaign on 10a, after the Matriarch rather than on her', () => {
+    const finale = storyInterstitialAfter(LEVELS.length, 'campaign');
+    // Level 10 is the Matriarch level and the last the Campaign defines, so beating her leads
+    // onto this screen and the screen is where the run stops - there is no level 11 behind it.
+    expect(finale?.id).toBe('10a');
+    expect(finale?.endsRun).toBe(true);
+    expect(storyInterstitialAfter(LEVELS.length + 1, 'campaign')).toBeNull();
+  });
+
+  it('bookends the Campaign with its two spectacles and leaves Depthless plain', () => {
+    // The tiger pack opens the Campaign and the exodus closes it; every Depthless screen is
+    // plain water the player simply swims through.
+    expect(storyInterstitialAfter(OPENING_STORY_LEVEL, 'campaign')?.spectacle).toBe('tigerPatrol');
+    expect(storyInterstitialAfter(10, 'campaign')?.spectacle).toBe('sharkExodus');
+    expect(STORY_INTERSTITIALS.filter((s) => s.spectacle).every((s) => s.mode === 'campaign')).toBe(
+      true,
+    );
+    expect(STORY_INTERSTITIALS.filter((s) => s.mode === 'endless' && s.spectacle)).toHaveLength(0);
+  });
+
+  it('gates the exit only on the screen the player is meant to watch first', () => {
+    // 0a holds its prompt back until the pack has left, because following it is the instruction.
+    // Every other screen, the exodus included, can be crossed the moment it appears.
+    expect(storyInterstitialAfter(OPENING_STORY_LEVEL, 'campaign')?.exitAfterSpectacle).toBe(true);
+    expect(storyInterstitialAfter(10, 'campaign')?.exitAfterSpectacle).toBeUndefined();
+    const gated = STORY_INTERSTITIALS.filter((s) => s.exitAfterSpectacle);
+    expect(gated).toHaveLength(1);
+    // A gated screen with no spectacle would never open, so the two must travel together.
+    for (const s of gated) expect(s.spectacle).toBeDefined();
+  });
+
+  it('ends no run the player is meant to swim out of', () => {
+    // Only the Campaign finale stops a run. Every Depthless screen is a crossing, and the
+    // Campaign's opening screen leads into level 1.
+    const ending = STORY_INTERSTITIALS.filter((s) => s.endsRun);
+    expect(ending).toHaveLength(1);
+    expect(ending[0]).toMatchObject({ mode: 'campaign', afterLevel: 10 });
+  });
+
+  it('opens the Campaign on 0a, before level 1 rather than after a level', () => {
+    const opening = storyInterstitialAfter(OPENING_STORY_LEVEL, 'campaign');
+    expect(OPENING_STORY_LEVEL).toBe(0);
+    expect(opening?.mode).toBe('campaign');
+    // Nothing is ever cleared to reach it - there is no level 0 - so it can only be a run's start.
+    expect(LEVELS.some((l) => l.level === OPENING_STORY_LEVEL)).toBe(false);
+  });
+
+  it('tells each beat once, not once per lap of the Endless backgrounds', () => {
+    // Level 60 draws background 10, but the story after level 10 has already been told.
+    expect(storyInterstitialAfter(60, 'endless')).toBeNull();
+    expect(storyInterstitialAfter(67, 'endless')).toBeNull();
+  });
+
+  it('leaves the Matriarch levels where they were', () => {
+    // The whole reason these are not numbered levels: inserting one would shift every depth
+    // above it and move the bosses off the tens.
+    for (const s of endlessScreens) {
+      expect(getLevelConfigForMode(s.afterLevel + 1, 'endless').matriarch).toBe(
+        (s.afterLevel + 1) % 10 === 0,
+      );
+    }
+  });
+
+  it('loads its art from the background set of its own mode', () => {
+    // Both modes have a 10a and they are different files; the mode is what tells them apart.
+    const campaign10a = storyInterstitialAfter(10, 'campaign')!;
+    const endless10a = storyInterstitialAfter(10, 'endless')!;
+    expect(getStoryInterstitialBackground(campaign10a)).toBe('/levels/10a.webp');
+    expect(getStoryInterstitialBackground(endless10a)).toBe('/levels/endless/10a.webp');
+    expect(getStoryInterstitialBackground(storyInterstitialAfter(OPENING_STORY_LEVEL, 'campaign')!)).toBe(
+      '/levels/0a.webp',
+    );
   });
 });
 

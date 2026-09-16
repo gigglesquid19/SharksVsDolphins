@@ -114,6 +114,91 @@ export function zoneClearedAt(level: number): DepthZone | null {
   return DEPTH_ZONES.find((z) => z.lastLevel === level) ?? null;
 }
 
+/**
+ * The story screens of the Depthless Campaign: the stills that sit between two levels rather than
+ * being levels themselves. Clearing the level named here swims the player onto the screen, where
+ * nothing hunts and nothing is hunted; swimming east again carries them on into the next level.
+ *
+ * They are deliberately not numbered levels. Every piece of zone arithmetic in the game keys off an
+ * integer level - the Matriarch lands on `level % 10 === 0`, and zoneForLevel, zoneEnteredAt and
+ * zoneClearedAt all index off the same figure - so inserting a half-level would shift all fifty
+ * depths and silently move the bosses. A screen keyed to "after level N" leaves that structure
+ * alone, and costs the player nothing: no Pearls, no level counter, no leaderboard entry, and no
+ * tile in Level Select.
+ *
+ * They also tell once per run rather than once per lap. Endless cycles its backgrounds past level
+ * 50 but keeps counting upwards, so matching on the exact level means a second lap swims past the
+ * story instead of telling it again.
+ *
+ * One of them sits before a level rather than after one. OPENING_STORY_LEVEL is the screen a run
+ * opens on: the Campaign begins on 0a and the player swims east off it into level 1, so that
+ * crossing starts a level instead of finishing one.
+ */
+export const OPENING_STORY_LEVEL = 0;
+
+export interface StoryInterstitial {
+  /** The level whose clear leads onto this screen, or OPENING_STORY_LEVEL for the opening screen. */
+  afterLevel: number;
+  /** Which campaign the screen belongs to - the two modes keep separate art and separate stories. */
+  mode: 'campaign' | 'endless';
+  /** Asset stem beside that mode's backgrounds - '10a' is the screen after level 10. */
+  id: string;
+  /**
+   * Set on a screen the run ends on rather than passes through. Swimming east off one of these
+   * hands the player back to the title screen instead of opening another level: the Campaign's
+   * 10a is its last beat, reached by beating the Matriarch, and there is no level 11 behind it.
+   */
+  endsRun?: boolean;
+  /**
+   * A one-off spectacle the screen plays while the player crosses it. Scenery only - see
+   * startSpectacle() in game.ts - so nothing either one draws can be fought, recruited or
+   * collided with.
+   *
+   * 'sharkExodus' is the Campaign's closing image, the sharks abandoning the Shallows.
+   * 'tigerPatrol' is its opening one: a pack crosses in front of the hidden player, holds, and
+   * leaves east, and the player follows it into level 1.
+   */
+  spectacle?: 'sharkExodus' | 'tigerPatrol';
+  /**
+   * Holds the swim-east prompt back until the spectacle has played out, so the screen is watched
+   * before it is crossed. Without it the prompt is up the moment the screen appears.
+   */
+  exitAfterSpectacle?: boolean;
+  /**
+   * Nothing reads this yet. The screens are wordless for now and the art carries them on its own,
+   * but characters and dialogue are planned for them, so the shape that will hold it is named here
+   * rather than bolted on later.
+   */
+  dialogue?: string[];
+}
+
+export const STORY_INTERSTITIALS: StoryInterstitial[] = [
+  { afterLevel: OPENING_STORY_LEVEL, mode: 'campaign', id: '0a', spectacle: 'tigerPatrol', exitAfterSpectacle: true },
+  { afterLevel: 10, mode: 'campaign', id: '10a', endsRun: true, spectacle: 'sharkExodus' },
+  { afterLevel: 10, mode: 'endless', id: '10a' },
+  { afterLevel: 17, mode: 'endless', id: '17a' },
+  { afterLevel: 29, mode: 'endless', id: '29a' },
+  { afterLevel: 30, mode: 'endless', id: '30a' },
+  { afterLevel: 34, mode: 'endless', id: '34a' },
+  { afterLevel: 39, mode: 'endless', id: '39a' },
+];
+
+/** The story screen that follows this level in this mode, if there is one. */
+export function storyInterstitialAfter(
+  level: number,
+  mode: 'campaign' | 'endless',
+): StoryInterstitial | null {
+  return STORY_INTERSTITIALS.find((s) => s.afterLevel === level && s.mode === mode) ?? null;
+}
+
+/** Story screens sit beside their own mode's backgrounds, under their '10a' style stems. */
+export function getStoryInterstitialBackground(story: StoryInterstitial): string {
+  const base = import.meta.env.BASE_URL;
+  return story.mode === 'endless'
+    ? `${base}levels/endless/${story.id}.webp`
+    : `${base}levels/${story.id}.webp`;
+}
+
 export function getLevelBackground(level: number, mode: 'campaign' | 'endless' = 'campaign'): string {
   // BASE_URL is '/' for the app / dev and '/SharksVsDolphins/' on GitHub Pages.
   const base = import.meta.env.BASE_URL;

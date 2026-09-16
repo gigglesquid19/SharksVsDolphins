@@ -391,6 +391,13 @@ document.getElementById('narrativeContinueBtn')!.addEventListener('click', () =>
   syncStageTop();
 });
 
+/**
+ * Set by main() once the title-screen helpers exist. `inputs` is built at module scope and handed
+ * to the Game constructor before those are defined, so the callback has to reach them through a
+ * variable rather than closing over them directly.
+ */
+let returnToTitleHandler: (() => void) | null = null;
+
 const inputs = {
   sharkSpeed: document.getElementById('sharkSpeed') as HTMLInputElement,
   speed: document.getElementById('speed') as HTMLInputElement,
@@ -456,6 +463,8 @@ const inputs = {
     bgMusic.currentTime = 0;
     bgMusic.volume = chosenMusicVolume();
   },
+  // The Campaign's last screen hands the player back to the title rather than to another level.
+  onReturnToTitle: () => returnToTitleHandler?.(),
   onMusicResume: () => {
     if (!bgMusic.paused) return;
     bgMusic.volume = chosenMusicVolume();
@@ -548,7 +557,10 @@ const inputs = {
     appContent.classList.add('hidden');
     narrativeScreen.classList.add('hidden');
     titleScreen.classList.remove('hidden');
-    if (loadRunCheckpoint()) titleContinueBtn.classList.remove('hidden');
+    // Toggled rather than only revealed: a campaign that has just been finished clears its
+    // checkpoint, and this screen is now where that run ends, so a Continue left over from
+    // earlier in the session would offer to resume a run that no longer exists.
+    titleContinueBtn.classList.toggle('hidden', !loadRunCheckpoint());
     refreshTitlePearls();
   }
 
@@ -556,6 +568,7 @@ const inputs = {
     game.reset();
     showTitleScreen();
   }
+  returnToTitleHandler = returnToTitle;
   document.getElementById('continueAdBtn')!.addEventListener('click', () => void game.continueViaAd());
   document.getElementById('continuePayBtn')!.addEventListener('click', () => void game.continueViaPurchase());
   document.getElementById('continueDeclineBtn')!.addEventListener('click', () => game.declineContinue());

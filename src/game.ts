@@ -38,13 +38,17 @@ import { HUNTING_MODE_POD_SIZE, podRequirement } from './sharks';
 import {
   LEVELS,
   LevelConfig,
+  StoryInterstitial,
   dealLargeSharkKinds,
   getLevelBackground,
+  getStoryInterstitialBackground,
   largeKindPool,
   getLevelConfig,
   getLevelConfigForMode,
   isMesopelagicLevel,
   isSandboxLevel,
+  OPENING_STORY_LEVEL,
+  storyInterstitialAfter,
   zoneClearedAt,
   zoneEnteredAt,
   zoneNumber,
@@ -399,6 +403,70 @@ const LARGE_SHARK_SIZE_MULTIPLIER = 1.8;
  * it should be unmistakable in the moment it is visible.
  */
 const LARGE_TIGER_SIZE_MULTIPLIER = 3;
+
+/**
+ * The Campaign's closing spectacle, on 10a: the sharks leaving the Shallows. They rise out of the
+ * dark below and stream off the top two corners, replaced as they go so the exodus never thins
+ * out while the player crosses.
+ *
+ * Deliberately not `Shark` entities, and deliberately never in `this.sharks`. Nothing here hunts,
+ * bites, blocks the screen or counts towards anything - they are scenery, and keeping them out of
+ * the simulation is what guarantees that, rather than a flag threaded through every combat path.
+ * It is also what makes a hundred of them affordable: one animated sprite each, with none of the
+ * glow, eyes, photophores or pod-requirement text a real shark's container carries.
+ */
+const SHARK_EXODUS_COUNT = 100;
+/** Every shark the Shallows has art for, at both sizes. */
+const EXODUS_KINDS: SharkKind[] = ['greatWhite', 'hammerhead', 'tiger'];
+/** Share of the exodus drawn at the larger size. */
+const SHARK_EXODUS_LARGE_FRACTION = 0.3;
+/** World units a second, before each shark's own variation. */
+const SHARK_EXODUS_SPEED = 20;
+/** How far outside the arena they enter and are culled, in world units. */
+const SHARK_EXODUS_MARGIN = 18;
+
+/**
+ * The Campaign's opening beat, on 0a: a tiger pack crosses in front of Echo while she holds still
+ * in the rocks, stops long enough to be seen, then leaves east - and following it is what starts
+ * level 1. Scenery, on the same terms as the exodus: never in `this.sharks`, so it cannot hunt,
+ * bite or be fought, and the swim-east prompt stays down until the pack has gone.
+ */
+const TIGER_PATROL_COUNT = 20;
+/** World units a second, for both the entrance and the exit. */
+const TIGER_PATROL_SPEED = 22;
+/** How long the pack holds at the centre before leaving, in seconds. */
+const TIGER_PATROL_HOLD_SECONDS = 5;
+/** Half-extent of the loose shoal around the pack's centre, in world units. */
+const TIGER_PATROL_SPREAD_X = 24;
+const TIGER_PATROL_SPREAD_Y = 17;
+/** How far off each side the pack starts and finishes, in world units. */
+const TIGER_PATROL_MARGIN = 34;
+
+/** Where Echo waits out the pack: the bottom-left corner, tucked in against the floor. */
+const HIDING_SPOT_X = 8;
+const HIDING_SPOT_Y = SIZE_Y - 13;
+
+interface PatrolShark {
+  sprite: Container;
+  /** Position within the shoal, relative to the pack's centre. */
+  offsetX: number;
+  offsetY: number;
+  bobPhase: number;
+  scaleX: number;
+  scaleY: number;
+}
+
+interface ProcessionShark {
+  sprite: Container;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  scaleX: number;
+  scaleY: number;
+  wobblePhase: number;
+  wobbleRate: number;
+}
 // The tiger sprite draws at half the scale of the other two kinds (SHARK_KIND_SCALE), which
 // left small tigers looking undersized against them - a third bigger reads much better.
 const SMALL_TIGER_SIZE_MULTIPLIER = 1.33;
@@ -938,6 +1006,21 @@ export class Game {
   private levelCompleted = false;
   private levelCompleteTimer: ReturnType<typeof setTimeout> | null = null;
   private awaitingNewWaters = false;
+  /**
+   * The story screen the player is currently crossing, or null on an ordinary level. Set between
+   * two levels rather than being one - see STORY_INTERSTITIALS in levels.ts - so while it is set
+   * the level number has not moved yet and the arena holds nobody but the player.
+   */
+  private storyInterstitial: StoryInterstitial | null = null;
+  private procession: ProcessionShark[] = [];
+  private patrol: PatrolShark[] = [];
+  /** 'done' covers both never-started and finished - either way nothing is left to play. */
+  private patrolPhase: 'enter' | 'hold' | 'exit' | 'done' = 'done';
+  private patrolHoldLeft = 0;
+  private patrolX = 0;
+  private patrolY = 0;
+  /** Fractional sharks owed to the exodus, carried between frames so the flow is framerate-independent. */
+  private processionSpawnDebt = 0;
   private awaitingLevelUpChoice = false;
   private awaitingSharkWarning = false;
   private awaitingRunSummary = false;
@@ -1133,6 +1216,8 @@ export class Game {
   /** Starts the music again when a run begins - the counterpart to onMusicStop. */
   private onMusicResume?: () => void;
   private onEchoAvailabilityChange?: (available: boolean) => void;
+  /** Hands the player back to the title screen - the far side of a story screen that ends its run. */
+  private onReturnToTitle?: () => void;
   private onConsumableChange?: (counts: Inventory) => void;
   private lastMusicLevel = 0;
   private paused = false;
@@ -1158,6 +1243,9 @@ export class Game {
   private parallaxLeanY = 0;
   private parallaxX = 0;
   private parallaxY = 0;
+  /** Holds the 10a exodus. Its own layer, behind the entities, so a hundred sprites can be added
+   *  and culled without re-sorting the layer the player's own dolphin lives in. */
+  private processionContainer!: Container;
   private entityContainer!: Container;
   private stormOverlay!: Graphics;
   /** The darkness at depth, parked on the pod. Hidden entirely in water with no gloom. */
@@ -1203,6 +1291,7 @@ export class Game {
       onMusicResume?: () => void;
       onEchoAvailabilityChange?: (available: boolean) => void;
       onConsumableChange?: (counts: Inventory) => void;
+      onReturnToTitle?: () => void;
     }
   ) {
     this.canvas = canvas;
@@ -1274,6 +1363,7 @@ export class Game {
     this.onMusicStop = inputs.onMusicStop;
     this.onMusicResume = inputs.onMusicResume;
     this.onEchoAvailabilityChange = inputs.onEchoAvailabilityChange;
+    this.onReturnToTitle = inputs.onReturnToTitle;
     this.onConsumableChange = inputs.onConsumableChange;
     this.lastLifeHeart = document.getElementById('lastLifeHeart');
     this.levelBadgeNumberEl = document.getElementById('levelBadgeNumber');
@@ -1305,6 +1395,7 @@ export class Game {
 
     this.bgContainer = new Container();
     this.fxContainer = new Container();
+    this.processionContainer = new Container();
     this.entityContainer = new Container();
     this.entityContainer.sortableChildren = true;
     this.jellyfishContainer = new Container();
@@ -1319,6 +1410,7 @@ export class Game {
     this.stage.addChild(this.bubbleContainer);
     this.stage.addChild(this.jellyfishContainer);
     this.stage.addChild(this.fxContainer);
+    this.stage.addChild(this.processionContainer);
     this.stage.addChild(this.entityContainer);
 
     // Over the entities, so a shark outside the pod's light is swallowed by it rather than
@@ -1843,7 +1935,11 @@ export class Game {
     // the board is for, and undid the rule that keeps bought starting depths off it.
     const freshRun = this.sessionStartTime === 0 || this.mode === 'endless';
     const config = freshRun ? this.getSelectedLevelConfig() : getLevelConfigForMode(this.currentLevel, this.mode);
-    if (!this.initModel(config, !freshRun)) return;
+    // A fresh run opens on its story screen if its mode has one - the Campaign begins on 0a. It
+    // is resolved before the water is built so the shark introduction can be held back: the
+    // screen it would land on has no sharks in it.
+    const opening = freshRun ? storyInterstitialAfter(OPENING_STORY_LEVEL, this.mode) : null;
+    if (!this.initModel(config, !freshRun, false, opening !== null)) return;
     if (freshRun) this.sessionStartTime = Date.now();
     else this.retries++;
     this.running = true;
@@ -1851,6 +1947,12 @@ export class Game {
     this.onMusicResume?.();
     this.startBtn.textContent = freshRun ? 'Restart' : 'Retry';
     this.setStatus('Swimming');
+    // The level beneath the screen is already built and stocked; entering the screen clears it
+    // back out, and swimming east lands on that level rather than on the one after it. A retry
+    // mid-run is a second go at a level already played, so it never replays the opening.
+    if (opening) {
+      this.enterStoryInterstitial(opening).catch((err) => console.warn('Story screen failed:', err));
+    }
     this.step();
   }
 
@@ -2306,8 +2408,18 @@ export class Game {
    * exists only so the player can see where they are about to dive, and a shark-introduction
    * card belongs to a run rather than to a preview - shown here it fires once for the idle
    * level and then again the moment the run actually begins.
+   *
+   * `deferSharkIntro` is the same card held back for a different reason: the run has genuinely
+   * begun, but it begins on a story screen with nothing in the water, and a shark introduction
+   * belongs to the level it introduces rather than to the quiet screen in front of it. The card
+   * is shown instead by advanceLevel(), when the player swims east into the level proper.
    */
-  private initModel(config = LEVELS[0], keepUpgrades = false, silent = false): boolean {
+  private initModel(
+    config = LEVELS[0],
+    keepUpgrades = false,
+    silent = false,
+    deferSharkIntro = false,
+  ): boolean {
     this.entityContainer.removeChildren();
     this.lightsContainer.removeChildren();
     this.dolphinSprites.clear();
@@ -2458,6 +2570,10 @@ export class Game {
     this.stage?.position.set(0, 0);
     this.awaitingNewWaters = false;
     this.newWatersPromptEl.classList.remove('visible');
+    // A run that ended or restarted mid-crossing must not resume on the story screen, nor leave
+    // its scenery behind in the water of whatever level is built next.
+    this.storyInterstitial = null;
+    this.stopSpectacle();
     this.awaitingLevelUpChoice = false;
     this.levelUpOverlayEl.classList.add('hidden');
     this.awaitingSharkWarning = false;
@@ -2477,7 +2593,7 @@ export class Game {
     this.loadBackground(getLevelBackground(config.level, this.mode)).catch((err) => console.warn('Background load failed:', err));
     this.updateStats();
     this.draw();
-    if (!silent) this.checkForNewSharks(config);
+    if (!silent && !deferSharkIntro) this.checkForNewSharks(config);
     this.announceLevel();
     // The idle preview behind the title and menu screens plays the menu theme rather than
     // whatever level it happens to be showing - it is not being played yet, so its music
@@ -3224,22 +3340,18 @@ ${zone.depth}`, 'levelup', duration + 1400);
     this.dolphins = [this.player];
   }
 
-  /** Campaign-mode classic ending: clearing level 10 stops the run and prompts for the leaderboard. */
+  /**
+   * Campaign-mode ending: beating the Matriarch on level 10 banks everything the run was worth and
+   * then sends the player east onto 10a, which is the campaign's last beat. The run deliberately
+   * stays live here - stopping it would strand the player on a screen they are meant to swim
+   * across - and it is finishRunAtStoryScreen(), on the far side of 10a, that ends it.
+   *
+   * Everything is banked at this moment rather than on the story screen so that closing the game
+   * while reading 10a cannot cost the player their Pearls, achievements or leaderboard entry.
+   */
   private recordCampaignClear(): void {
-    this.running = false;
-    if (this.timer) clearTimeout(this.timer);
     clearRunCheckpoint();
     const timeToSaveOcean = this.runElapsed;
-    this.pendingScore = {
-      board: 'campaign',
-      score: {
-        timeToSaveOcean,
-        retries: this.retries,
-        recruited: this.totalRecruited,
-        lost: this.totalLost,
-        sharksKilled: this.sharksKilled,
-      },
-    };
 
     this.flushLifetimeStats();
     if (timeToSaveOcean <= 720) this.tryUnlock('speedrunner');
@@ -3251,6 +3363,22 @@ ${zone.depth}`, 'levelup', duration + 1400);
     // Unlocks Echolocation for purchase in the Store (src/store.ts reads this).
     markCampaignCleared();
 
+    // Written straight to the board rather than offered on a summary card. This ending hands the
+    // player back to the title from the story screen, so there is no card left for them to press
+    // Save on - and a campaign clear that quietly failed to place would be worse than no prompt.
+    if (this.runIsRanked()) {
+      saveCampaignScore({
+        timeToSaveOcean,
+        retries: this.retries,
+        recruited: this.totalRecruited,
+        lost: this.totalLost,
+        sharksKilled: this.sharksKilled,
+        name: getDolphinName(),
+      });
+      // Time board is milliseconds, smaller-is-better (see src/playGames.ts).
+      void playGames.submit('campaign', timeToSaveOcean * 1000);
+    }
+
     // The banner and the status line are read together as one sentence - "Sharks Vanquished,
     // the Shallows are now safe.." - because the banner is a single nowrap line and the whole
     // phrase would run off the canvas. Shallows rather than Ocean: clearing the campaign secures
@@ -3258,7 +3386,11 @@ ${zone.depth}`, 'levelup', duration + 1400);
     this.setStatus('The Shallows are now safe..');
     this.startBtn.textContent = 'Retry';
     this.showBanner('Sharks Vanquished', 'victory');
-    this.showRunSummary('campaign');
+
+    // East, onto 10a. The loop is still ticking - nothing in this path halted it - so the prompt
+    // is all that is needed to carry the player there.
+    this.awaitingNewWaters = true;
+    this.newWatersPromptEl.classList.add('visible');
   }
 
   /** End-of-run card: the dolphin's name, a stat grid, and any achievements from this run. */
@@ -3698,10 +3830,336 @@ ${cleared.name} Zone Liberated
     }
   }
 
+  /**
+   * The tiger pack on 0a. It enters from off the left at mid-height, closes on the centre, holds
+   * there for TIGER_PATROL_HOLD_SECONDS, then leaves east - and only then is the swim-east prompt
+   * armed, because following the pack is the instruction the screen is giving.
+   */
+  private startTigerPatrol(): void {
+    this.stopTigerPatrol();
+    this.patrolX = -TIGER_PATROL_MARGIN;
+    this.patrolY = SIZE_Y / 2;
+    this.patrolPhase = 'enter';
+    this.patrolHoldLeft = TIGER_PATROL_HOLD_SECONDS;
+
+    const look = SHARK_KIND_LOOK.tiger;
+    const textureSet = this.sharkTextureSets[SHARK_SPRITE_SOURCE.tiger];
+    if (!textureSet) return;
+
+    for (let i = 0; i < TIGER_PATROL_COUNT; i++) {
+      const container = new Container();
+      let fish: Container;
+      try {
+        fish = createSharkSprite(textureSet, look.animationSpeed);
+      } catch (err) {
+        console.warn('Patrol shark sprite failed:', err);
+        continue;
+      }
+      (fish as Sprite).tint = look.tint;
+      container.addChild(fish);
+
+      const base = SHARK_BASE_SCALE * SHARK_KIND_SCALE.tiger * look.smallSize;
+      this.patrol.push({
+        sprite: container,
+        // Biased behind the centre on entry so the pack reads as a column arriving rather than a
+        // block, and spread on both axes so it is a shoal rather than a row.
+        offsetX: (Math.random() - 0.65) * TIGER_PATROL_SPREAD_X * 2,
+        offsetY: (Math.random() - 0.5) * TIGER_PATROL_SPREAD_Y * 2,
+        bobPhase: Math.random() * Math.PI * 2,
+        scaleX: base * look.stretchX,
+        scaleY: base * look.stretchY,
+      });
+      this.processionContainer.addChild(container);
+    }
+  }
+
+  private stopTigerPatrol(): void {
+    for (const p of this.patrol) p.sprite.destroy({ children: true });
+    this.patrol = [];
+    this.patrolPhase = 'done';
+  }
+
+  /**
+   * Walk the pack through its three phases. Nothing here touches the player: she is free to move
+   * the whole time, and the pack neither sees her nor can be reached by her.
+   */
+  private updateTigerPatrol(dt: number): void {
+    if (this.patrolPhase === 'done') return;
+    const centre = SIZE_X / 2;
+
+    if (this.patrolPhase === 'enter') {
+      this.patrolX = Math.min(centre, this.patrolX + TIGER_PATROL_SPEED * dt);
+      if (this.patrolX >= centre) this.patrolPhase = 'hold';
+    } else if (this.patrolPhase === 'hold') {
+      this.patrolHoldLeft -= dt;
+      if (this.patrolHoldLeft <= 0) {
+        this.patrolPhase = 'exit';
+        this.setStatus('Follow them east');
+      }
+    } else {
+      this.patrolX += TIGER_PATROL_SPEED * dt;
+      // Clear of the right edge, shoal spread included, so the last tail is genuinely gone
+      // before the prompt appears and the screen becomes crossable.
+      if (this.patrolX > SIZE_X + TIGER_PATROL_MARGIN + TIGER_PATROL_SPREAD_X) {
+        this.stopTigerPatrol();
+        this.armStoryScreenExit();
+        return;
+      }
+    }
+
+    const t = performance.now() / 1000;
+    const scale = WORLD_SCALE;
+    for (let i = 0; i < this.patrol.length; i++) {
+      const p = this.patrol[i];
+      const bob = Math.sin(t * 1.6 + p.bobPhase) * 1.2;
+      p.sprite.x = (this.patrolX + p.offsetX) * scale + scale / 2;
+      p.sprite.y = (this.patrolY + p.offsetY + bob) * scale + scale / 2;
+      const fish = p.sprite.children[0] as Container;
+      fish.scale.set(p.scaleX, p.scaleY);
+      // A held pack still idles rather than freezing - the sprites keep swimming on the spot.
+      fish.rotation = Math.sin(t * 1.9 + p.bobPhase) * 0.06;
+    }
+  }
+
+  /** Put the swim-east prompt up on a story screen. Immediate on most, earned on 0a. */
+  private armStoryScreenExit(): void {
+    if (!this.storyInterstitial) return;
+    this.awaitingNewWaters = true;
+    this.newWatersPromptEl.classList.add('visible');
+  }
+
+  /** Tears down whichever spectacle is running. Safe to call when none is. */
+  private stopSpectacle(): void {
+    this.stopSharkExodus();
+    this.stopTigerPatrol();
+  }
+
+  /**
+   * Fill the screen with the exodus and keep it filled. Seeded at random points along their
+   * routes rather than all at the bottom, so the player arrives into a migration already under
+   * way instead of watching an empty screen fill up over the eight seconds a crossing takes.
+   */
+  private startSharkExodus(): void {
+    this.stopSharkExodus();
+    for (let i = 0; i < SHARK_EXODUS_COUNT; i++) this.spawnProcessionShark(Math.random());
+  }
+
+  private stopSharkExodus(): void {
+    for (const p of this.procession) p.sprite.destroy({ children: true });
+    this.procession = [];
+    this.processionContainer?.removeChildren();
+    this.processionSpawnDebt = 0;
+  }
+
+  /**
+   * One shark of the exodus, placed `progress` of the way along its route (0 below the arena,
+   * 1 off the top corner it is heading for).
+   *
+   * Which corner it leaves by is decided by the half it rises in, so the crowd reads as two
+   * streams parting over the player rather than one undifferentiated drift.
+   */
+  private spawnProcessionShark(progress: number): void {
+    const kind = EXODUS_KINDS[Math.floor(Math.random() * EXODUS_KINDS.length)];
+    const look = SHARK_KIND_LOOK[kind];
+    const large = Math.random() < SHARK_EXODUS_LARGE_FRACTION;
+    const sizeMultiplier = large
+      ? kind === 'tiger'
+        ? LARGE_TIGER_SIZE_MULTIPLIER
+        : LARGE_SHARK_SIZE_MULTIPLIER
+      : look.smallSize;
+
+    const container = new Container();
+    const textureSet =
+      this.sharkTextureSets[SHARK_SPRITE_SOURCE[kind]] ?? this.sharkTextureSets.greatWhite;
+    if (!textureSet) return;
+    let fish: Container;
+    try {
+      fish = createSharkSprite(textureSet, look.animationSpeed);
+    } catch (err) {
+      console.warn('Exodus shark sprite failed:', err);
+      return;
+    }
+    (fish as Sprite).tint = look.tint;
+    container.addChild(fish);
+
+    const startX = Math.random() * SIZE_X;
+    const startY = SIZE_Y + SHARK_EXODUS_MARGIN;
+    const endX = startX < SIZE_X / 2 ? -SHARK_EXODUS_MARGIN : SIZE_X + SHARK_EXODUS_MARGIN;
+    const endY = -SHARK_EXODUS_MARGIN;
+
+    const dx = endX - startX;
+    const dy = endY - startY;
+    const length = Math.hypot(dx, dy) || 1;
+    const speed = SHARK_EXODUS_SPEED * (0.75 + Math.random() * 0.5);
+
+    const base = SHARK_BASE_SCALE * SHARK_KIND_SCALE[kind] * sizeMultiplier;
+    const p: ProcessionShark = {
+      sprite: container,
+      x: startX + dx * progress,
+      y: startY + dy * progress,
+      vx: (dx / length) * speed,
+      vy: (dy / length) * speed,
+      scaleX: base * look.stretchX,
+      scaleY: base * look.stretchY,
+      wobblePhase: Math.random() * Math.PI * 2,
+      wobbleRate: 2 + Math.random() * 2,
+    };
+
+    // Smaller sharks sit further back, which gives the crowd depth without a second render pass.
+    container.alpha = large ? 1 : 0.85;
+    this.procession.push(p);
+    this.processionContainer.addChild(container);
+  }
+
+  /**
+   * Move the exodus and top it back up. Sharks are culled once fully clear of the top and one is
+   * started from below for each that left, which is what makes the flow continuous rather than a
+   * single wave that empties the screen halfway through the crossing.
+   */
+  private updateSharkExodus(dt: number): void {
+    if (this.procession.length === 0 && this.processionSpawnDebt === 0) return;
+    const t = performance.now() / 1000;
+    const scale = WORLD_SCALE;
+    const survivors: ProcessionShark[] = [];
+
+    for (const p of this.procession) {
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+
+      if (p.y < -SHARK_EXODUS_MARGIN) {
+        p.sprite.destroy({ children: true });
+        this.processionSpawnDebt += 1;
+        continue;
+      }
+
+      p.sprite.x = p.x * scale + scale / 2;
+      p.sprite.y = p.y * scale + scale / 2;
+
+      const fish = p.sprite.children[0] as Container;
+      // The strip is drawn facing right, so a shark heading left is mirrored and its angle has to
+      // be measured against the mirrored axis or it would point back down the way it came.
+      const dir = p.vx >= 0 ? 1 : -1;
+      fish.scale.set(p.scaleX * dir, p.scaleY);
+      fish.rotation =
+        Math.atan2(p.vy, p.vx * dir) + Math.sin(t * p.wobbleRate + p.wobblePhase) * 0.05;
+
+      survivors.push(p);
+    }
+    this.procession = survivors;
+
+    while (this.processionSpawnDebt >= 1) {
+      this.processionSpawnDebt -= 1;
+      this.spawnProcessionShark(0);
+    }
+  }
+
+  /**
+   * The far side of a story screen that ends its run - the Campaign's 10a. Everything the run was
+   * worth was already banked when its last level was cleared (see recordCampaignClear), so that a
+   * player who closes the game while reading the screen keeps it; all that is left here is to stop
+   * the loop and hand them back to the title.
+   */
+  private finishRunAtStoryScreen(): void {
+    this.running = false;
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = null;
+    }
+    this.awaitingNewWaters = false;
+    this.newWatersPromptEl.classList.remove('visible');
+    this.onReturnToTitle?.();
+  }
+
+  /**
+   * Swim the player onto a story screen. Nothing is spawned and nothing is scored: the sharks are
+   * already gone (a level only completes once the water is empty) and the pod went home in
+   * levelComplete(), so the screen holds the player alone with the art.
+   *
+   * levelCompleted deliberately stays true for the crossing. It is what stops the empty arena
+   * from reading as a fresh win and firing levelComplete() again on the next tick; advanceLevel()
+   * clears it when the player swims off the far side into the real level.
+   */
+  private async enterStoryInterstitial(story: StoryInterstitial): Promise<void> {
+    this.storyInterstitial = story;
+    // Only the player swimming east ends a story screen. Holding levelCompleted is what stops the
+    // empty water from reading as a fresh win and firing levelComplete() on the next tick - which
+    // the opening screen would otherwise do the instant it appeared, never having been played.
+    this.levelCompleted = true;
+
+    // Between two levels the water is already empty, because a level only completes once the last
+    // shark is gone. The opening screen is not: it is entered straight after initModel has stocked
+    // level 1, whose sharks are waiting in the water. Either way the screen promises the player
+    // that nothing in it can hurt them, so it is emptied rather than assumed empty.
+    for (const shark of this.sharks) this.removeSharkSprite(shark);
+    this.sharks = [];
+    this.matriarch = null;
+
+    for (const dolphin of this.dolphins) {
+      if (!dolphin.isPlayer) this.removeDolphinSprite(dolphin);
+    }
+    if (this.player) this.dolphins = [this.player];
+
+    // A screen with something to watch puts the player where they can watch it from. Echo waits
+    // out the tiger pack tucked into the bottom-left corner, which is also as far from the pack's
+    // line across the middle as the arena gets.
+    if (story.spectacle === 'tigerPatrol' && this.player) {
+      this.player._x = HIDING_SPOT_X;
+      this.player._y = HIDING_SPOT_Y;
+      this.player.lastX = HIDING_SPOT_X;
+    }
+
+    // No level announcement - the screen is the beat, and a card over it would be the one thing
+    // the player has to read past rather than look at. A story banner is a different thing: it is
+    // the screen speaking, so a screen that has a line to say gets one.
+    if (story.spectacle === 'tigerPatrol') {
+      this.showBanner(`Stay hidden
+Let the pack pass`, 'storm', 3200);
+      this.setStatus('Stay hidden..');
+    } else {
+      this.setStatus('Swim east to continue');
+    }
+
+    if (story.spectacle === 'sharkExodus') this.startSharkExodus();
+    if (story.spectacle === 'tigerPatrol') this.startTigerPatrol();
+
+    // Most screens are crossable the moment they appear. One that gates its exit stays shut until
+    // its spectacle has played out - on 0a, until the pack the player is meant to follow has gone.
+    if (!story.exitAfterSpectacle) this.armStoryScreenExit();
+
+    await this.loadBackground(getStoryInterstitialBackground(story));
+  }
+
   private async advanceLevel(): Promise<void> {
     this.awaitingNewWaters = false;
     this.newWatersPromptEl.classList.remove('visible');
-    this.currentLevel += 1;
+
+    // A story screen is crossed on the way between two levels, so this runs twice for one level
+    // change: once to swim onto the screen, and again - with storyInterstitial already set - to
+    // leave it. Both halves happen before the level number moves, which is what keeps every zone
+    // and Matriarch calculation downstream seeing an unbroken run of integers.
+    let leavingOpeningScreen = false;
+    if (this.storyInterstitial) {
+      const screen = this.storyInterstitial;
+      this.stopSpectacle();
+      leavingOpeningScreen = screen.afterLevel === OPENING_STORY_LEVEL;
+      this.storyInterstitial = null;
+      // Some screens are the far end of a run rather than a step through it. Checked before the
+      // level number moves, because there is no level on the other side for it to move to.
+      if (screen.endsRun) {
+        this.finishRunAtStoryScreen();
+        return;
+      }
+    } else {
+      const story = storyInterstitialAfter(this.currentLevel, this.mode);
+      if (story) {
+        await this.enterStoryInterstitial(story);
+        return;
+      }
+    }
+
+    // Crossing the opening screen begins the level the run is already sitting on, so the number
+    // stays put; every other crossing leaves a level behind and moves it on.
+    if (!leavingOpeningScreen) this.currentLevel += 1;
     this.wasOnLastLifeThisLevel = false;
     if (this.mode === 'endless') {
       if (this.currentLevel >= 15) this.tryUnlock('deepDiver');
@@ -5960,9 +6418,21 @@ ${cleared.name} Zone Liberated
       this.flushLifetimeStats();
     }
 
-    this.updateEvents();
-    this.updateDeepCry();
-    this.updateMatriarch();
+    // The exodus is the only thing that moves on a story screen, and it is scenery: it is stepped
+    // here rather than in the simulation above, which never sees it.
+    if (this.storyInterstitial) {
+      this.updateSharkExodus(dt);
+      this.updateTigerPatrol(dt);
+    }
+
+    // Nothing arrives on a story screen: no storm, no swarm, no kraken, no megamouth. It is a
+    // crossing rather than a level, and an event firing mid-crossing would be a hazard on a screen
+    // the player was told was safe - see enterStoryInterstitial.
+    if (!this.storyInterstitial) {
+      this.updateEvents();
+      this.updateDeepCry();
+      this.updateMatriarch();
+    }
 
     if (this.activeEvent?.type === 'jellyfish') {
       this.updateJellyfish();
@@ -5981,7 +6451,10 @@ ${cleared.name} Zone Liberated
     // wandering in to be recruited while the arms are out reads as the sea not having noticed -
     // so the spawn clock is pushed along instead of firing, which also stops a backlog building
     // up and emptying into the arena the moment the event ends.
-    if (this.activeEvent?.type === 'kraken') {
+    // Nothing swims into a kraken, and nobody is waiting to be found on a story screen either.
+    // Both push the spawn clock along rather than firing, so no backlog builds up and empties into
+    // the arena the moment the crossing or the event ends.
+    if (this.activeEvent?.type === 'kraken' || this.storyInterstitial) {
       while (this.gameTime >= this.nextDolphinSpawnTime) this.nextDolphinSpawnTime += this.dolphinSpawnInterval;
     } else if (this.gameTime >= this.nextDolphinSpawnTime && this.dolphins.length < this.maxDolphins) {
       const hasStray = this.dolphins.some((d) => !d.isPlayer && !d.recruited);
