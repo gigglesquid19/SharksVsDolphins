@@ -6,6 +6,7 @@ import {
   LEVELS,
   CAMPAIGN_LARGE_SHARK_COUNTS,
   SMALL_BEFORE_LARGE_UNTIL_LEVEL,
+  descentLevels,
   OPENING_STORY_LEVEL,
   STORY_INTERSTITIALS,
   dealLargeSharkKinds,
@@ -122,7 +123,9 @@ describe('story interstitials', () => {
   const endlessScreens = STORY_INTERSTITIALS.filter((s) => s.mode === 'endless');
 
   it('sits after the levels the art was drawn for', () => {
-    expect(endlessScreens.map((s) => s.afterLevel)).toEqual([10, 17, 29, 30, 34, 39]);
+    expect([...endlessScreens.map((s) => s.afterLevel)].sort((a, b) => a - b)).toEqual([
+      10, 17, 20, 29, 30, 34, 39, 40,
+    ]);
   });
 
   it('names each screen after the level it follows', () => {
@@ -134,7 +137,7 @@ describe('story interstitials', () => {
     expect(storyInterstitialAfter(39, 'endless')?.id).toBe('39a');
     expect(storyInterstitialAfter(9, 'endless')).toBeNull();
     expect(storyInterstitialAfter(11, 'endless')).toBeNull();
-    expect(storyInterstitialAfter(40, 'endless')).toBeNull();
+    expect(storyInterstitialAfter(41, 'endless')).toBeNull();
   });
 
   it('keeps each mode to its own story screens', () => {
@@ -192,6 +195,33 @@ describe('story interstitials', () => {
     expect(opening?.mode).toBe('campaign');
     // Nothing is ever cleared to reach it - there is no level 0 - so it can only be a run's start.
     expect(LEVELS.some((l) => l.level === OPENING_STORY_LEVEL)).toBe(false);
+  });
+
+  it('descends at every zone boundary and nowhere else', () => {
+    // The four boundaries between the five depth zones, which are also the four Matriarch levels
+    // a descent can follow. 50 is the floor of the Hadal: the last zone, with nothing below it.
+    expect(descentLevels('endless')).toEqual([10, 20, 30, 40]);
+    for (const zone of DEPTH_ZONES.slice(0, -1)) {
+      expect(storyInterstitialAfter(zone.lastLevel, 'endless')?.descend).toBe(true);
+    }
+    expect(storyInterstitialAfter(DEPTH_ZONES[DEPTH_ZONES.length - 1].lastLevel, 'endless')).toBeNull();
+  });
+
+  it('descends only from a Matriarch level', () => {
+    // The descent is the reward for the boss, so every one must land on a tenth level.
+    for (const level of descentLevels('endless')) {
+      expect(level % 10).toBe(0);
+      expect(getLevelConfigForMode(level, 'endless').matriarch).toBe(true);
+    }
+  });
+
+  it('keeps the mid-zone screens as ordinary east crossings', () => {
+    // These are story beats rather than zone changes: no Matriarch behind them, no descent.
+    for (const level of [17, 29, 34, 39]) {
+      const screen = storyInterstitialAfter(level, 'endless');
+      expect(screen?.descend).toBeUndefined();
+      expect(getLevelConfigForMode(level, 'endless').matriarch).toBe(false);
+    }
   });
 
   it('tells each beat once, not once per lap of the Endless backgrounds', () => {

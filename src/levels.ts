@@ -160,10 +160,17 @@ export interface StoryInterstitial {
    */
   spectacle?: 'sharkExodus' | 'tigerPatrol';
   /**
-   * Holds the swim-east prompt back until the spectacle has played out, so the screen is watched
-   * before it is crossed. Without it the prompt is up the moment the screen appears.
+   * Holds the exit prompt back until the spectacle has played out, so the screen is watched before
+   * it is crossed. Without it the prompt is up the moment the screen appears.
    */
   exitAfterSpectacle?: boolean;
+  /**
+   * A screen left by swimming *down* off the bottom of the arena rather than east off the side.
+   * The four Depthless zone transitions are drop-offs at the edge of a shelf, and the art is drawn
+   * so the dark water runs off the bottom of the frame - the way out of the picture is down, and
+   * the prompt points that way and says so.
+   */
+  descend?: boolean;
   /**
    * Nothing reads this yet. The screens are wordless for now and the art carries them on its own,
    * but characters and dialogue are planned for them, so the shape that will hold it is named here
@@ -174,14 +181,28 @@ export interface StoryInterstitial {
 
 export const STORY_INTERSTITIALS: StoryInterstitial[] = [
   { afterLevel: OPENING_STORY_LEVEL, mode: 'campaign', id: '0a', spectacle: 'tigerPatrol', exitAfterSpectacle: true },
-  { afterLevel: 10, mode: 'campaign', id: '10a', endsRun: true, spectacle: 'sharkExodus' },
-  { afterLevel: 10, mode: 'endless', id: '10a' },
+  { afterLevel: 10, mode: 'campaign', id: '10a', endsRun: true, descend: true, spectacle: 'sharkExodus' },
+  // The four Depthless zone transitions. Each sits on a Matriarch level and on a zone boundary -
+  // the two coincide at every tenth level - and each is left by descending into the drop.
+  { afterLevel: 10, mode: 'endless', id: '10a', descend: true },
+  { afterLevel: 20, mode: 'endless', id: '20a', descend: true },
+  { afterLevel: 30, mode: 'endless', id: '30a', descend: true },
+  { afterLevel: 40, mode: 'endless', id: '40a', descend: true },
+  // Mid-zone story beats. Ordinary crossings: no Matriarch, no descent, swim east and carry on.
   { afterLevel: 17, mode: 'endless', id: '17a' },
   { afterLevel: 29, mode: 'endless', id: '29a' },
-  { afterLevel: 30, mode: 'endless', id: '30a' },
   { afterLevel: 34, mode: 'endless', id: '34a' },
   { afterLevel: 39, mode: 'endless', id: '39a' },
 ];
+
+/**
+ * Every level whose clear leads onto a descent screen, in order. There is deliberately none past
+ * 40: the Hadal is the last zone, so there is nothing below it to announce, and the Matriarchs
+ * Depthless keeps spawning every tenth level past that clear straight through as they always did.
+ */
+export function descentLevels(mode: 'campaign' | 'endless'): number[] {
+  return STORY_INTERSTITIALS.filter((s) => s.mode === mode && s.descend).map((s) => s.afterLevel);
+}
 
 /** The story screen that follows this level in this mode, if there is one. */
 export function storyInterstitialAfter(

@@ -1159,6 +1159,8 @@ export class Game {
   private bannerEl: HTMLDivElement;
   private bannerTimeout: ReturnType<typeof setTimeout> | null = null;
   private newWatersPromptEl: HTMLDivElement;
+  /** The descent prompt, at the bottom of the water. Null on a build whose markup predates it. */
+  private descendPromptEl: HTMLDivElement | null;
   private pauseOverlayEl: HTMLDivElement;
   private schoolBtnWrap: HTMLDivElement;
   private megaPodBtnWrap: HTMLDivElement | null = null;
@@ -1307,6 +1309,7 @@ export class Game {
     this.sharkGuideList = inputs.sharkGuideList;
     this.bannerEl = inputs.banner;
     this.newWatersPromptEl = inputs.newWatersPrompt;
+    this.descendPromptEl = document.getElementById('descendPrompt') as HTMLDivElement | null;
     this.pauseOverlayEl = inputs.pauseOverlay;
     this.schoolBtnWrap = inputs.schoolBtnWrap;
     this.megaPodBtnWrap = document.getElementById('megaPodBtnWrap') as HTMLDivElement | null;
@@ -2569,7 +2572,7 @@ export class Game {
     this.shakeTime = 0;
     this.stage?.position.set(0, 0);
     this.awaitingNewWaters = false;
-    this.newWatersPromptEl.classList.remove('visible');
+    this.clearExitPrompts();
     // A run that ended or restarted mid-crossing must not resume on the story screen, nor leave
     // its scenery behind in the water of whatever level is built next.
     this.storyInterstitial = null;
@@ -3925,11 +3928,52 @@ ${cleared.name} Zone Liberated
     }
   }
 
-  /** Put the swim-east prompt up on a story screen. Immediate on most, earned on 0a. */
+  /**
+   * Put the exit prompt up on a story screen. Immediate on most, earned on 0a.
+   *
+   * A descent screen points down and says so; every other screen points east as it always has.
+   * Which one is showing is also what `movePlayer` reads to decide which edge ends the screen, so
+   * the arrow and the way out can never disagree.
+   */
   private armStoryScreenExit(): void {
     if (!this.storyInterstitial) return;
     this.awaitingNewWaters = true;
-    this.newWatersPromptEl.classList.add('visible');
+    if (this.storyInterstitial.descend) {
+      this.positionDescendPrompt();
+      this.descendPromptEl?.classList.add('visible');
+    } else {
+      this.newWatersPromptEl.classList.add('visible');
+    }
+  }
+
+  /**
+   * Sits the descent arrow just inside the bottom of the water. It is positioned against the
+   * canvas rather than against its own containing block, which is the whole canvas-wrap - that
+   * also holds the on-screen controls, so a plain CSS offset put the arrow over the joystick
+   * instead of over the edge the player is being told to swim through.
+   */
+  private positionDescendPrompt(): void {
+    const el = this.descendPromptEl;
+    const wrap = el?.parentElement;
+    if (!el || !wrap) return;
+    // Measured off the laid-out canvas by rect rather than off `this.canvas`, which is the element
+    // handed to the constructor - Pixi renders into its own canvas, so the original reports an
+    // offsetTop and offsetHeight of zero and the arrow ends up at the top of the page.
+    const live = wrap.querySelector('canvas');
+    if (!live) return;
+    const gap = wrap.getBoundingClientRect().bottom - live.getBoundingClientRect().bottom;
+    el.style.bottom = `${Math.max(0, gap) + 12}px`;
+  }
+
+  /** Takes down whichever exit prompt is showing. */
+  private clearExitPrompts(): void {
+    this.newWatersPromptEl.classList.remove('visible');
+    this.descendPromptEl?.classList.remove('visible');
+  }
+
+  /** True while the screen being crossed is left downward rather than east. */
+  private get exitIsDownward(): boolean {
+    return this.storyInterstitial?.descend === true;
   }
 
   /** Tears down whichever spectacle is running. Safe to call when none is. */
@@ -4070,7 +4114,7 @@ ${cleared.name} Zone Liberated
       this.timer = null;
     }
     this.awaitingNewWaters = false;
-    this.newWatersPromptEl.classList.remove('visible');
+    this.clearExitPrompts();
     this.onReturnToTitle?.();
   }
 
@@ -4135,7 +4179,7 @@ Let the pack pass`, 'storm', 3200);
 
   private async advanceLevel(): Promise<void> {
     this.awaitingNewWaters = false;
-    this.newWatersPromptEl.classList.remove('visible');
+    this.clearExitPrompts();
 
     // A story screen is crossed on the way between two levels, so this runs twice for one level
     // change: once to swim onto the screen, and again - with storyInterstitial already set - to
@@ -6006,14 +6050,28 @@ Let the pack pass`, 'storm', 3200);
     if (dx !== 0 || dy !== 0) {
       const step = maxSpeed * throttle;
       const rawX = this.player._x + dx * step;
-      if (this.awaitingNewWaters && dx > 0 && rawX >= SIZE_X) {
+      const rawY = this.player._y + dy * step;
+      // A descent screen is left through the floor rather than the side: the art is a drop-off
+      // with open water running off the bottom of the frame, so swimming down out of the arena is
+      // what carries the player into the next zone. Every other screen still leaves east.
+      if (this.awaitingNewWaters && this.exitIsDownward && dy > 0 && rawY >= SIZE_Y) {
+        // Re-entered at the top of the next level, having come down into it.
+        this.player._y = 2;
+        this.player._x = wrapX(rawX);
+        this.advanceLevel().catch((err) => console.warn('Level transition failed:', err));
+      } else if (this.awaitingNewWaters && !this.exitIsDownward && dx > 0 && rawX >= SIZE_X) {
         this.player._x = 2;
         this.player.lastX = 2;
         this.advanceLevel().catch((err) => console.warn('Level transition failed:', err));
       } else {
         this.player._x = wrapX(rawX);
+        // The floor clamp lifts while a descent is armed. It normally holds an entity three units
+        // clear of the bottom, which would have parked the player just short of the one edge the
+        // screen is telling them to swim through - the vertical counterpart of wrapX letting rawX
+        // run past SIZE_X for the swim east.
+        const descending = this.awaitingNewWaters && this.exitIsDownward;
+        this.player._y = descending ? Math.max(2, rawY) : clampEntityY(rawY, 2);
       }
-      this.player._y = clampEntityY(this.player._y + dy * step, 2);
     }
   }
 
