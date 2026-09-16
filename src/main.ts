@@ -375,9 +375,24 @@ document.getElementById('coffeeBtn')!.addEventListener('click', (e) => {
   window.open(COFFEE_URL, '_blank', 'noopener');
 });
 
-function enterAppFromTitle(): void {
+/**
+ * Leaves the title screen for the game.
+ *
+ * `narrative` decides whether the story panel is read on the way through. It is the Campaign's
+ * own opening - Echo cut off from her pod, the Shallows to take back - so a dive launched from
+ * Level Select skips it and goes straight to the water: that player is picking a bought depth
+ * partway down, not starting the story.
+ */
+function enterAppFromTitle(narrative: boolean): void {
   titleScreen.classList.add('hidden');
-  narrativeScreen.classList.remove('hidden');
+  if (narrative) {
+    narrativeScreen.classList.remove('hidden');
+  } else {
+    // Skipping the panel means doing the job its Continue button would have done on the way out.
+    narrativeScreen.classList.add('hidden');
+    appContent.classList.remove('hidden');
+    syncStageTop();
+  }
   bgMusic.play().catch((err) => console.warn('Music playback failed:', err));
   sfx.resume();
 }
@@ -502,12 +517,12 @@ const inputs = {
     clearRunCheckpoint();
     game.setMode('campaign');
     game.showSelectedLevel();
-    enterAppFromTitle();
+    enterAppFromTitle(true);
   });
   document.getElementById('titleEndlessBtn')!.addEventListener('click', () => {
     game.setMode('endless');
     game.showSelectedLevel();
-    enterAppFromTitle();
+    enterAppFromTitle(true);
   });
 
   // Level Select: the same entry as the button above, but starting at a bought depth. setMode is
@@ -520,7 +535,7 @@ const inputs = {
       // Show that depth straight away rather than level 1 until Start is pressed.
       game.showSelectedLevel();
       depthSelect.close();
-        enterAppFromTitle();
+      enterAppFromTitle(false);
     },
   });
   document.getElementById('titleDepthSelectBtn')!.addEventListener('click', () => depthSelect.open());
