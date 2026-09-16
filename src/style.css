@@ -1814,18 +1814,24 @@ button.mega-shrimp.green {
   pointer-events: none;
 }
 .descend-prompt.visible { display: flex; animation: descendPulse 1.2s ease-in-out infinite; }
+/* Purple rather than the swim-east yellow: the descent is its own beat, and the lighter #c084fc
+   holds up against the near-black drop the arrow points into, where the darker #a855f7 of the
+   glow would sink. Both are already in the palette - #a855f7 is the invulnerability ring. */
 .descend-prompt .arrow {
   font-size: 2.2rem;
   line-height: 1;
-  color: #facc15;
-  text-shadow: 0 0 18px rgba(250, 204, 21, 0.85);
+  color: #c084fc;
+  /* Dark halo first, purple glow over it. 40a drops the arrow straight into a dense field of cyan
+     bioluminescence, and purple on cyan at the same brightness all but disappears - the dark layer
+     is what keeps it separated from whatever the art puts behind it. */
+  text-shadow: 0 2px 7px rgba(2, 6, 23, 0.95), 0 0 18px rgba(168, 85, 247, 0.9);
   transform: rotate(90deg);
 }
 .descend-prompt .label {
   font-size: 0.78rem;
   font-weight: 800;
-  color: #facc15;
-  text-shadow: 0 0 10px rgba(250, 204, 21, 0.65);
+  color: #c084fc;
+  text-shadow: 0 2px 6px rgba(2, 6, 23, 0.95), 0 0 10px rgba(168, 85, 247, 0.7);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   white-space: nowrap;
