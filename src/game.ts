@@ -424,6 +424,12 @@ const SHARK_EXODUS_LARGE_FRACTION = 0.3;
 const SHARK_EXODUS_SPEED = 20;
 /** How far outside the arena they enter and are culled, in world units. */
 const SHARK_EXODUS_MARGIN = 18;
+/**
+ * How wide each highway is across its centre line, in world units. Deliberately narrower than the
+ * gap between the two lane entries (about 17 units apart at the bottom of the frame) - at half
+ * that the two ribbons touch on the way up and read as one mass rather than two.
+ */
+const SHARK_EXODUS_LANE_WIDTH = 9;
 
 /**
  * The Campaign's opening beat, on 0a: a tiger pack crosses in front of Echo while she holds still
@@ -456,12 +462,71 @@ interface PatrolShark {
   scaleY: number;
 }
 
+/**
+ * The two lanes the exodus swims, as world-space waypoints traced from the art.
+ *
+ * Both enter through the bottom of the frame in the open water to the right of the shelf - the
+ * left-hand lane deliberately does not rise through the cliff, which it used to do back when the
+ * sharks simply spawned across the full width. The left lane then arcs up and over the shelf, well
+ * above its lip, and leaves through the left edge; the right lane climbs almost straight and peels
+ * out through the right edge near the top. First and last points sit outside the arena so sharks
+ * arrive and leave already off-frame.
+ */
+const EXODUS_LANES: readonly (readonly { x: number; y: number }[])[] = [
+  [
+    { x: 50, y: SIZE_Y + SHARK_EXODUS_MARGIN },
+    { x: 52, y: 88 },
+    { x: 43, y: 54 },
+    { x: 23, y: 35 },
+    { x: 4, y: 25 },
+    { x: -SHARK_EXODUS_MARGIN, y: 21 },
+  ],
+  [
+    { x: 67, y: SIZE_Y + SHARK_EXODUS_MARGIN },
+    { x: 68, y: 99 },
+    { x: 65, y: 65 },
+    { x: 68, y: 42 },
+    { x: 77, y: 33 },
+    { x: SIZE_X + SHARK_EXODUS_MARGIN, y: 28 },
+  ],
+];
+
+/** Cumulative arc length along each lane, so a shark can be placed by distance travelled. */
+const EXODUS_LANE_LENGTHS: readonly number[][] = EXODUS_LANES.map((lane) => {
+  const acc = [0];
+  for (let i = 1; i < lane.length; i++) {
+    acc.push(acc[i - 1] + Math.hypot(lane[i].x - lane[i - 1].x, lane[i].y - lane[i - 1].y));
+  }
+  return acc;
+});
+
+/** A point and a heading `dist` along a lane, clamped at both ends. */
+function pointAlongLane(lane: number, dist: number): { x: number; y: number; tx: number; ty: number } {
+  const pts = EXODUS_LANES[lane];
+  const acc = EXODUS_LANE_LENGTHS[lane];
+  const total = acc[acc.length - 1];
+  const d = Math.max(0, Math.min(total, dist));
+  let i = 1;
+  while (i < acc.length - 1 && acc[i] < d) i++;
+  const span = acc[i] - acc[i - 1] || 1;
+  const t = (d - acc[i - 1]) / span;
+  const a = pts[i - 1];
+  const b = pts[i];
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len = Math.hypot(dx, dy) || 1;
+  return { x: a.x + dx * t, y: a.y + dy * t, tx: dx / len, ty: dy / len };
+}
+
 interface ProcessionShark {
   sprite: Container;
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
+  /** Which of the two lanes this shark is in. */
+  lane: number;
+  /** Arc length travelled along that lane. */
+  dist: number;
+  speed: number;
+  /** Offset across the lane, which is what gives the highway its width. */
+  offset: number;
   scaleX: number;
   scaleY: number;
   wobblePhase: number;
@@ -4030,39 +4095,33 @@ ${cleared.name} Zone Liberated
     (fish as Sprite).tint = look.tint;
     container.addChild(fish);
 
-    const startX = Math.random() * SIZE_X;
-    const startY = SIZE_Y + SHARK_EXODUS_MARGIN;
-    const endX = startX < SIZE_X / 2 ? -SHARK_EXODUS_MARGIN : SIZE_X + SHARK_EXODUS_MARGIN;
-    const endY = -SHARK_EXODUS_MARGIN;
-
-    const dx = endX - startX;
-    const dy = endY - startY;
-    const length = Math.hypot(dx, dy) || 1;
-    const speed = SHARK_EXODUS_SPEED * (0.75 + Math.random() * 0.5);
-
+    const lane = Math.random() < 0.5 ? 0 : 1;
+    const acc = EXODUS_LANE_LENGTHS[lane];
     const base = SHARK_BASE_SCALE * SHARK_KIND_SCALE[kind] * sizeMultiplier;
-    const p: ProcessionShark = {
+
+    this.procession.push({
       sprite: container,
-      x: startX + dx * progress,
-      y: startY + dy * progress,
-      vx: (dx / length) * speed,
-      vy: (dy / length) * speed,
+      lane,
+      dist: acc[acc.length - 1] * progress,
+      speed: SHARK_EXODUS_SPEED * (0.75 + Math.random() * 0.5),
+      // Spread across the lane rather than strung along its centre line, so each reads as a
+      // highway with width rather than as a single queue of sharks.
+      offset: (Math.random() - 0.5) * SHARK_EXODUS_LANE_WIDTH,
       scaleX: base * look.stretchX,
       scaleY: base * look.stretchY,
       wobblePhase: Math.random() * Math.PI * 2,
       wobbleRate: 2 + Math.random() * 2,
-    };
+    });
 
     // Smaller sharks sit further back, which gives the crowd depth without a second render pass.
     container.alpha = large ? 1 : 0.85;
-    this.procession.push(p);
     this.processionContainer.addChild(container);
   }
 
   /**
-   * Move the exodus and top it back up. Sharks are culled once fully clear of the top and one is
-   * started from below for each that left, which is what makes the flow continuous rather than a
-   * single wave that empties the screen halfway through the crossing.
+   * Walk the exodus along its lanes and top it back up. Sharks are culled at the far end of a lane
+   * and one is started at the near end for each that left, which is what makes the flow continuous
+   * rather than a single wave that empties the screen halfway through the crossing.
    */
   private updateSharkExodus(dt: number): void {
     if (this.procession.length === 0 && this.processionSpawnDebt === 0) return;
@@ -4071,25 +4130,28 @@ ${cleared.name} Zone Liberated
     const survivors: ProcessionShark[] = [];
 
     for (const p of this.procession) {
-      p.x += p.vx * dt;
-      p.y += p.vy * dt;
-
-      if (p.y < -SHARK_EXODUS_MARGIN) {
+      p.dist += p.speed * dt;
+      const acc = EXODUS_LANE_LENGTHS[p.lane];
+      if (p.dist >= acc[acc.length - 1]) {
         p.sprite.destroy({ children: true });
         this.processionSpawnDebt += 1;
         continue;
       }
 
-      p.sprite.x = p.x * scale + scale / 2;
-      p.sprite.y = p.y * scale + scale / 2;
+      const at = pointAlongLane(p.lane, p.dist);
+      // Offset across the lane: the tangent turned ninety degrees.
+      const x = at.x + -at.ty * p.offset;
+      const y = at.y + at.tx * p.offset;
+      p.sprite.x = x * scale + scale / 2;
+      p.sprite.y = y * scale + scale / 2;
 
       const fish = p.sprite.children[0] as Container;
       // The strip is drawn facing right, so a shark heading left is mirrored and its angle has to
-      // be measured against the mirrored axis or it would point back down the way it came.
-      const dir = p.vx >= 0 ? 1 : -1;
+      // be measured against the mirrored axis or it would point back down the lane it came up.
+      const dir = at.tx >= 0 ? 1 : -1;
       fish.scale.set(p.scaleX * dir, p.scaleY);
       fish.rotation =
-        Math.atan2(p.vy, p.vx * dir) + Math.sin(t * p.wobbleRate + p.wobblePhase) * 0.05;
+        Math.atan2(at.ty, at.tx * dir) + Math.sin(t * p.wobbleRate + p.wobblePhase) * 0.05;
 
       survivors.push(p);
     }
@@ -4100,6 +4162,7 @@ ${cleared.name} Zone Liberated
       this.spawnProcessionShark(0);
     }
   }
+
 
   /**
    * The far side of a story screen that ends its run - the Campaign's 10a. Everything the run was
