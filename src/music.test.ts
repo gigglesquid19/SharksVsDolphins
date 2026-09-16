@@ -5,6 +5,7 @@ import {
   BOSS_TRACKS,
   MENU_TRACK,
   nextTrackIn,
+  OPENING_TRACKS,
   pickRandomTrack,
   trackTitle,
 } from './music';
@@ -22,6 +23,30 @@ describe('track lists', () => {
 
   it('gives every zone at least one track', () => {
     for (const zone of AMBIENT_ZONES) expect(zone.length).toBeGreaterThan(0);
+  });
+});
+
+describe('OPENING_TRACKS', () => {
+  it('offers exactly the two tracks a run may open on', () => {
+    expect(OPENING_TRACKS.map(trackTitle).sort()).toEqual([
+      'Fantasy Worlds – Enchanted Garden',
+      'Ocean Waves Chill',
+    ]);
+  });
+
+  it('draws them from zone 1, so skipping forward still walks that pool', () => {
+    // If an opening track were not in the zone's own pool, nextTrackIn would not recognise it and
+    // the skip button would jump the player to the top of zone 1 instead of to the next track.
+    for (const track of OPENING_TRACKS) {
+      expect(AMBIENT_ZONES[0]).toContain(track);
+      expect(AMBIENT_ZONES[0]).toContain(nextTrackIn(track));
+    }
+  });
+
+  it('narrows the opening without shrinking the zone', () => {
+    // The other two Eutrophic tracks are kept out of the opening slot only, not out of the zone.
+    expect(OPENING_TRACKS.length).toBeLessThan(AMBIENT_ZONES[0].length);
+    expect(AMBIENT_ZONES[0]).toHaveLength(4);
   });
 });
 

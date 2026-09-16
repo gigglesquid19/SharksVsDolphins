@@ -39,6 +39,18 @@ export const AMBIENT_ZONES: readonly (readonly string[])[] = [
   ],
 ];
 
+/**
+ * The two tracks a run is allowed to open on. Zone 1's pool of four plays across the whole of the
+ * Eutrophic, but the first thing heard when a run actually starts is narrowed to these: they are
+ * the two that set the tone the game opens on, and a run should not open on a coin toss between
+ * four moods. Both are already in the zone 1 pool, so skipping forward still walks that pool
+ * normally and the other two are only kept out of the opening slot, not out of the zone.
+ */
+export const OPENING_TRACKS: readonly string[] = [
+  `${B}music/ambient/zone1/ocean-waves-chill.mp3`,
+  `${B}music/ambient/zone1/enchanted-garden.mp3`,
+];
+
 export const BOSS_TRACKS = [
   `${B}music/boss/mad-world.mp3`,
   `${B}music/boss/dark-fight.mp3`,

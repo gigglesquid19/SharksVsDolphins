@@ -68,7 +68,7 @@ import {
 } from './scoring';
 import { RunCheckpoint, clearRunCheckpoint, saveRunCheckpoint } from './runState';
 import { hasSeenHint, markHintSeen, HintId } from './tutorialHints';
-import { ambientTracksForLevel, BOSS_TRACKS, MENU_TRACK, pickRandomTrack } from './music';
+import { ambientTracksForLevel, BOSS_TRACKS, MENU_TRACK, OPENING_TRACKS, pickRandomTrack } from './music';
 import { ACHIEVEMENTS, AchievementId, getUnlockedMap, unlock } from './achievements';
 import { bumpLifetime, recordPlayDay } from './lifetimeStats';
 import {
@@ -2680,7 +2680,11 @@ ${zone.depth}`, 'levelup', duration + 1400);
 
     const previousWasBoss = this.currentLevel > 1 && getLevelConfig(this.currentLevel - 1).matriarch;
     if (this.currentLevel === 1 || previousWasBoss) {
-      this.onMusicTrackChange?.(pickRandomTrack(ambientTracksForLevel(this.currentLevel)));
+      // A run opens on one of two tracks rather than on any of zone 1's four - see OPENING_TRACKS.
+      // Every later ambient change draws from the whole pool of whatever zone it lands in.
+      const pool =
+        this.currentLevel === 1 ? OPENING_TRACKS : ambientTracksForLevel(this.currentLevel);
+      this.onMusicTrackChange?.(pickRandomTrack(pool));
     }
   }
 
