@@ -157,8 +157,12 @@ export interface StoryInterstitial {
    * 'sharkExodus' is the Campaign's closing image, the sharks abandoning the Shallows.
    * 'tigerPatrol' is its opening one: a pack crosses in front of the hidden player, holds, and
    * leaves east, and the player follows it into level 1.
+   * 'matriarchDefeat' is Depthless's own: the Matriarch just beaten in the level behind this
+   * screen settles onto the seabed and a scripted conversation plays over her - see
+   * startMatriarchDefeatScene() in game.ts. Only levels with a scripted defeat carry it; every
+   * other Matriarch level still has her flee and return, exactly as before.
    */
-  spectacle?: 'sharkExodus' | 'tigerPatrol';
+  spectacle?: 'sharkExodus' | 'tigerPatrol' | 'matriarchDefeat';
   /**
    * Holds the exit prompt back until the spectacle has played out, so the screen is watched before
    * it is crossed. Without it the prompt is up the moment the screen appears.
@@ -172,11 +176,35 @@ export interface StoryInterstitial {
    */
   descend?: boolean;
   /**
-   * Nothing reads this yet. The screens are wordless for now and the art carries them on its own,
-   * but characters and dialogue are planned for them, so the shape that will hold it is named here
-   * rather than bolted on later.
+   * The Matriarch and Echo's scripted back-and-forth on a 'matriarchDefeat' screen, shown one line
+   * at a time over her sunk body - see showNextConversationLine() in game.ts. The lines below are
+   * placeholders only, each marked [PLACEHOLDER]: the real script for each of these three
+   * encounters is written by hand, not generated, and belongs here once it exists.
    */
-  dialogue?: string[];
+  conversation?: ConversationLine[];
+}
+
+/** Who is speaking a line of a Matriarch-defeat conversation - see StoryInterstitial.conversation. */
+export type ConversationSpeaker = 'matriarch' | 'echo';
+
+export interface ConversationLine {
+  speaker: ConversationSpeaker;
+  /** What they say. Echo's lines are hers even though nothing on screen draws her speaking. */
+  line: string;
+}
+
+/**
+ * A short shape for a placeholder script: the Matriarch opens, Echo answers, the Matriarch presses
+ * once more, Echo closes it. Four lines is enough to prove the conversation plays correctly without
+ * pretending to be the real writing - see the field doc on `conversation`.
+ */
+function placeholderConversation(level: number): ConversationLine[] {
+  return [
+    { speaker: 'matriarch', line: `[PLACEHOLDER] Matriarch, level ${level}, line 1` },
+    { speaker: 'echo', line: `[PLACEHOLDER] Echo, level ${level}, reply` },
+    { speaker: 'matriarch', line: `[PLACEHOLDER] Matriarch, level ${level}, line 2` },
+    { speaker: 'echo', line: `[PLACEHOLDER] Echo, level ${level}, closing line` },
+  ];
 }
 
 export const STORY_INTERSTITIALS: StoryInterstitial[] = [
@@ -184,9 +212,15 @@ export const STORY_INTERSTITIALS: StoryInterstitial[] = [
   { afterLevel: 10, mode: 'campaign', id: '10a', endsRun: true, descend: true, spectacle: 'sharkExodus' },
   // The four Depthless zone transitions. Each sits on a Matriarch level and on a zone boundary -
   // the two coincide at every tenth level - and each is left by descending into the drop.
-  { afterLevel: 10, mode: 'endless', id: '10a', descend: true },
-  { afterLevel: 20, mode: 'endless', id: '20a', descend: true },
-  { afterLevel: 30, mode: 'endless', id: '30a', descend: true },
+  //
+  // The first three carry a scripted defeat: the Matriarch beaten on that level settles on the
+  // seabed here and a conversation plays over her before the descent unlocks - see
+  // startMatriarchDefeatScene() in game.ts. That is a "for now" scope, not a rule: 40 has no
+  // conversation yet, so a Matriarch beaten there (and every tenth level past it) still flees and
+  // returns as she always has. Add a fourth conversation here when there is one to add.
+  { afterLevel: 10, mode: 'endless', id: '10a', descend: true, spectacle: 'matriarchDefeat', exitAfterSpectacle: true, conversation: placeholderConversation(10) },
+  { afterLevel: 20, mode: 'endless', id: '20a', descend: true, spectacle: 'matriarchDefeat', exitAfterSpectacle: true, conversation: placeholderConversation(20) },
+  { afterLevel: 30, mode: 'endless', id: '30a', descend: true, spectacle: 'matriarchDefeat', exitAfterSpectacle: true, conversation: placeholderConversation(30) },
   { afterLevel: 40, mode: 'endless', id: '40a', descend: true },
   // Mid-zone story beats. Ordinary crossings: no Matriarch, no descent, swim east and carry on.
   { afterLevel: 17, mode: 'endless', id: '17a' },

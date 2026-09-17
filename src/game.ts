@@ -36,6 +36,7 @@ import { sfx } from './sfx';
 import { recordEncounter, recordSharkEncounter } from './sharkopedia';
 import { HUNTING_MODE_POD_SIZE, podRequirement } from './sharks';
 import {
+  ConversationLine,
   LEVELS,
   LevelConfig,
   StoryInterstitial,
@@ -470,6 +471,35 @@ const TIGER_PATROL_MARGIN = 34;
 /** Where Echo waits out the pack: the bottom-left corner, tucked in against the floor. */
 const HIDING_SPOT_X = 8;
 const HIDING_SPOT_Y = SIZE_Y - 13;
+
+/**
+ * The Matriarch's defeat scene, on 10a/20a/30a: her body settles onto the seabed and a scripted
+ * conversation plays over it before the descent unlocks. Scenery, on the same terms as the exodus
+ * and the tiger patrol - a plain shark sprite in the scenery layer, never in `this.sharks`, so
+ * nothing about it can be fought, collided with, or mistaken for a live threat.
+ */
+const MATRIARCH_SETTLE_SECONDS = 1.6;
+/** How far above her resting spot she starts, so the settle reads as a fall rather than a fade-in. */
+const MATRIARCH_SETTLE_DROP = 14;
+/** Gentle idle bob once she has settled, so the scene does not read as a static cutout. */
+const MATRIARCH_IDLE_BOB = 1.3;
+
+/**
+ * Where she comes to rest on each screen, picked to sit on the visible rock rather than out over
+ * the open drop each of these screens is built around. Approximate, and meant to be nudged once
+ * seen against the real art rather than trusted as exact.
+ */
+const MATRIARCH_REST_SPOTS: Record<string, { x: number; y: number }> = {
+  '10a': { x: 22, y: 108 },
+  '20a': { x: 24, y: 96 },
+  '30a': { x: 20, y: 84 },
+};
+
+interface MatriarchScene {
+  sprite: Container;
+  /** World-space resting Y, in pixels - the settle animates toward this and the idle bob plays around it. */
+  restYPx: number;
+}
 
 interface PatrolShark {
   sprite: Container;
@@ -1105,6 +1135,16 @@ export class Game {
   private patrolY = 0;
   /** Fractional sharks owed to the exodus, carried between frames so the flow is framerate-independent. */
   private processionSpawnDebt = 0;
+  private matriarchScene: MatriarchScene | null = null;
+  /** 'done' covers both never-started and finished - either way nothing is left to play or read. */
+  private matriarchScenePhase: 'settling' | 'talking' | 'done' = 'done';
+  private matriarchSettleT = 0;
+  private conversationLines: ConversationLine[] = [];
+  /** -1 before the first line has been shown. */
+  private conversationIndex = -1;
+  private matriarchDialogueEl: HTMLDivElement | null;
+  private matriarchDialogueSpeakerEl: HTMLDivElement | null;
+  private matriarchDialogueTextEl: HTMLDivElement | null;
   private awaitingLevelUpChoice = false;
   private awaitingSharkWarning = false;
   private awaitingRunSummary = false;
@@ -1394,6 +1434,9 @@ export class Game {
     this.bannerEl = inputs.banner;
     this.newWatersPromptEl = inputs.newWatersPrompt;
     this.descendPromptEl = document.getElementById('descendPrompt') as HTMLDivElement | null;
+    this.matriarchDialogueEl = document.getElementById('matriarchDialogue') as HTMLDivElement | null;
+    this.matriarchDialogueSpeakerEl = document.getElementById('matriarchDialogueSpeaker') as HTMLDivElement | null;
+    this.matriarchDialogueTextEl = document.getElementById('matriarchDialogueText') as HTMLDivElement | null;
     this.pauseOverlayEl = inputs.pauseOverlay;
     this.schoolBtnWrap = inputs.schoolBtnWrap;
     this.megaPodBtnWrap = document.getElementById('megaPodBtnWrap') as HTMLDivElement | null;
@@ -2993,11 +3036,12 @@ ${zone.depth}`, 'levelup', duration + 1400);
     requestAnimationFrame(animate);
   }
 
-  /** Endless mode: instead of being destroyed, the Matriarch flashes damaged and swims off - she'll be back. */
+  /**
+   * Endless mode, on a Matriarch level with no scripted defeat: instead of being destroyed, she
+   * flashes damaged and darts off - she'll be back at the next tenth level. See sinkMatriarch()
+   * for the levels that do have one, where this beat is a real defeat instead.
+   */
   private fleeMatriarch(shark: Shark): void {
-    // The Matriarch first appears at level 10, then every 10 levels; seeing her off at 20+
-    // means the player has now survived a second encounter.
-    if (this.currentLevel >= 20) this.tryUnlock('matriarchRematch');
     const sprite = this.sharkSprites.get(shark);
     if (sprite) {
       this.disposeSharkLights(sprite);
@@ -3024,6 +3068,44 @@ ${zone.depth}`, 'levelup', duration + 1400);
     }
     this.setStatus('The Matriarch flees, wounded...');
     this.showBanner('Matriarch Flees!', 'storm', 2600);
+  }
+
+  /**
+   * Endless mode, on a Matriarch level with a scripted defeat (10/20/30 - see STORY_INTERSTITIALS
+   * in levels.ts): she is genuinely beaten rather than fleeing to return. She rolls, dulls and
+   * sinks out of the fight rather than darting sideways and fading - the same wording the Campaign
+   * uses for a real kill (see finishMatriarchWithMegaPod), because that is what this now is. The
+   * screen ahead picks her up already resting on the seabed - see startMatriarchDefeatScene().
+   */
+  private sinkMatriarch(shark: Shark): void {
+    const sprite = this.sharkSprites.get(shark);
+    if (sprite) {
+      this.disposeSharkLights(sprite);
+      this.sharkSprites.delete(shark);
+      const fish = sprite.getChildByName('fish');
+      if (fish) (fish as unknown as { tint: number }).tint = 0x8a5a5a;
+
+      const startY = sprite.y;
+      const startRotation = sprite.rotation;
+      const start = performance.now();
+      const DURATION = 1400;
+      const DRIFT = 220;
+      const animate = (now: number) => {
+        const t = Math.min(1, (now - start) / DURATION);
+        sprite.y = startY + t * DRIFT;
+        sprite.rotation = startRotation + t * 0.9;
+        sprite.alpha = 1 - t;
+        if (t < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          this.entityContainer.removeChild(sprite);
+          sprite.destroy();
+        }
+      };
+      requestAnimationFrame(animate);
+    }
+    this.setStatus('The Matriarch is defeated!');
+    this.showBanner('Matriarch Defeated!', 'victory', 1800);
   }
 
   private addSharkSprite(shark: Shark): void {
@@ -4013,6 +4095,123 @@ ${cleared.name} Zone Liberated
   }
 
   /**
+   * The Matriarch's body, settling onto the seabed at the start of a 'matriarchDefeat' screen.
+   * Drawn at her true in-water size and only lightly darkened, so she stays the clear focus of the
+   * scene rather than reading as background scenery the way the exodus does.
+   */
+  private startMatriarchDefeatScene(story: StoryInterstitial): void {
+    this.stopMatriarchDefeatScene();
+    this.conversationLines = story.conversation ?? [];
+    this.conversationIndex = -1;
+
+    const textureSet = this.sharkTextureSets.greatWhite;
+    const rest = MATRIARCH_REST_SPOTS[story.id] ?? { x: SIZE_X * 0.3, y: SIZE_Y - 24 };
+    const scale = WORLD_SCALE;
+    const restYPx = rest.y * scale + scale / 2;
+
+    if (textureSet) {
+      const look = SHARK_KIND_LOOK.greatWhite;
+      let fish: Container;
+      try {
+        fish = createSharkSprite(textureSet, look.animationSpeed);
+      } catch (err) {
+        console.warn('Matriarch scene sprite failed:', err);
+        fish = new Container();
+      }
+      // Lightly darkened rather than tinted the way the exodus is - she is the one thing on this
+      // screen the player is meant to look straight at, not something glimpsed at a distance.
+      (fish as Sprite).tint = darkenTint(look.tint, 0.15);
+      const base = SHARK_BASE_SCALE * SHARK_KIND_SCALE.greatWhite * (LARGE_SHARK_SIZE_MULTIPLIER * 2);
+      fish.scale.set(base * look.stretchX, base * look.stretchY);
+      // Rolled onto her side rather than upright - lying, not swimming.
+      fish.rotation = -0.14;
+
+      const container = new Container();
+      container.addChild(fish);
+      container.x = rest.x * scale + scale / 2;
+      container.y = restYPx - MATRIARCH_SETTLE_DROP * scale;
+      this.processionContainer.addChild(container);
+      this.matriarchScene = { sprite: container, restYPx };
+    }
+
+    this.matriarchScenePhase = 'settling';
+    this.matriarchSettleT = 0;
+  }
+
+  private stopMatriarchDefeatScene(): void {
+    this.matriarchScene?.sprite.destroy({ children: true });
+    this.matriarchScene = null;
+    this.matriarchScenePhase = 'done';
+    this.conversationLines = [];
+    this.conversationIndex = -1;
+    this.matriarchDialogueEl?.classList.add('hidden');
+  }
+
+  /**
+   * Settles the Matriarch onto the seabed, then holds her there with a slow idle bob for as long
+   * as the conversation is showing. The conversation itself is turn-based - advanced only by the
+   * player tapping the dialogue box, see advanceMatriarchDialogue() - so nothing here drives it
+   * forward on its own; this only ever starts the first line once she has come to rest.
+   */
+  private updateMatriarchDefeatScene(dt: number): void {
+    if (this.matriarchScenePhase === 'done' || !this.matriarchScene) return;
+    const scale = WORLD_SCALE;
+
+    if (this.matriarchScenePhase === 'settling') {
+      this.matriarchSettleT = Math.min(1, this.matriarchSettleT + dt / MATRIARCH_SETTLE_SECONDS);
+      const eased = 1 - Math.pow(1 - this.matriarchSettleT, 3);
+      const startY = this.matriarchScene.restYPx - MATRIARCH_SETTLE_DROP * scale;
+      this.matriarchScene.sprite.y = startY + (this.matriarchScene.restYPx - startY) * eased;
+      if (this.matriarchSettleT >= 1) {
+        this.matriarchScenePhase = 'talking';
+        this.showNextConversationLine();
+      }
+      return;
+    }
+
+    const t = performance.now() / 1000;
+    this.matriarchScene.sprite.y = this.matriarchScene.restYPx + Math.sin(t * 0.6) * MATRIARCH_IDLE_BOB;
+  }
+
+  /**
+   * Shows the next line of the conversation, or ends the scene once the last one has been read.
+   * Called once automatically when the Matriarch finishes settling, and after that only from
+   * advanceMatriarchDialogue() - the player reads at their own pace, nothing here times out.
+   */
+  private showNextConversationLine(): void {
+    this.conversationIndex++;
+    const line = this.conversationLines[this.conversationIndex];
+    if (!line) {
+      this.finishMatriarchDialogue();
+      return;
+    }
+    if (this.matriarchDialogueSpeakerEl) {
+      this.matriarchDialogueSpeakerEl.textContent = line.speaker === 'matriarch' ? 'The Matriarch' : getDolphinName();
+    }
+    if (this.matriarchDialogueTextEl) this.matriarchDialogueTextEl.textContent = line.line;
+    this.positionAtCanvasBottom(this.matriarchDialogueEl, 12);
+    this.matriarchDialogueEl?.classList.remove('hidden');
+    this.matriarchDialogueEl?.classList.toggle('matriarch-dialogue-echo', line.speaker === 'echo');
+  }
+
+  /** The conversation is over: the dialogue box comes down and the descent unlocks. */
+  private finishMatriarchDialogue(): void {
+    this.matriarchDialogueEl?.classList.add('hidden');
+    this.matriarchScenePhase = 'done';
+    this.armStoryScreenExit();
+  }
+
+  /**
+   * Advances the Matriarch's conversation by one line - the dialogue box's own click handler,
+   * wired in main.ts. A no-op outside the 'talking' phase, so a stray click while she is still
+   * settling, or after the scene has ended, does nothing.
+   */
+  advanceMatriarchDialogue(): void {
+    if (this.matriarchScenePhase !== 'talking') return;
+    this.showNextConversationLine();
+  }
+
+  /**
    * Put the exit prompt up on a story screen. Immediate on most, earned on 0a.
    *
    * A descent screen points down and says so; every other screen points east as it always has.
@@ -4037,7 +4236,17 @@ ${cleared.name} Zone Liberated
    * instead of over the edge the player is being told to swim through.
    */
   private positionDescendPrompt(): void {
-    const el = this.descendPromptEl;
+    this.positionAtCanvasBottom(this.descendPromptEl, 12);
+  }
+
+  /**
+   * Sits `el` just inside the bottom of the water, `marginPx` above the waterline. Shared by the
+   * descend prompt and the Matriarch's dialogue box - both are positioned against the canvas
+   * rather than against their own containing block, which is the whole canvas-wrap. That block
+   * also holds the on-screen controls, so a plain CSS offset put either one over the joystick
+   * instead of over the water's edge.
+   */
+  private positionAtCanvasBottom(el: HTMLElement | null, marginPx: number): void {
     const wrap = el?.parentElement;
     if (!el || !wrap) return;
     // Measured off the laid-out canvas by rect rather than off `this.canvas`, which is the element
@@ -4046,7 +4255,7 @@ ${cleared.name} Zone Liberated
     const live = wrap.querySelector('canvas');
     if (!live) return;
     const gap = wrap.getBoundingClientRect().bottom - live.getBoundingClientRect().bottom;
-    el.style.bottom = `${Math.max(0, gap) + 12}px`;
+    el.style.bottom = `${Math.max(0, gap) + marginPx}px`;
   }
 
   /** Takes down whichever exit prompt is showing. */
@@ -4064,6 +4273,7 @@ ${cleared.name} Zone Liberated
   private stopSpectacle(): void {
     this.stopSharkExodus();
     this.stopTigerPatrol();
+    this.stopMatriarchDefeatScene();
   }
 
   /**
@@ -4243,12 +4453,18 @@ ${cleared.name} Zone Liberated
       this.showBanner(`Stay hidden
 Let the pack pass`, 'storm', 3200);
       this.setStatus('Stay hidden..');
+    } else if (story.spectacle === 'matriarchDefeat') {
+      // No banner here - "Matriarch Defeated!" just played moments ago, in the level behind this
+      // screen (see sinkMatriarch), and a second one stacked on top of it would read as a glitch
+      // rather than a second beat.
+      this.setStatus('The Matriarch falls silent...');
     } else {
       this.setStatus('Swim east to continue');
     }
 
     if (story.spectacle === 'sharkExodus') this.startSharkExodus();
     if (story.spectacle === 'tigerPatrol') this.startTigerPatrol();
+    if (story.spectacle === 'matriarchDefeat') this.startMatriarchDefeatScene(story);
 
     // Most screens are crossable the moment they appear. One that gates its exit stays shut until
     // its spectacle has played out - on 0a, until the pack the player is meant to follow has gone.
@@ -6354,7 +6570,14 @@ Let the pack pass`, 'storm', 3200);
         } else if (shark === this.matriarch && this.mode === 'endless') {
           this.particles.emit('hit', shark._x * scale + scale / 2, shark._y * scale + scale / 2, 16, { speed: 3, life: 0.6 });
           this.triggerBigKillFeedback('matriarch');
-          this.fleeMatriarch(shark);
+          // The Matriarch first appears at level 10, then every 10 levels; seeing this one off at
+          // 20+ means the player has now survived a second encounter - true whether she is fleeing
+          // or genuinely defeated here, so the check sits above the fork rather than inside either
+          // branch of it.
+          if (this.currentLevel >= 20) this.tryUnlock('matriarchRematch');
+          const scriptedDefeat = storyInterstitialAfter(this.currentLevel, 'endless')?.spectacle === 'matriarchDefeat';
+          if (scriptedDefeat) this.sinkMatriarch(shark);
+          else this.fleeMatriarch(shark);
         } else {
           this.particles.emit('hit', shark._x * scale + scale / 2, shark._y * scale + scale / 2, 16, { speed: 3, life: 0.6 });
           this.sharksKilled++;
@@ -6565,6 +6788,7 @@ Let the pack pass`, 'storm', 3200);
     if (this.storyInterstitial) {
       this.updateSharkExodus(dt);
       this.updateTigerPatrol(dt);
+      this.updateMatriarchDefeatScene(dt);
     }
 
     // Nothing arrives on a story screen: no storm, no swarm, no kraken, no megamouth. It is a

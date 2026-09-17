@@ -600,6 +600,9 @@ const inputs = {
   document.getElementById('megaShrimpGreen')!.addEventListener('click', () => game.chooseUpgrade('boost'));
   document.getElementById('sharkWarningContinueBtn')!.addEventListener('click', () => game.dismissSharkWarning());
   document.getElementById('tutorialHintContinueBtn')!.addEventListener('click', () => game.dismissTutorialHint());
+  // The whole dialogue box is the tap target, not a button inside it - there is nothing else to
+  // tap on the Matriarch's defeat screen.
+  document.getElementById('matriarchDialogue')!.addEventListener('click', () => game.advanceMatriarchDialogue());
   document.getElementById('leaderboardCloseBtn')!.addEventListener('click', () => game.hideLeaderboard());
   document.getElementById('resetBtn')!.addEventListener('click', () => game.reset());
   document.getElementById('fullscreenBtn')!.addEventListener('click', toggleFullscreen);

@@ -1900,6 +1900,54 @@ button.mega-shrimp.green {
   50% { transform: translateX(-50%) translateY(10px); }
 }
 
+/*
+ * The Matriarch's defeat conversation. A textbox docked to the bottom of the water, not a
+ * full-screen card like the shark-warning and tutorial-hint overlays - the whole point of the
+ * scene is that her sunk body and the drop behind her stay visible while the lines play, so
+ * covering the canvas would undo it. Positioned the same way as .descend-prompt: absolute against
+ * .canvas-wrap, at a `bottom` set from the live canvas in JS rather than a fixed CSS offset, since
+ * the wrap is taller than the water once the on-screen controls are counted in.
+ */
+.matriarch-dialogue {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 18px;
+  z-index: 26;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 18px;
+  background: var(--panel);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px);
+  cursor: pointer;
+}
+.matriarch-dialogue.hidden { display: none; }
+.matriarch-dialogue-speaker {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--shark);
+}
+/* Echo's lines get the dolphin's own colour, so who is speaking is legible at a glance without
+   reading the name every time. */
+.matriarch-dialogue.matriarch-dialogue-echo .matriarch-dialogue-speaker { color: var(--dolphin); }
+.matriarch-dialogue-text {
+  font-size: 0.95rem;
+  line-height: 1.4;
+  color: var(--text);
+}
+.matriarch-dialogue-hint {
+  align-self: flex-end;
+  font-size: 0.68rem;
+  opacity: 0.65;
+  margin-top: 2px;
+}
+
 @keyframes newWatersPulse {
   0%, 100% { transform: translateY(-50%) translateX(0); }
   50% { transform: translateY(-50%) translateX(10px); }

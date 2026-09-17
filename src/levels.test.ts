@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { SharkKind } from './sprites';
 import {
+  ConversationLine,
   DEPTH_ZONES,
   GREAT_WHITE_PAIR_FROM_LEVEL,
   LEVELS,
@@ -159,24 +160,35 @@ describe('story interstitials', () => {
     expect(storyInterstitialAfter(LEVELS.length + 1, 'campaign')).toBeNull();
   });
 
-  it('bookends the Campaign with its two spectacles and leaves Depthless plain', () => {
-    // The tiger pack opens the Campaign and the exodus closes it; every Depthless screen is
-    // plain water the player simply swims through.
+  it('bookends the Campaign with its two spectacles, and gives Depthless its own three', () => {
+    // The tiger pack opens the Campaign and the exodus closes it; the Matriarch's defeat is
+    // Depthless's own spectacle, on the three levels that have a scripted one so far.
     expect(storyInterstitialAfter(OPENING_STORY_LEVEL, 'campaign')?.spectacle).toBe('tigerPatrol');
     expect(storyInterstitialAfter(10, 'campaign')?.spectacle).toBe('sharkExodus');
-    expect(STORY_INTERSTITIALS.filter((s) => s.spectacle).every((s) => s.mode === 'campaign')).toBe(
-      true,
-    );
-    expect(STORY_INTERSTITIALS.filter((s) => s.mode === 'endless' && s.spectacle)).toHaveLength(0);
+    const endlessWithSpectacle = STORY_INTERSTITIALS.filter((s) => s.mode === 'endless' && s.spectacle);
+    expect([...endlessWithSpectacle.map((s) => s.afterLevel)].sort((a, b) => a - b)).toEqual([
+      10, 20, 30,
+    ]);
+    for (const s of endlessWithSpectacle) expect(s.spectacle).toBe('matriarchDefeat');
+    // 40a and the mid-zone screens are still plain water, swum through with nothing playing.
+    for (const level of [17, 29, 34, 39, 40]) {
+      expect(storyInterstitialAfter(level, 'endless')?.spectacle).toBeUndefined();
+    }
   });
 
-  it('gates the exit only on the screen the player is meant to watch first', () => {
-    // 0a holds its prompt back until the pack has left, because following it is the instruction.
-    // Every other screen, the exodus included, can be crossed the moment it appears.
+  it('gates the exit on every screen with something to watch first', () => {
+    // 0a holds its prompt back until the pack has left, and each Matriarch scene holds the
+    // descent back until the conversation is read - following/reading is the instruction on both.
+    // The plain exodus is the exception: it can be crossed the moment it appears.
     expect(storyInterstitialAfter(OPENING_STORY_LEVEL, 'campaign')?.exitAfterSpectacle).toBe(true);
     expect(storyInterstitialAfter(10, 'campaign')?.exitAfterSpectacle).toBeUndefined();
     const gated = STORY_INTERSTITIALS.filter((s) => s.exitAfterSpectacle);
-    expect(gated).toHaveLength(1);
+    expect([...gated.map((s) => `${s.mode}/${s.id}`)].sort()).toEqual([
+      'campaign/0a',
+      'endless/10a',
+      'endless/20a',
+      'endless/30a',
+    ]);
     // A gated screen with no spectacle would never open, so the two must travel together.
     for (const s of gated) expect(s.spectacle).toBeDefined();
   });
@@ -222,6 +234,49 @@ describe('story interstitials', () => {
       expect(screen?.descend).toBeUndefined();
       expect(getLevelConfigForMode(level, 'endless').matriarch).toBe(false);
     }
+  });
+
+  describe("the Matriarch's defeat conversation", () => {
+    const scriptedLevels = [10, 20, 30];
+
+    it('is carried only by the three levels with a scripted defeat', () => {
+      for (const level of scriptedLevels) {
+        expect(storyInterstitialAfter(level, 'endless')?.conversation?.length).toBeGreaterThan(0);
+      }
+      // 40a has no conversation yet - see the comment on the table - and neither does anything
+      // in the Campaign or a mid-zone screen.
+      for (const level of [17, 29, 34, 39, 40]) {
+        expect(storyInterstitialAfter(level, 'endless')?.conversation).toBeUndefined();
+      }
+      expect(storyInterstitialAfter(OPENING_STORY_LEVEL, 'campaign')?.conversation).toBeUndefined();
+      expect(storyInterstitialAfter(10, 'campaign')?.conversation).toBeUndefined();
+    });
+
+    it('is still a placeholder script, clearly marked as one', () => {
+      // Every line ships marked [PLACEHOLDER] until it is replaced with the real writing - this
+      // is the trip-wire that catches a placeholder script accidentally shipping as final text.
+      for (const level of scriptedLevels) {
+        const lines = storyInterstitialAfter(level, 'endless')!.conversation!;
+        for (const line of lines) expect(line.line).toContain('[PLACEHOLDER]');
+      }
+    });
+
+    it('alternates speakers, opening and closing with the same one', () => {
+      for (const level of scriptedLevels) {
+        const lines: ConversationLine[] = storyInterstitialAfter(level, 'endless')!.conversation!;
+        expect(lines[0].speaker).toBe('matriarch');
+        for (let i = 1; i < lines.length; i++) expect(lines[i].speaker).not.toBe(lines[i - 1].speaker);
+      }
+    });
+
+    it('writes a different script for each of the three encounters', () => {
+      // Not a content check - the placeholders are not the real writing - just a guard against a
+      // copy-paste that gave three levels the exact same lines.
+      const scripts = scriptedLevels.map((level) =>
+        storyInterstitialAfter(level, 'endless')!.conversation!.map((l) => l.line).join('|'),
+      );
+      expect(new Set(scripts).size).toBe(scriptedLevels.length);
+    });
   });
 
   it('tells each beat once, not once per lap of the Endless backgrounds', () => {
