@@ -4,6 +4,9 @@ import {
   ConversationLine,
   DEPTH_ZONES,
   GREAT_WHITE_PAIR_FROM_LEVEL,
+  MATRIARCH_DEFEAT_LEVELS,
+  MATRIARCH_LEVELS,
+  matriarchDefeatConversation,
   LEVELS,
   CAMPAIGN_LARGE_SHARK_COUNTS,
   SMALL_BEFORE_LARGE_UNTIL_LEVEL,
@@ -160,35 +163,23 @@ describe('story interstitials', () => {
     expect(storyInterstitialAfter(LEVELS.length + 1, 'campaign')).toBeNull();
   });
 
-  it('bookends the Campaign with its two spectacles, and gives Depthless its own three', () => {
-    // The tiger pack opens the Campaign and the exodus closes it; the Matriarch's defeat is
-    // Depthless's own spectacle, on the three levels that have a scripted one so far.
+  it('bookends the Campaign with its two spectacles and leaves every Depthless screen plain', () => {
+    // The tiger pack opens the Campaign and the exodus closes it. The Matriarch's defeat is not a
+    // screen spectacle at all - it happens in the level itself, before any of these screens are
+    // ever reached - so no Depthless screen carries a spectacle of its own.
     expect(storyInterstitialAfter(OPENING_STORY_LEVEL, 'campaign')?.spectacle).toBe('tigerPatrol');
     expect(storyInterstitialAfter(10, 'campaign')?.spectacle).toBe('sharkExodus');
-    const endlessWithSpectacle = STORY_INTERSTITIALS.filter((s) => s.mode === 'endless' && s.spectacle);
-    expect([...endlessWithSpectacle.map((s) => s.afterLevel)].sort((a, b) => a - b)).toEqual([
-      10, 20, 30,
-    ]);
-    for (const s of endlessWithSpectacle) expect(s.spectacle).toBe('matriarchDefeat');
-    // 40a and the mid-zone screens are still plain water, swum through with nothing playing.
-    for (const level of [17, 29, 34, 39, 40]) {
-      expect(storyInterstitialAfter(level, 'endless')?.spectacle).toBeUndefined();
-    }
+    expect(STORY_INTERSTITIALS.filter((s) => s.mode === 'endless' && s.spectacle)).toHaveLength(0);
   });
 
-  it('gates the exit on every screen with something to watch first', () => {
-    // 0a holds its prompt back until the pack has left, and each Matriarch scene holds the
-    // descent back until the conversation is read - following/reading is the instruction on both.
-    // The plain exodus is the exception: it can be crossed the moment it appears.
+  it('gates the exit only on the screen the player is meant to watch first', () => {
+    // 0a holds its prompt back until the pack has left, because following it is the instruction.
+    // Every Depthless screen, the three that follow a scripted defeat included, can be crossed
+    // the moment it appears - whatever happened to the Matriarch is already over by then.
     expect(storyInterstitialAfter(OPENING_STORY_LEVEL, 'campaign')?.exitAfterSpectacle).toBe(true);
     expect(storyInterstitialAfter(10, 'campaign')?.exitAfterSpectacle).toBeUndefined();
     const gated = STORY_INTERSTITIALS.filter((s) => s.exitAfterSpectacle);
-    expect([...gated.map((s) => `${s.mode}/${s.id}`)].sort()).toEqual([
-      'campaign/0a',
-      'endless/10a',
-      'endless/20a',
-      'endless/30a',
-    ]);
+    expect(gated).toHaveLength(1);
     // A gated screen with no spectacle would never open, so the two must travel together.
     for (const s of gated) expect(s.spectacle).toBeDefined();
   });
@@ -210,8 +201,10 @@ describe('story interstitials', () => {
   });
 
   it('descends at every zone boundary and nowhere else', () => {
-    // The four boundaries between the five depth zones, which are also the four Matriarch levels
-    // a descent can follow. 50 is the floor of the Hadal: the last zone, with nothing below it.
+    // The four boundaries between the five depth zones. 50 is the floor of the Hadal: the last
+    // zone, with nothing below it. Not every one of these still has a Matriarch guarding it - see
+    // MATRIARCH_LEVELS - the zone transition and the boss fight are two separate things that used
+    // to always coincide and now only mostly do.
     expect(descentLevels('endless')).toEqual([10, 20, 30, 40]);
     for (const zone of DEPTH_ZONES.slice(0, -1)) {
       expect(storyInterstitialAfter(zone.lastLevel, 'endless')?.descend).toBe(true);
@@ -219,12 +212,17 @@ describe('story interstitials', () => {
     expect(storyInterstitialAfter(DEPTH_ZONES[DEPTH_ZONES.length - 1].lastLevel, 'endless')).toBeNull();
   });
 
-  it('descends only from a Matriarch level', () => {
-    // The descent is the reward for the boss, so every one must land on a tenth level.
+  it('descends only on a tenth level, whether or not a Matriarch is there', () => {
+    // The zone boundary itself is what a descent marks, not the boss - 40 proves the two are
+    // independent: still a descend level, no Matriarch there any more (see MATRIARCH_LEVELS).
+    for (const level of descentLevels('endless')) expect(level % 10).toBe(0);
+  });
+
+  it('has a Matriarch behind three of its four descents, not all of them', () => {
     for (const level of descentLevels('endless')) {
-      expect(level % 10).toBe(0);
-      expect(getLevelConfigForMode(level, 'endless').matriarch).toBe(true);
+      expect(getLevelConfigForMode(level, 'endless').matriarch).toBe(MATRIARCH_LEVELS.includes(level));
     }
+    expect(getLevelConfigForMode(40, 'endless').matriarch).toBe(false);
   });
 
   it('keeps the mid-zone screens as ordinary east crossings', () => {
@@ -236,34 +234,56 @@ describe('story interstitials', () => {
     }
   });
 
-  describe("the Matriarch's defeat conversation", () => {
-    const scriptedLevels = [10, 20, 30];
+  describe('MATRIARCH_LEVELS', () => {
+    it('spawns a Matriarch only on 10, 20, 30 and 50 - not on every tenth level', () => {
+      expect([...MATRIARCH_LEVELS].sort((a, b) => a - b)).toEqual([10, 20, 30, 50]);
+      // The old rule was "every tenth level forever" - 40, 60, 70 and 80 would all have matched
+      // that and must not spawn one now.
+      for (const level of [40, 60, 70, 80]) expect(MATRIARCH_LEVELS.includes(level)).toBe(false);
+    });
 
-    it('is carried only by the three levels with a scripted defeat', () => {
+    it('is what getEndlessLevelConfig actually reads, not a parallel list', () => {
+      for (let level = 10; level <= 80; level += 10) {
+        expect(getEndlessLevelConfig(level).matriarch).toBe(MATRIARCH_LEVELS.includes(level));
+      }
+    });
+  });
+
+  describe("the Matriarch's defeat conversation", () => {
+    const scriptedLevels = [...MATRIARCH_DEFEAT_LEVELS];
+
+    it('is scripted for 10, 20 and 30 - a subset of MATRIARCH_LEVELS, not all of it', () => {
+      expect([...scriptedLevels].sort((a, b) => a - b)).toEqual([10, 20, 30]);
+      for (const level of scriptedLevels) expect(MATRIARCH_LEVELS.includes(level)).toBe(true);
       for (const level of scriptedLevels) {
-        expect(storyInterstitialAfter(level, 'endless')?.conversation?.length).toBeGreaterThan(0);
+        expect(matriarchDefeatConversation(level)?.length).toBeGreaterThan(0);
       }
-      // 40a has no conversation yet - see the comment on the table - and neither does anything
-      // in the Campaign or a mid-zone screen.
-      for (const level of [17, 29, 34, 39, 40]) {
-        expect(storyInterstitialAfter(level, 'endless')?.conversation).toBeUndefined();
+      // 50 spawns a Matriarch (see MATRIARCH_LEVELS) but has no script yet, so she still flees and
+      // returns there like any other unscripted encounter.
+      expect(matriarchDefeatConversation(50)).toBeNull();
+      for (const level of [17, 29, 34, 39, 40]) expect(matriarchDefeatConversation(level)).toBeNull();
+    });
+
+    it('is not attached to any story screen - it plays in the level, not on the (a) after it', () => {
+      // The whole reason for this change: the old version put the conversation and her sunk body
+      // on the screen after the level. Nothing on StoryInterstitial should carry it any more.
+      for (const s of STORY_INTERSTITIALS) {
+        expect((s as { conversation?: unknown }).conversation).toBeUndefined();
       }
-      expect(storyInterstitialAfter(OPENING_STORY_LEVEL, 'campaign')?.conversation).toBeUndefined();
-      expect(storyInterstitialAfter(10, 'campaign')?.conversation).toBeUndefined();
     });
 
     it('is still a placeholder script, clearly marked as one', () => {
       // Every line ships marked [PLACEHOLDER] until it is replaced with the real writing - this
       // is the trip-wire that catches a placeholder script accidentally shipping as final text.
       for (const level of scriptedLevels) {
-        const lines = storyInterstitialAfter(level, 'endless')!.conversation!;
+        const lines = matriarchDefeatConversation(level)!;
         for (const line of lines) expect(line.line).toContain('[PLACEHOLDER]');
       }
     });
 
     it('alternates speakers, opening and closing with the same one', () => {
       for (const level of scriptedLevels) {
-        const lines: ConversationLine[] = storyInterstitialAfter(level, 'endless')!.conversation!;
+        const lines: ConversationLine[] = matriarchDefeatConversation(level)!;
         expect(lines[0].speaker).toBe('matriarch');
         for (let i = 1; i < lines.length; i++) expect(lines[i].speaker).not.toBe(lines[i - 1].speaker);
       }
@@ -273,7 +293,7 @@ describe('story interstitials', () => {
       // Not a content check - the placeholders are not the real writing - just a guard against a
       // copy-paste that gave three levels the exact same lines.
       const scripts = scriptedLevels.map((level) =>
-        storyInterstitialAfter(level, 'endless')!.conversation!.map((l) => l.line).join('|'),
+        matriarchDefeatConversation(level)!.map((l) => l.line).join('|'),
       );
       expect(new Set(scripts).size).toBe(scriptedLevels.length);
     });
@@ -285,13 +305,13 @@ describe('story interstitials', () => {
     expect(storyInterstitialAfter(67, 'endless')).toBeNull();
   });
 
-  it('leaves the Matriarch levels where they were', () => {
+  it('sits on the tenth level it names, not a level shifted by having been inserted', () => {
     // The whole reason these are not numbered levels: inserting one would shift every depth
-    // above it and move the bosses off the tens.
-    for (const s of endlessScreens) {
-      expect(getLevelConfigForMode(s.afterLevel + 1, 'endless').matriarch).toBe(
-        (s.afterLevel + 1) % 10 === 0,
-      );
+    // above it off the tens. Every descend screen's own afterLevel is checked directly against
+    // that arithmetic, rather than through the matriarch flag - MATRIARCH_LEVELS is now an
+    // independent list, not derived from afterLevel, so it no longer proves this on its own.
+    for (const s of endlessScreens.filter((s) => s.descend)) {
+      expect(s.afterLevel % 10).toBe(0);
     }
   });
 

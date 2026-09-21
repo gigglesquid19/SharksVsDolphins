@@ -48,6 +48,7 @@ import {
   getLevelConfigForMode,
   isMesopelagicLevel,
   isSandboxLevel,
+  matriarchDefeatConversation,
   OPENING_STORY_LEVEL,
   storyInterstitialAfter,
   zoneClearedAt,
@@ -473,33 +474,14 @@ const HIDING_SPOT_X = 8;
 const HIDING_SPOT_Y = SIZE_Y - 13;
 
 /**
- * The Matriarch's defeat scene, on 10a/20a/30a: her body settles onto the seabed and a scripted
- * conversation plays over it before the descent unlocks. Scenery, on the same terms as the exodus
- * and the tiger patrol - a plain shark sprite in the scenery layer, never in `this.sharks`, so
- * nothing about it can be fought, collided with, or mistaken for a live threat.
+ * The Matriarch's scripted defeat, on Depthless levels 10, 20 and 30 (MATRIARCH_DEFEAT_LEVELS in
+ * levels.ts - "for now", not every Matriarch level; 50 still flees and returns like any other
+ * unscripted one). She settles on the seabed of the level itself, right where she was beaten, and
+ * a conversation with Echo plays over the water before the level completes - not on the
+ * zone-transition screen that follows, which never shows her at all. See sinkMatriarch() and
+ * startMatriarchDialogue() below.
  */
-const MATRIARCH_SETTLE_SECONDS = 1.6;
-/** How far above her resting spot she starts, so the settle reads as a fall rather than a fade-in. */
-const MATRIARCH_SETTLE_DROP = 14;
-/** Gentle idle bob once she has settled, so the scene does not read as a static cutout. */
-const MATRIARCH_IDLE_BOB = 1.3;
-
-/**
- * Where she comes to rest on each screen, picked to sit on the visible rock rather than out over
- * the open drop each of these screens is built around. Approximate, and meant to be nudged once
- * seen against the real art rather than trusted as exact.
- */
-const MATRIARCH_REST_SPOTS: Record<string, { x: number; y: number }> = {
-  '10a': { x: 22, y: 108 },
-  '20a': { x: 24, y: 96 },
-  '30a': { x: 20, y: 84 },
-};
-
-interface MatriarchScene {
-  sprite: Container;
-  /** World-space resting Y, in pixels - the settle animates toward this and the idle bob plays around it. */
-  restYPx: number;
-}
+const MATRIARCH_IN_LEVEL_SINK_DROP = 30;
 
 interface PatrolShark {
   sprite: Container;
@@ -1119,6 +1101,10 @@ export class Game {
   private matriarchEnraged = false;
   private levelCompleted = false;
   private levelCompleteTimer: ReturnType<typeof setTimeout> | null = null;
+  /** The pause between her settling and the first line appearing - see the kill-resolution block
+   *  in step(). Tracked and cleared on reset for the same reason levelCompleteTimer is: a run that
+   *  ends or restarts mid-delay must not fire dialogue for a level that is no longer live. */
+  private matriarchDialogueTimer: ReturnType<typeof setTimeout> | null = null;
   private awaitingNewWaters = false;
   /**
    * The story screen the player is currently crossing, or null on an ordinary level. Set between
@@ -1135,10 +1121,12 @@ export class Game {
   private patrolY = 0;
   /** Fractional sharks owed to the exodus, carried between frames so the flow is framerate-independent. */
   private processionSpawnDebt = 0;
-  private matriarchScene: MatriarchScene | null = null;
-  /** 'done' covers both never-started and finished - either way nothing is left to play or read. */
-  private matriarchScenePhase: 'settling' | 'talking' | 'done' = 'done';
-  private matriarchSettleT = 0;
+  /** The Matriarch's own sunk body, once she has been beaten on a scripted-defeat level. Null the
+   *  rest of the time; see sinkMatriarch() and finishMatriarchDialogue(). */
+  private matriarchRestingSprite: Container | null = null;
+  /** True from the moment a scripted defeat is triggered until its conversation finishes - what
+   *  holds the level open (see the kill-resolution block in step()) and stops it firing twice. */
+  private matriarchDialogueActive = false;
   private conversationLines: ConversationLine[] = [];
   /** -1 before the first line has been shown. */
   private conversationIndex = -1;
@@ -2689,6 +2677,17 @@ export class Game {
       clearTimeout(this.levelCompleteTimer);
       this.levelCompleteTimer = null;
     }
+    if (this.matriarchDialogueTimer) {
+      clearTimeout(this.matriarchDialogueTimer);
+      this.matriarchDialogueTimer = null;
+    }
+    this.matriarchDialogueActive = false;
+    this.matriarchDialogueEl?.classList.add('hidden');
+    if (this.matriarchRestingSprite) {
+      this.entityContainer.removeChild(this.matriarchRestingSprite);
+      this.matriarchRestingSprite.destroy({ children: true });
+      this.matriarchRestingSprite = null;
+    }
     this.levelCompleted = false;
     this.autoFormedForThisPod = false;
     this.sprinting = false;
@@ -3071,39 +3070,43 @@ ${zone.depth}`, 'levelup', duration + 1400);
   }
 
   /**
-   * Endless mode, on a Matriarch level with a scripted defeat (10/20/30 - see STORY_INTERSTITIALS
-   * in levels.ts): she is genuinely beaten rather than fleeing to return. She rolls, dulls and
-   * sinks out of the fight rather than darting sideways and fading - the same wording the Campaign
-   * uses for a real kill (see finishMatriarchWithMegaPod), because that is what this now is. The
-   * screen ahead picks her up already resting on the seabed - see startMatriarchDefeatScene().
+   * Endless mode, on a level with a scripted defeat (MATRIARCH_DEFEAT_LEVELS in levels.ts): she is
+   * genuinely beaten rather than fleeing to return. She rolls, dulls and sinks to the seabed of the
+   * level itself - the same wording the Campaign uses for a real kill (see
+   * finishMatriarchWithMegaPod), because that is what this now is.
+   *
+   * Unlike fleeMatriarch, she does not fade out and get destroyed: she comes to rest and stays,
+   * because the conversation with Echo that follows plays out right where she fell. The kill loop
+   * keeps the reference (matriarchRestingSprite) and cleans it up once that conversation ends - see
+   * startMatriarchDialogue() and finishMatriarchDialogue().
    */
   private sinkMatriarch(shark: Shark): void {
     const sprite = this.sharkSprites.get(shark);
-    if (sprite) {
-      this.disposeSharkLights(sprite);
-      this.sharkSprites.delete(shark);
-      const fish = sprite.getChildByName('fish');
-      if (fish) (fish as unknown as { tint: number }).tint = 0x8a5a5a;
+    if (!sprite) return;
+    this.disposeSharkLights(sprite);
+    this.sharkSprites.delete(shark);
+    const fish = sprite.getChildByName('fish');
+    if (fish) (fish as unknown as { tint: number }).tint = 0x8a5a5a;
 
-      const startY = sprite.y;
-      const startRotation = sprite.rotation;
-      const start = performance.now();
-      const DURATION = 1400;
-      const DRIFT = 220;
-      const animate = (now: number) => {
-        const t = Math.min(1, (now - start) / DURATION);
-        sprite.y = startY + t * DRIFT;
-        sprite.rotation = startRotation + t * 0.9;
-        sprite.alpha = 1 - t;
-        if (t < 1) {
-          requestAnimationFrame(animate);
-        } else {
-          this.entityContainer.removeChild(sprite);
-          sprite.destroy();
-        }
-      };
-      requestAnimationFrame(animate);
-    }
+    const scale = WORLD_SCALE;
+    const startY = sprite.y;
+    const startRotation = sprite.rotation;
+    // Settles near the bottom of the arena rather than at a fixed depth, so a kill high in the
+    // water still reads as falling a believable distance rather than snapping down to one spot.
+    const restY = Math.min(startY + MATRIARCH_IN_LEVEL_SINK_DROP * scale, (SIZE_Y - 6) * scale);
+    const start = performance.now();
+    const DURATION = 1400;
+    const animate = (now: number) => {
+      const t = Math.min(1, (now - start) / DURATION);
+      const eased = 1 - Math.pow(1 - t, 3);
+      sprite.y = startY + (restY - startY) * eased;
+      sprite.rotation = startRotation + t * 0.9;
+      // No fade here - she comes to rest and stays, rather than vanishing.
+      if (t < 1) requestAnimationFrame(animate);
+    };
+    requestAnimationFrame(animate);
+    this.matriarchRestingSprite = sprite;
+
     this.setStatus('The Matriarch is defeated!');
     this.showBanner('Matriarch Defeated!', 'victory', 1800);
   }
@@ -4095,87 +4098,19 @@ ${cleared.name} Zone Liberated
   }
 
   /**
-   * The Matriarch's body, settling onto the seabed at the start of a 'matriarchDefeat' screen.
-   * Drawn at her true in-water size and only lightly darkened, so she stays the clear focus of the
-   * scene rather than reading as background scenery the way the exodus does.
+   * Starts the Matriarch's conversation with Echo, right there in the level she was just beaten
+   * in - not on a separate screen. Called once, from the kill-resolution block in step(), after a
+   * short pause (see matriarchDialogueTimer) so her sink has had a beat to register first.
    */
-  private startMatriarchDefeatScene(story: StoryInterstitial): void {
-    this.stopMatriarchDefeatScene();
-    this.conversationLines = story.conversation ?? [];
+  private startMatriarchDialogue(lines: ConversationLine[]): void {
+    this.conversationLines = lines;
     this.conversationIndex = -1;
-
-    const textureSet = this.sharkTextureSets.greatWhite;
-    const rest = MATRIARCH_REST_SPOTS[story.id] ?? { x: SIZE_X * 0.3, y: SIZE_Y - 24 };
-    const scale = WORLD_SCALE;
-    const restYPx = rest.y * scale + scale / 2;
-
-    if (textureSet) {
-      const look = SHARK_KIND_LOOK.greatWhite;
-      let fish: Container;
-      try {
-        fish = createSharkSprite(textureSet, look.animationSpeed);
-      } catch (err) {
-        console.warn('Matriarch scene sprite failed:', err);
-        fish = new Container();
-      }
-      // Lightly darkened rather than tinted the way the exodus is - she is the one thing on this
-      // screen the player is meant to look straight at, not something glimpsed at a distance.
-      (fish as Sprite).tint = darkenTint(look.tint, 0.15);
-      const base = SHARK_BASE_SCALE * SHARK_KIND_SCALE.greatWhite * (LARGE_SHARK_SIZE_MULTIPLIER * 2);
-      fish.scale.set(base * look.stretchX, base * look.stretchY);
-      // Rolled onto her side rather than upright - lying, not swimming.
-      fish.rotation = -0.14;
-
-      const container = new Container();
-      container.addChild(fish);
-      container.x = rest.x * scale + scale / 2;
-      container.y = restYPx - MATRIARCH_SETTLE_DROP * scale;
-      this.processionContainer.addChild(container);
-      this.matriarchScene = { sprite: container, restYPx };
-    }
-
-    this.matriarchScenePhase = 'settling';
-    this.matriarchSettleT = 0;
-  }
-
-  private stopMatriarchDefeatScene(): void {
-    this.matriarchScene?.sprite.destroy({ children: true });
-    this.matriarchScene = null;
-    this.matriarchScenePhase = 'done';
-    this.conversationLines = [];
-    this.conversationIndex = -1;
-    this.matriarchDialogueEl?.classList.add('hidden');
+    this.showNextConversationLine();
   }
 
   /**
-   * Settles the Matriarch onto the seabed, then holds her there with a slow idle bob for as long
-   * as the conversation is showing. The conversation itself is turn-based - advanced only by the
-   * player tapping the dialogue box, see advanceMatriarchDialogue() - so nothing here drives it
-   * forward on its own; this only ever starts the first line once she has come to rest.
-   */
-  private updateMatriarchDefeatScene(dt: number): void {
-    if (this.matriarchScenePhase === 'done' || !this.matriarchScene) return;
-    const scale = WORLD_SCALE;
-
-    if (this.matriarchScenePhase === 'settling') {
-      this.matriarchSettleT = Math.min(1, this.matriarchSettleT + dt / MATRIARCH_SETTLE_SECONDS);
-      const eased = 1 - Math.pow(1 - this.matriarchSettleT, 3);
-      const startY = this.matriarchScene.restYPx - MATRIARCH_SETTLE_DROP * scale;
-      this.matriarchScene.sprite.y = startY + (this.matriarchScene.restYPx - startY) * eased;
-      if (this.matriarchSettleT >= 1) {
-        this.matriarchScenePhase = 'talking';
-        this.showNextConversationLine();
-      }
-      return;
-    }
-
-    const t = performance.now() / 1000;
-    this.matriarchScene.sprite.y = this.matriarchScene.restYPx + Math.sin(t * 0.6) * MATRIARCH_IDLE_BOB;
-  }
-
-  /**
-   * Shows the next line of the conversation, or ends the scene once the last one has been read.
-   * Called once automatically when the Matriarch finishes settling, and after that only from
+   * Shows the next line of the conversation, or ends it once the last one has been read.
+   * Called once automatically to open the conversation, and after that only from
    * advanceMatriarchDialogue() - the player reads at their own pace, nothing here times out.
    */
   private showNextConversationLine(): void {
@@ -4194,20 +4129,33 @@ ${cleared.name} Zone Liberated
     this.matriarchDialogueEl?.classList.toggle('matriarch-dialogue-echo', line.speaker === 'echo');
   }
 
-  /** The conversation is over: the dialogue box comes down and the descent unlocks. */
+  /**
+   * The conversation is over: the dialogue box comes down, her body is cleared from the water, and
+   * the level completes - which is what was held back since the moment she was beaten, see the
+   * kill-resolution block in step().
+   */
   private finishMatriarchDialogue(): void {
     this.matriarchDialogueEl?.classList.add('hidden');
-    this.matriarchScenePhase = 'done';
-    this.armStoryScreenExit();
+    this.matriarchDialogueActive = false;
+    if (this.matriarchRestingSprite) {
+      this.entityContainer.removeChild(this.matriarchRestingSprite);
+      this.matriarchRestingSprite.destroy({ children: true });
+      this.matriarchRestingSprite = null;
+    }
+    this.levelComplete();
   }
 
   /**
    * Advances the Matriarch's conversation by one line - the dialogue box's own click handler,
-   * wired in main.ts. A no-op outside the 'talking' phase, so a stray click while she is still
-   * settling, or after the scene has ended, does nothing.
+   * wired in main.ts. Guarded on conversationIndex too, not just matriarchDialogueActive: that
+   * flag goes true the instant the level defers completion, before matriarchDialogueTimer's pause
+   * has even elapsed and the box is still hidden - conversationIndex only reaches 0 once a line
+   * has actually been shown, so a click landing in that gap (the box is unclickable while hidden
+   * in real play, but nothing stops a caller from reaching this directly) cannot short-circuit
+   * straight to finishMatriarchDialogue() before the player has read anything.
    */
   advanceMatriarchDialogue(): void {
-    if (this.matriarchScenePhase !== 'talking') return;
+    if (!this.matriarchDialogueActive || this.conversationIndex < 0) return;
     this.showNextConversationLine();
   }
 
@@ -4273,7 +4221,6 @@ ${cleared.name} Zone Liberated
   private stopSpectacle(): void {
     this.stopSharkExodus();
     this.stopTigerPatrol();
-    this.stopMatriarchDefeatScene();
   }
 
   /**
@@ -4453,18 +4400,12 @@ ${cleared.name} Zone Liberated
       this.showBanner(`Stay hidden
 Let the pack pass`, 'storm', 3200);
       this.setStatus('Stay hidden..');
-    } else if (story.spectacle === 'matriarchDefeat') {
-      // No banner here - "Matriarch Defeated!" just played moments ago, in the level behind this
-      // screen (see sinkMatriarch), and a second one stacked on top of it would read as a glitch
-      // rather than a second beat.
-      this.setStatus('The Matriarch falls silent...');
     } else {
       this.setStatus('Swim east to continue');
     }
 
     if (story.spectacle === 'sharkExodus') this.startSharkExodus();
     if (story.spectacle === 'tigerPatrol') this.startTigerPatrol();
-    if (story.spectacle === 'matriarchDefeat') this.startMatriarchDefeatScene(story);
 
     // Most screens are crossable the moment they appear. One that gates its exit stays shut until
     // its spectacle has played out - on 0a, until the pack the player is meant to follow has gone.
@@ -6575,8 +6516,7 @@ Let the pack pass`, 'storm', 3200);
           // or genuinely defeated here, so the check sits above the fork rather than inside either
           // branch of it.
           if (this.currentLevel >= 20) this.tryUnlock('matriarchRematch');
-          const scriptedDefeat = storyInterstitialAfter(this.currentLevel, 'endless')?.spectacle === 'matriarchDefeat';
-          if (scriptedDefeat) this.sinkMatriarch(shark);
+          if (matriarchDefeatConversation(this.currentLevel)) this.sinkMatriarch(shark);
           else this.fleeMatriarch(shark);
         } else {
           this.particles.emit('hit', shark._x * scale + scale / 2, shark._y * scale + scale / 2, 16, { speed: 3, life: 0.6 });
@@ -6592,13 +6532,35 @@ Let the pack pass`, 'storm', 3200);
         }
       }
       this.sharks = survivingSharks;
+      // A scripted Matriarch defeat holds the level open until her conversation has been read.
+      // Both halves matter: the moment she is beaten (she has left `sharks` but the conversation has
+      // not started yet - and she is often the last shark standing, which would otherwise satisfy
+      // the generic "water is empty" branch below first and complete the level over her), and the
+      // whole time the conversation is showing (`sharks` stays empty throughout, so that same
+      // branch would fire on the very next tick).
+      const holdForMatriarchTalk =
+        this.matriarchDialogueActive ||
+        (this.mode === 'endless' &&
+          !!this.matriarch &&
+          !this.sharks.includes(this.matriarch) &&
+          !!matriarchDefeatConversation(this.currentLevel));
       if (matriarchJustDefeated) {
         this.finishMatriarchWithMegaPod();
-      } else if (this.sharks.length === 0 && !this.megamouthHoldsTheLevel() && !this.levelCompleted) {
+      } else if (
+        this.sharks.length === 0 &&
+        !this.megamouthHoldsTheLevel() &&
+        !this.levelCompleted &&
+        !holdForMatriarchTalk
+      ) {
         // A megamouth in the water holds the level open until it has taken its three. It is the
         // only thing here that is not in `sharks` and still has to be dealt with.
         this.levelComplete();
-      } else if (this.matriarch && !this.sharks.includes(this.matriarch) && !this.levelCompleted) {
+      } else if (
+        this.matriarch &&
+        !this.sharks.includes(this.matriarch) &&
+        !this.levelCompleted &&
+        !this.matriarchDialogueActive
+      ) {
         this.sharksKilled += this.sharks.length;
         if (this.sharks.length > 0) this.triggerBigKillFeedback();
         for (const s of this.sharks) {
@@ -6607,7 +6569,21 @@ Let the pack pass`, 'storm', 3200);
         }
         this.sharks = [];
         if (this.mode !== 'endless') this.tryUnlock('matriarchSlayer');
-        this.levelComplete();
+        const conversation = matriarchDefeatConversation(this.currentLevel);
+        if (conversation) {
+          // matriarchDialogueActive goes true immediately, not inside the timeout - it is what
+          // stops this branch re-firing on every tick between now and the delay actually elapsing,
+          // since this.matriarch stays set and absent from this.sharks the whole time.
+          this.matriarchDialogueActive = true;
+          // A short pause before the first line: long enough to read as her settling and the
+          // "Matriarch Defeated!" banner registering, short enough not to feel like a stall.
+          this.matriarchDialogueTimer = setTimeout(() => {
+            this.matriarchDialogueTimer = null;
+            this.startMatriarchDialogue(conversation);
+          }, 900);
+        } else {
+          this.levelComplete();
+        }
       }
     }
 
@@ -6788,7 +6764,6 @@ Let the pack pass`, 'storm', 3200);
     if (this.storyInterstitial) {
       this.updateSharkExodus(dt);
       this.updateTigerPatrol(dt);
-      this.updateMatriarchDefeatScene(dt);
     }
 
     // Nothing arrives on a story screen: no storm, no swarm, no kraken, no megamouth. It is a

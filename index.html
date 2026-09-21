@@ -290,10 +290,12 @@
         <span class="label sublabel">Into the Dark</span>
         <span class="arrow">&#10148;</span>
       </div>
-      <!-- The Matriarch's defeat conversation, over her sunk body on 10a/20a/30a. Docked to the
-           bottom of the water rather than a full-screen card, so the scene stays visible above it
-           while the lines play. The whole box is the tap target - there is nothing else to tap
-           here - wired in main.ts to game.advanceMatriarchDialogue(). -->
+      <!-- The Matriarch's defeat conversation, over her sunk body right in the level she was
+           beaten in (levels 10, 20, 30 - see MATRIARCH_DEFEAT_LEVELS in levels.ts), not on a
+           separate screen afterward. Docked to the bottom of the water rather than a full-screen
+           card, so the scene stays visible above it while the lines play. The whole box is the
+           tap target - there is nothing else to tap here - wired in main.ts to
+           game.advanceMatriarchDialogue(). -->
       <div class="matriarch-dialogue hidden" id="matriarchDialogue">
         <div class="matriarch-dialogue-speaker" id="matriarchDialogueSpeaker"></div>
         <div class="matriarch-dialogue-text" id="matriarchDialogueText"></div>
